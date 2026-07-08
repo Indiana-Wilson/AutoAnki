@@ -1,0 +1,4 @@
+output/output.apkg
+.idea/
+.venv/
+__pycache__/
