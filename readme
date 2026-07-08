@@ -1,0 +1,25 @@
+Welcome to the AutoAnki repository!
+
+The purpose of this project is to automate the creation of Anki cards using the OpenAI API, as well as the
+genanki python package.
+
+At the moment, this only automates the creation of English vocabulary cards. However, it would be fairly easy
+to modify which cards are created by modifying the prompt, as well as the card and processing code.
+
+Here's what everything does:
+
+input/words: Contains the words that ChatGPT will create cards for. At the moment, you modify this manually.
+
+input/prompt: The prompt that will be given to ChatGPT every time. The words will be appended at the end of this prompt.
+
+process_text.py: The Python script that automates creating the card decks. Relies on the OPENAI_API_KEY environment
+variable being configured to a valid OpenAI API key.
+
+templates.py: Contains the templates for genanki cards. Other modules will use this templates to create cards,
+as well as package them into a deck.
+
+output/ directory: Whenever a card deck is created, the deck will be saved here as "output.apkg". The most recent
+ChatGPT response will be saved as response.json, and response_log will save all of the ChatGPT responses, with
+"\n<break>\n" as a separator.
+
+requirements.txt: The dependencies of the virtual machine (venv).
