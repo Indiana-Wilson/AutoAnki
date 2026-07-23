@@ -3,23 +3,100 @@ Welcome to the AutoAnki repository!
 The purpose of this project is to automate the creation of Anki cards using the OpenAI API, as well as the
 genanki python package.
 
-At the moment, this only automates the creation of English vocabulary cards. However, it would be fairly easy
-to modify which cards are created by modifying the prompt, as well as the card and processing code.
-
 Here's what everything does:
 
-input/words: Contains the words that ChatGPT will create cards for. At the moment, you modify this manually.
+input/words: Contains input used by the command-line generation script.
 
-input/prompt: The prompt that will be given to ChatGPT every time. The words will be appended at the end of this prompt.
+input/prompts/: Contains every prompt discovered automatically and shown in
+the Pipelines tab. The built-in prompts are english_vocab and
+classical_chinese.
 
-process_text.py: The Python script that automates creating the card decks. Relies on the OPENAI_API_KEY environment
-variable being configured to a valid OpenAI API key.
+src/process_text.py: Calls the OpenAI API and converts JSON responses into
+genanki packages. API responses use a strict JSON schema and are validated
+again locally before any package is written.
 
-templates.py: Contains the templates for genanki cards. Other modules will use this templates to create cards,
-as well as package them into a deck.
+src/templates.py: Contains the registered genanki card types. English and
+Classical Chinese each support a context-sentence card, word-to-meaning card,
+and meaning-to-word card.
 
-output/ directory: Whenever a card deck is created, the deck will be saved here as "output.apkg". The most recent
-ChatGPT response will be saved as response.json, and response_log will save all of the ChatGPT responses, with
-"\n<break>\n" as a separator.
+output/: Stores generated responses and packages at output/response.json and
+output/output.apkg.
 
-requirements.txt: The dependencies of the virtual machine (venv).
+Running the user interface:
+
+1. From the repository root, run:
+
+   .venv/bin/python src/gui.py
+
+2. Enter words or notes in the scrolling text box and click
+   "Generate and import".
+
+Configuring card generation:
+
+Open the Card setup tab. Select:
+
+1. The language tab matching the input.
+2. One or more card outputs inside that language tab.
+3. A target deck from Anki.
+
+AutoAnki chooses the cheapest sufficient prompt automatically. If only the
+word-to-meaning and/or meaning-to-word outputs are selected, the response asks
+only for the word and meaning. If the context-sentence output is selected, the
+richer prompt is used once and its response is reused for every selected card
+output. A generation run therefore makes exactly one API request regardless
+of how many outputs are selected.
+
+Target-deck choices are refreshed automatically while Anki is running, and
+every setting is saved automatically. Settings are persisted in the current
+user's AutoAnki configuration directory.
+
+genanki identities:
+
+Every card type has a unique model ID generated once and hard-coded in
+src/templates.py. The generated temporary deck also retains its stable deck
+ID, and generated notes use stable GUIDs.
+
+On the first generation, AutoAnki asks for an OpenAI API key. The key is
+entered through a masked field and stored outside the repository in the
+current user's configuration directory. On Linux, the default location is
+~/.config/autoanki/openai_api_key. The directory and file use owner-only
+permissions. Use the "API key" menu to replace or forget the saved key.
+
+OPENAI_API_KEY can still be set as an environment variable and takes
+precedence over the saved key.
+
+Opening the interface does not call the OpenAI API. Requests are made only
+after "Generate and import" is clicked.
+
+If generation fails or OpenAI returns an incomplete/refused response, the GUI
+shows the failure and does not retry automatically. A new paid request is made
+only if the user explicitly chooses Retry; automatic retries in the OpenAI
+client are disabled. Anki import failures retain the generated package and do
+not prompt for a paid regeneration.
+
+Automatic Anki import:
+
+AutoAnki uses the local AnkiConnect API and does not control the mouse or
+keyboard. Install AnkiConnect once in Anki:
+
+1. Open Tools > Add-ons > Get Add-ons.
+2. Enter the add-on code 2055492159.
+3. Restart Anki.
+
+After generating a package, AutoAnki:
+
+1. Starts Anki if AnkiConnect is not already available.
+   On Linux/X11, a newly launched Anki window is minimized automatically
+   without controlling the mouse or keyboard.
+2. Waits for Anki, the active profile, and any automatic startup sync to
+   finish.
+3. Imports each generated package.
+4. Moves every package's cards into the selected target deck.
+5. Verifies each temporary deck is empty, then deletes it.
+
+Every selected target deck must already exist.
+If Anki is installed under a non-standard command, set
+AUTOANKI_ANKI_COMMAND to the command used to start it. An optional AnkiConnect
+API key can be supplied through ANKICONNECT_API_KEY. AutoAnki does not trigger
+synchronization itself; Anki's automatic synchronization settings remain in
+control.
