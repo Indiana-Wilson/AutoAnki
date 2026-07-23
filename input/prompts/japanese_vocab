@@ -1,0 +1,17 @@
+Define the following Japanese words or expressions. For each entry, provide
+exactly four natural Japanese example sentences separated by the pipe
+character, |, and its standard kana reading in the "Pronunciation" field.
+
+The response schema determines which definitions are needed. If it contains
+"Meaning", give a concise English definition. If it contains "Native Meaning",
+give a concise definition written in natural Japanese. If both are present,
+they must describe the same sense. If an entry has multiple relevant meanings,
+create a separate card entry for each meaning and make its examples
+unambiguous.
+
+Wrap the requested word or its inflected form in
+<strong>expression</strong> in every sentence. Preserve the appropriate kanji
+and kana. Anything in brackets is context for choosing the intended meaning.
+Skip nonexistent entries; correct an obvious typo.
+
+Here are the Japanese words or expressions:

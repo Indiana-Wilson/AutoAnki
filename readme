@@ -8,16 +8,18 @@ Here's what everything does:
 input/words: Contains input used by the command-line generation script.
 
 input/prompts/: Contains every prompt discovered automatically and shown in
-the Pipelines tab. The built-in prompts are english_vocab and
-classical_chinese.
+the Card setup tab. Built-in detailed and simple prompts are provided for
+English, Classical Chinese, French, Japanese, and Latin.
 
 src/process_text.py: Calls the OpenAI API and converts JSON responses into
 genanki packages. API responses use a strict JSON schema and are validated
 again locally before any package is written.
 
-src/templates.py: Contains the registered genanki card types. English and
-Classical Chinese each support a context-sentence card, word-to-meaning card,
-and meaning-to-word card.
+src/templates.py: Contains the registered genanki card types. English supports
+context-sentence, word-to-definition, and definition-to-word cards. Classical
+Chinese, French, and Japanese provide those same three directions with either
+an English definition or a definition written in the language itself. Latin
+provides the same six outputs.
 
 output/: Stores generated responses and packages at output/response.json and
 output/output.apkg.
@@ -31,30 +33,55 @@ Running the user interface:
 2. Enter words or notes in the scrolling text box and click
    "Generate and import".
 
+The interface uses screen-aware sizing and DPI scaling, rounded card surfaces
+and controls, a non-tiled scrollbar, transient autosave feedback, and explicit
+busy/progress states. Clicking a non-interactive background clears transient
+focus and text highlighting. AutoAnki prevents the window from closing while
+a paid response is still being generated or imported.
+
 Configuring card generation:
 
 Open the Card setup tab. Select:
 
 1. The language tab matching the input.
 2. One or more card outputs inside that language tab.
-3. A target deck from Anki.
+3. That language's target deck from inside its tab, or enable separate target
+   decks and choose one beside each selected card output.
 
-AutoAnki chooses the cheapest sufficient prompt automatically. If only the
-word-to-meaning and/or meaning-to-word outputs are selected, the response asks
-only for the word and meaning. If the context-sentence output is selected, the
-richer prompt is used once and its response is reused for every selected card
-output. A generation run therefore makes exactly one API request regardless
-of how many outputs are selected.
+Each language tab retains its own card selections, shared target deck,
+separate-deck mode, and per-card target decks. Switching languages does not
+replace the preferences saved for the other language tabs.
 
-Target-deck choices are refreshed automatically while Anki is running, and
-every setting is saved automatically. Settings are persisted in the current
-user's AutoAnki configuration directory.
+AutoAnki chooses the cheapest sufficient prompt automatically. If only simple
+word/definition outputs are selected, the response asks only for the word and
+the selected English and/or native-language definitions. If any
+context-sentence output is selected, the richer prompt adds examples and
+pronunciation once. The same response is reused for every selected card output,
+so a generation run makes exactly one API request regardless of how many
+outputs are selected.
+
+Opening Card setup or a target-deck selector connects to Anki, waits for its
+collection to become available, and refreshes the choices. The most recently
+seen deck list is cached for the next launch, and the editable selectors still
+allow an exact deck name to be entered if Anki is unavailable. Every setting
+is saved automatically in the current user's AutoAnki configuration directory.
+
+Editing prompts:
+
+The Advanced tab lists every file discovered in input/prompts. Prompts open
+in read-only mode. Tick "Enable prompt editing" to unlock the text editor,
+then use "Save prompt" to apply an atomic update. Empty prompts and paths
+outside input/prompts are rejected. AutoAnki asks whether to save, discard, or
+cancel if unsaved changes exist while switching prompts, disabling editing,
+or closing the application.
 
 genanki identities:
 
 Every card type has a unique model ID generated once and hard-coded in
 src/templates.py. The generated temporary deck also retains its stable deck
-ID, and generated notes use stable GUIDs.
+ID, and generated notes use stable GUIDs. All generated note types share a
+22px `.card` styling rule while retaining their individual front/back HTML
+and JavaScript.
 
 On the first generation, AutoAnki asks for an OpenAI API key. The key is
 entered through a masked field and stored outside the repository in the
@@ -91,7 +118,8 @@ After generating a package, AutoAnki:
 2. Waits for Anki, the active profile, and any automatic startup sync to
    finish.
 3. Imports each generated package.
-4. Moves every package's cards into the selected target deck.
+4. Moves every package's cards into the selected target deck, or routes each
+   selected card type to its separate target deck when that option is enabled.
 5. Verifies each temporary deck is empty, then deletes it.
 
 Every selected target deck must already exist.

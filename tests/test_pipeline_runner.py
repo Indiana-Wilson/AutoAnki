@@ -33,6 +33,24 @@ class PipelineRunnerTests(unittest.TestCase):
         (prompt_directory / "classical_chinese_simple").write_text(
             "simple Classical Chinese prompt",
             encoding="utf-8")
+        (prompt_directory / "french_vocab").write_text(
+            "French prompt",
+            encoding="utf-8")
+        (prompt_directory / "french_vocab_simple").write_text(
+            "simple French prompt",
+            encoding="utf-8")
+        (prompt_directory / "japanese_vocab").write_text(
+            "Japanese prompt",
+            encoding="utf-8")
+        (prompt_directory / "japanese_vocab_simple").write_text(
+            "simple Japanese prompt",
+            encoding="utf-8")
+        (prompt_directory / "latin_vocab").write_text(
+            "Latin prompt",
+            encoding="utf-8")
+        (prompt_directory / "latin_vocab_simple").write_text(
+            "simple Latin prompt",
+            encoding="utf-8")
         return project_root
 
     def test_two_pipelines_generate_and_import_independently(self):
@@ -191,6 +209,125 @@ class PipelineRunnerTests(unittest.TestCase):
             (
                 "english_word_to_meaning",
                 "english_meaning_to_word"))
+
+    def test_selected_outputs_can_be_imported_into_separate_decks(self):
+        pipeline = replace(
+            pipeline_store.create_pipeline(),
+            card_type_keys=(
+                templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.key,
+                templates.ENGLISH_MEANING_TO_WORD_CARD_TYPE.key),
+            separate_target_decks=True,
+            card_type_target_decks=(
+                (
+                    templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.key,
+                    "English::Recognition"),
+                (
+                    templates.ENGLISH_MEANING_TO_WORD_CARD_TYPE.key,
+                    "English::Production"),
+            ))
+        generator = MagicMock(
+            side_effect=lambda _words, **kwargs: kwargs["output_path"])
+        importer = MagicMock(return_value=(
+            anki_integration.AnkiImportResult(
+                cards_moved=2,
+                target_deck="Multiple decks")))
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            project_root = self._project_with_prompts(temporary_directory)
+            pipeline_runner.run_pipelines(
+                "astrolabe",
+                (pipeline,),
+                project_root=project_root,
+                generator=generator,
+                importer=importer)
+
+        generator.assert_called_once()
+        importer.assert_called_once_with(
+            generator.call_args.kwargs["output_path"],
+            target_deck=pipeline.target_deck,
+            target_decks=(
+                (
+                    templates
+                    .ENGLISH_WORD_TO_MEANING_CARD_TYPE.model.name,
+                    "English::Recognition"),
+                (
+                    templates
+                    .ENGLISH_MEANING_TO_WORD_CARD_TYPE.model.name,
+                    "English::Production"),
+            ),
+            source_deck=pipeline.generated_deck_name,
+            client=None)
+
+    def test_mixed_japanese_definitions_share_one_detailed_request(self):
+        pipeline = replace(
+            pipeline_store.create_pipeline(),
+            language_key="japanese",
+            card_type_keys=(
+                templates.JAPANESE_VOCABULARY_CARD_TYPE.key,
+                templates.JAPANESE_WORD_TO_NATIVE_MEANING_CARD_TYPE.key),
+            target_deck="Retained Information::Japanese")
+        generator = MagicMock(
+            side_effect=lambda _words, **kwargs: kwargs["output_path"])
+        importer = MagicMock(return_value=(
+            anki_integration.AnkiImportResult(
+                cards_moved=2,
+                target_deck=pipeline.target_deck)))
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            project_root = self._project_with_prompts(temporary_directory)
+            summary = pipeline_runner.run_pipelines(
+                "勉強",
+                (pipeline,),
+                project_root=project_root,
+                generator=generator,
+                importer=importer)
+
+        self.assertEqual(len(summary.successes), 1)
+        generator.assert_called_once()
+        generation = generator.call_args.kwargs
+        self.assertEqual(
+            generation["prompt_path"].name,
+            "japanese_vocab")
+        self.assertEqual(
+            generation["card_type_keys"],
+            (
+                "japanese_vocabulary",
+                "japanese_word_to_native_meaning"))
+
+    def test_latin_native_outputs_use_one_minimal_request(self):
+        pipeline = replace(
+            pipeline_store.create_pipeline(),
+            language_key="latin",
+            card_type_keys=(
+                templates.LATIN_WORD_TO_NATIVE_MEANING_CARD_TYPE.key,
+                templates.LATIN_NATIVE_MEANING_TO_WORD_CARD_TYPE.key),
+            target_deck="Retained Information::Latin")
+        generator = MagicMock(
+            side_effect=lambda _words, **kwargs: kwargs["output_path"])
+        importer = MagicMock(return_value=(
+            anki_integration.AnkiImportResult(
+                cards_moved=2,
+                target_deck=pipeline.target_deck)))
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            project_root = self._project_with_prompts(temporary_directory)
+            summary = pipeline_runner.run_pipelines(
+                "sapientia",
+                (pipeline,),
+                project_root=project_root,
+                generator=generator,
+                importer=importer)
+
+        self.assertEqual(len(summary.successes), 1)
+        generator.assert_called_once()
+        self.assertEqual(
+            generator.call_args.kwargs["prompt_path"].name,
+            "latin_vocab_simple")
+        self.assertEqual(
+            generator.call_args.kwargs["card_type_keys"],
+            (
+                "latin_word_to_native_meaning",
+                "latin_native_meaning_to_word"))
 
     def test_default_pipeline_keeps_legacy_output_paths(self):
         paths = pipeline_runner.get_pipeline_output_paths(

@@ -1,9 +1,13 @@
 Define the following Classical Chinese words or expressions.
 
-Give a concise English meaning. If an expression has multiple relevant
-meanings, create a separate card entry for each meaning. Preserve traditional
-Chinese characters unless the input explicitly uses or requests a different
-form. Anything in brackets is context for choosing the intended meaning. Skip
-nonexistent entries; correct an obvious typo.
+The response schema determines which definitions are needed. If it contains
+"Meaning", give a concise English definition. If it contains "Native Meaning",
+give a concise definition in Chinese using traditional characters. If both are
+present, they must describe the same sense. If an expression has multiple
+relevant meanings, create a separate card entry for each meaning.
+
+Preserve traditional Chinese characters unless the input explicitly uses or
+requests a different form. Anything in brackets is context for choosing the
+intended meaning. Skip nonexistent entries; correct an obvious typo.
 
 Here are the Classical Chinese words or expressions:

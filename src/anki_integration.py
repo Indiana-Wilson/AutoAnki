@@ -41,6 +41,7 @@ class AnkiConnectResponseError(AnkiIntegrationError):
 class AnkiImportResult:
     cards_moved: int
     target_deck: str
+    target_decks: tuple[str, ...] = ()
 
 
 class AnkiConnectClient:
@@ -270,15 +271,22 @@ def _deck_search_query(deck_name):
     return f'deck:"{escaped_name}"'
 
 
-def move_all_cards(
+def _note_type_search_query(note_type_name):
+    escaped_name = (
+        note_type_name
+        .replace("\\", "\\\\")
+        .replace('"', '\\"'))
+    return f'note:"{escaped_name}"'
+
+
+def _move_matching_cards(
         client,
         *,
-        source_deck,
+        source_query,
         target_deck,
-        retry_count=MOVE_RETRY_COUNT,
-        retry_delay=MOVE_RETRY_DELAY_SECONDS,
-        sleep=time.sleep):
-    source_query = _deck_search_query(source_deck)
+        retry_count,
+        retry_delay,
+        sleep):
     remaining_card_ids = client.invoke(
         "findCards",
         query=source_query)
@@ -305,10 +313,51 @@ def move_all_cards(
         f'"{target_deck}". The temporary deck was kept to prevent card loss.')
 
 
+def move_all_cards(
+        client,
+        *,
+        source_deck,
+        target_deck,
+        retry_count=MOVE_RETRY_COUNT,
+        retry_delay=MOVE_RETRY_DELAY_SECONDS,
+        sleep=time.sleep):
+    source_query = _deck_search_query(source_deck)
+    return _move_matching_cards(
+        client,
+        source_query=source_query,
+        target_deck=target_deck,
+        retry_count=retry_count,
+        retry_delay=retry_delay,
+        sleep=sleep)
+
+
+def move_cards_by_note_type(
+        client,
+        *,
+        source_deck,
+        note_type_name,
+        target_deck,
+        retry_count=MOVE_RETRY_COUNT,
+        retry_delay=MOVE_RETRY_DELAY_SECONDS,
+        sleep=time.sleep):
+    source_query = " ".join((
+        _deck_search_query(source_deck),
+        _note_type_search_query(note_type_name),
+    ))
+    return _move_matching_cards(
+        client,
+        source_query=source_query,
+        target_deck=target_deck,
+        retry_count=retry_count,
+        retry_delay=retry_delay,
+        sleep=sleep)
+
+
 def import_generated_deck(
         package_path,
         *,
         target_deck=TARGET_DECK_NAME,
+        target_decks=None,
         source_deck=templates.DECK_NAME,
         client=None,
         ensure_running=ensure_anki_running,
@@ -317,7 +366,21 @@ def import_generated_deck(
     if not package_path.is_file():
         raise AnkiIntegrationError(
             f"The generated Anki package does not exist: {package_path}")
-    if target_deck == source_deck:
+    target_decks = (
+        tuple(target_decks.items())
+        if isinstance(target_decks, dict)
+        else tuple(target_decks or ()))
+    destination_decks = tuple(dict.fromkeys(
+        (
+            routed_deck
+            for _note_type, routed_deck in target_decks
+        )
+        if target_decks
+        else (target_deck,)))
+    if not destination_decks:
+        raise AnkiIntegrationError(
+            "Select at least one destination deck.")
+    if source_deck in destination_decks:
         raise AnkiIntegrationError(
             "The destination deck must differ from the generated deck.")
 
@@ -325,19 +388,47 @@ def import_generated_deck(
     ensure_running(client)
 
     deck_names = wait_until_ready(client)
-    if target_deck not in deck_names:
+    missing_decks = [
+        deck_name
+        for deck_name in destination_decks
+        if deck_name not in deck_names
+    ]
+    if missing_decks:
+        if len(missing_decks) == 1:
+            raise AnkiIntegrationError(
+                f'The destination deck "{missing_decks[0]}" '
+                "does not exist in Anki.")
         raise AnkiIntegrationError(
-            f'The destination deck "{target_deck}" does not exist in Anki.')
+            "The following destination decks do not exist in Anki: "
+            + ", ".join(f'"{deck_name}"' for deck_name in missing_decks))
 
     imported = client.invoke("importPackage", path=str(package_path))
     if imported is not True:
         raise AnkiIntegrationError(
             "AnkiConnect reported that package import failed.")
 
-    cards_moved = move_all_cards(
-        client,
-        source_deck=source_deck,
-        target_deck=target_deck)
+    if target_decks:
+        cards_moved = sum(
+            move_cards_by_note_type(
+                client,
+                source_deck=source_deck,
+                note_type_name=note_type_name,
+                target_deck=routed_deck)
+            for note_type_name, routed_deck in target_decks
+        )
+        remaining_card_ids = client.invoke(
+            "findCards",
+            query=_deck_search_query(source_deck))
+        if remaining_card_ids:
+            raise AnkiIntegrationError(
+                f"{len(remaining_card_ids)} generated cards did not match "
+                "a configured card type. The temporary deck was kept to "
+                "prevent card loss.")
+    else:
+        cards_moved = move_all_cards(
+            client,
+            source_deck=source_deck,
+            target_deck=target_deck)
 
     if source_deck in client.invoke("deckNames"):
         client.invoke(
@@ -347,4 +438,8 @@ def import_generated_deck(
 
     return AnkiImportResult(
         cards_moved=cards_moved,
-        target_deck=target_deck)
+        target_deck=(
+            destination_decks[0]
+            if len(destination_decks) == 1
+            else "Multiple decks"),
+        target_decks=destination_decks)

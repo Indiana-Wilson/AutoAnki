@@ -52,10 +52,20 @@ def build_response_format(card_types):
         field_name
         for card_type in card_types
         for field_name in card_type.field_names))
-    language_name = (
-        "classical_chinese"
-        if "Classical Chinese" in field_names
-        else "english")
+    language_fields = (
+        ("Classical Chinese", "classical_chinese"),
+        ("French", "french"),
+        ("Japanese", "japanese"),
+        ("Latin", "latin"),
+        ("Word", "english"),
+    )
+    language_name = next(
+        (
+            language_name
+            for field_name, language_name in language_fields
+            if field_name in field_names
+        ),
+        "vocabulary")
     detail_name = "detailed" if "Sentences" in field_names else "simple"
 
     card_schema = {

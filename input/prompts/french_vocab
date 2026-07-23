@@ -1,0 +1,16 @@
+Define the following French words or expressions. For each entry, provide
+exactly four natural French example sentences separated by the pipe character,
+|, and its IPA pronunciation.
+
+The response schema determines which definitions are needed. If it contains
+"Meaning", give a concise English definition. If it contains "Native Meaning",
+give a concise definition written in French. If both are present, they must
+describe the same sense. If an entry has multiple relevant meanings, create a
+separate card entry for each meaning and make its examples unambiguous.
+
+Wrap the requested word or expression in <strong>expression</strong> in every
+sentence. Preserve French accents and spelling. Anything in brackets is context
+for choosing the intended meaning. Skip nonexistent entries; correct an obvious
+typo.
+
+Here are the French words or expressions:

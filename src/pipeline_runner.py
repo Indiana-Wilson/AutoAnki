@@ -137,11 +137,17 @@ def run_pipelines(
                 stage="importing"))
 
         try:
+            import_arguments = {
+                "target_deck": pipeline.target_deck,
+                "source_deck": pipeline.generated_deck_name,
+                "client": anki_client,
+            }
+            if pipeline.separate_target_decks:
+                import_arguments["target_decks"] = (
+                    pipeline_store.get_model_target_decks(pipeline))
             import_result = importer(
                 package_path,
-                target_deck=pipeline.target_deck,
-                source_deck=pipeline.generated_deck_name,
-                client=anki_client)
+                **import_arguments)
         except Exception as error:
             failures.append(PipelineFailure(
                 pipeline=pipeline,

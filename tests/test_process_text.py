@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import genanki
 
@@ -150,6 +150,43 @@ class FetchResponseTests(unittest.TestCase):
             {"Word", "Meaning"})
         self.assertFalse(card_schema["additionalProperties"])
 
+    def test_mixed_french_definitions_request_only_shared_required_fields(self):
+        response_format = process_text.build_response_format((
+            templates.FRENCH_WORD_TO_MEANING_CARD_TYPE,
+            templates.FRENCH_WORD_TO_NATIVE_MEANING_CARD_TYPE,
+        ))
+        card_schema = (
+            response_format["schema"]["properties"]["cards"]["items"])
+
+        self.assertEqual(
+            response_format["name"],
+            "autoanki_french_simple_cards")
+        self.assertEqual(
+            card_schema["required"],
+            ["French", "Meaning", "Native Meaning"])
+        self.assertEqual(
+            set(card_schema["properties"]),
+            {"French", "Meaning", "Native Meaning"})
+
+    def test_latin_native_detail_uses_latin_schema_name_and_fields(self):
+        response_format = process_text.build_response_format((
+            templates.LATIN_NATIVE_VOCABULARY_CARD_TYPE,
+        ))
+        card_schema = (
+            response_format["schema"]["properties"]["cards"]["items"])
+
+        self.assertEqual(
+            response_format["name"],
+            "autoanki_latin_detailed_cards")
+        self.assertEqual(
+            card_schema["required"],
+            [
+                "Latin",
+                "Sentences",
+                "Native Meaning",
+                "Pronunciation",
+            ])
+
     def test_fetch_response_rejects_refusal_without_writing_files(self):
         client = MagicMock()
         response = client.responses.create.return_value
@@ -223,6 +260,135 @@ class FetchResponseTests(unittest.TestCase):
 
 
 class ProcessJsonTests(unittest.TestCase):
+    def test_latin_response_creates_english_and_native_context_cards(self):
+        text = json.dumps({"cards": [{
+            "Latin": "sapientia",
+            "Sentences": (
+                "<strong>Sapientia</strong> ducem bonum facit.|"
+                "Sine <strong>sapientia</strong> potentia periculosa est.|"
+                "Philosophus <strong>sapientiam</strong> quaerit.|"
+                "<strong>Sapientia</strong> aetate saepe crescit."),
+            "Meaning": "Wisdom; sound knowledge and judgement.",
+            "Native Meaning": (
+                "Scientia rerum cum iudicio recto coniuncta."),
+            "Pronunciation": "/sa.piˈen.ti.a/",
+        }]})
+        deck = MagicMock()
+        package = MagicMock()
+        card_types = (
+            templates.LATIN_VOCABULARY_CARD_TYPE,
+            templates.LATIN_NATIVE_VOCABULARY_CARD_TYPE,
+        )
+
+        with (
+                patch.object(process_text.genanki, "Note") as note_class,
+                patch.object(
+                    process_text.genanki,
+                    "Package",
+                    return_value=package)):
+            count = process_text.process_json_text(
+                text,
+                deck=deck,
+                output_path="/tmp/latin.apkg",
+                card_types=card_types,
+                guid_seed="latin-pipeline")
+
+        self.assertEqual(count, 2)
+        self.assertEqual(
+            [call.kwargs["model"] for call in note_class.call_args_list],
+            [
+                templates.latin_vocabulary_model,
+                templates.latin_native_vocabulary_model,
+            ])
+        self.assertEqual(
+            note_class.call_args_list[1].kwargs["fields"][2],
+            "Scientia rerum cum iudicio recto coniuncta.")
+
+    def test_french_response_creates_all_definition_directions(self):
+        text = json.dumps({"cards": [{
+            "French": "épanouir",
+            "Sentences": (
+                "La fleur va <strong>épanouir</strong> ses pétales.|"
+                "Ce travail l'aide à <strong>épanouir</strong> son talent.|"
+                "Le soleil fait <strong>épanouir</strong> le jardin.|"
+                "Elle veut <strong>épanouir</strong> sa créativité."),
+            "Meaning": "To cause to flourish or develop fully.",
+            "Native Meaning": (
+                "Faire se développer pleinement ou devenir florissant."),
+            "Pronunciation": "/e.pa.nwiʁ/",
+        }]})
+        deck = MagicMock()
+        package = MagicMock()
+        card_types = (
+            templates.FRENCH_VOCABULARY_CARD_TYPE,
+            templates.FRENCH_WORD_TO_MEANING_CARD_TYPE,
+            templates.FRENCH_MEANING_TO_WORD_CARD_TYPE,
+            templates.FRENCH_NATIVE_VOCABULARY_CARD_TYPE,
+            templates.FRENCH_WORD_TO_NATIVE_MEANING_CARD_TYPE,
+            templates.FRENCH_NATIVE_MEANING_TO_WORD_CARD_TYPE,
+        )
+
+        with (
+                patch.object(process_text.genanki, "Note") as note_class,
+                patch.object(
+                    process_text.genanki,
+                    "Package",
+                    return_value=package)):
+            count = process_text.process_json_text(
+                text,
+                deck=deck,
+                output_path="/tmp/french.apkg",
+                card_types=card_types,
+                guid_seed="french-pipeline")
+
+        self.assertEqual(count, 6)
+        self.assertEqual(note_class.call_count, 6)
+        self.assertEqual(
+            [call.kwargs["model"] for call in note_class.call_args_list],
+            [card_type.model for card_type in card_types])
+        self.assertEqual(
+            note_class.call_args_list[4].kwargs["fields"],
+            [
+                "épanouir",
+                "Faire se développer pleinement ou devenir florissant.",
+            ])
+
+    def test_japanese_native_definition_creates_expected_note(self):
+        text = json.dumps({"cards": [{
+            "Japanese": "勉強",
+            "Native Meaning": "知識や技能を身につけるために学ぶこと。",
+        }]})
+        deck = MagicMock()
+        package = MagicMock()
+
+        with (
+                patch.object(process_text.genanki, "Note") as note_class,
+                patch.object(
+                    process_text.genanki,
+                    "Package",
+                    return_value=package)):
+            process_text.process_json_text(
+                text,
+                deck=deck,
+                output_path="/tmp/japanese.apkg",
+                card_type=(
+                    templates
+                    .JAPANESE_NATIVE_MEANING_TO_WORD_CARD_TYPE),
+                guid_seed="japanese-pipeline")
+
+        note_class.assert_called_once_with(
+            model=templates.japanese_native_meaning_to_word_model,
+            fields=[
+                "勉強",
+                "知識や技能を身につけるために学ぶこと。",
+            ],
+            guid=process_text.genanki.guid_for(
+                "autoanki",
+                "japanese-pipeline",
+                "japanese_native_meaning_to_word",
+                "勉強",
+                "知識や技能を身につけるために学ぶこと。"))
+
     def test_one_detailed_response_creates_multiple_selected_card_types(self):
         text = json.dumps([{
             "Word": "astrolabe",
@@ -558,6 +724,176 @@ class EntrypointTests(unittest.TestCase):
 
 
 class GuiWorkerTests(unittest.TestCase):
+    def test_wheel_events_are_normalized_across_tk_platforms(self):
+        self.assertEqual(
+            gui.wheel_scroll_amount(MagicMock(num=4, state=0)),
+            -1)
+        self.assertEqual(
+            gui.wheel_scroll_amount(MagicMock(num=5, state=0)),
+            1)
+        self.assertEqual(
+            gui.wheel_scroll_amount(
+                MagicMock(num=None, delta=120)),
+            -1)
+
+    def test_text_selection_is_cleared_when_focus_moves_away(self):
+        widget = MagicMock()
+        event = MagicMock(widget=widget)
+
+        gui.AutoAnkiApp._clear_text_selection(event)
+
+        widget.tag_remove.assert_called_once_with(
+            gui.tk.SEL,
+            "1.0",
+            gui.tk.END)
+
+    def test_entry_selection_is_cleared_when_focus_moves_away(self):
+        widget = MagicMock()
+        event = MagicMock(widget=widget)
+
+        gui.AutoAnkiApp._clear_entry_selection(event)
+
+        widget.selection_clear.assert_called_once_with()
+
+    def test_background_click_clears_focus_but_text_click_does_not(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.root = MagicMock()
+        background = MagicMock()
+        background.winfo_class.return_value = "TFrame"
+        text = MagicMock()
+        text.winfo_class.return_value = "Text"
+
+        app._clear_focus_on_background_click(
+            MagicMock(widget=background))
+        app._clear_focus_on_background_click(
+            MagicMock(widget=text))
+
+        app.root.focus_set.assert_called_once_with()
+
+    def test_busy_state_updates_action_and_progress_feedback(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.generate_button = MagicMock()
+        app.api_key_button = MagicMock()
+        app.generation_progress = MagicMock()
+
+        app._set_generation_busy(True)
+
+        self.assertTrue(app.generation_in_progress)
+        app.generate_button.configure.assert_called_once_with(
+            state=gui.tk.DISABLED,
+            text="Generating and importing…")
+        app.api_key_button.configure.assert_called_once_with(
+            state=gui.tk.DISABLED)
+        app.generation_progress.start.assert_called_once_with(12)
+
+    def test_close_waits_for_active_generation(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.root = MagicMock()
+        app.generation_in_progress = True
+        app.save_pipeline_rows = MagicMock()
+
+        with patch.object(gui.messagebox, "showinfo") as showinfo:
+            app.close()
+
+        showinfo.assert_called_once()
+        app.save_pipeline_rows.assert_not_called()
+        app.root.destroy.assert_not_called()
+
+    def test_prompt_editor_only_unlocks_after_checkbox_is_enabled(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.prompt_editing_enabled = MagicMock()
+        app.prompt_editing_enabled.get.return_value = True
+        app.prompt_text = MagicMock()
+        app.prompt_dirty = False
+        app.prompt_status = MagicMock()
+        app.save_prompt_button = MagicMock()
+
+        app._toggle_prompt_editing()
+
+        app.prompt_text.configure.assert_called_once_with(
+            state=gui.tk.NORMAL,
+            foreground=app.TEXT_PRIMARY)
+        app.prompt_text.focus_set.assert_called_once_with()
+        app.save_prompt_button.configure.assert_called_once_with(
+            state=gui.tk.DISABLED)
+
+    def test_prompt_selector_uses_concrete_combobox_index(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.current_prompt_key = "english_vocab"
+        app.prompt_options = (
+            gui.pipeline_store.PromptOption(
+                key="classical_chinese",
+                name="Classical Chinese",
+                path=Path("/prompts/classical_chinese")),
+            gui.pipeline_store.PromptOption(
+                key="english_vocab",
+                name="English Vocab",
+                path=Path("/prompts/english_vocab")),
+        )
+        app.prompt_selector = MagicMock()
+        app.prompt_selector_value = MagicMock()
+
+        app._refresh_prompt_selector_display()
+
+        app.prompt_selector.current.assert_called_once_with(1)
+        app.prompt_selector_value.set.assert_not_called()
+
+    def test_disabling_prompt_editing_can_save_before_locking(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.prompt_editing_enabled = MagicMock()
+        app.prompt_editing_enabled.get.return_value = False
+        app.prompt_dirty = True
+        app._confirm_unsaved_prompt = MagicMock(
+            return_value="save")
+        app.save_current_prompt = MagicMock(return_value=True)
+        app.prompt_text = MagicMock()
+        app._update_prompt_editor_state = MagicMock()
+
+        app._toggle_prompt_editing()
+
+        app.save_current_prompt.assert_called_once_with(
+            show_confirmation=False,
+            require_editing=False)
+        app.prompt_text.configure.assert_called_once_with(
+            state=gui.tk.DISABLED,
+            foreground=app.TEXT_SECONDARY)
+
+    def test_closing_with_unsaved_prompt_can_be_cancelled(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.root = MagicMock()
+        app.generation_in_progress = False
+        app.prompt_dirty = True
+        app._confirm_unsaved_prompt = MagicMock(
+            return_value="cancel")
+        app.save_pipeline_rows = MagicMock()
+
+        app.close()
+
+        app._confirm_unsaved_prompt.assert_called_once_with(
+            "closing AutoAnki")
+        app.save_pipeline_rows.assert_not_called()
+        app.root.destroy.assert_not_called()
+
+    def test_close_flushes_settings_before_destroying_window(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.root = MagicMock()
+        app.generation_in_progress = False
+        app.pipeline_save_after_id = "pending-save"
+        app.pipeline_notice_after_id = "pending-notice"
+        app.save_pipeline_rows = MagicMock(return_value=("pipeline",))
+
+        app.close()
+
+        self.assertEqual(
+            app.root.after_cancel.call_args_list,
+            [
+                call("pending-save"),
+                call("pending-notice"),
+            ])
+        app.save_pipeline_rows.assert_called_once_with(
+            show_errors=True)
+        app.root.destroy.assert_called_once_with()
+
     def test_automatic_deck_refresh_does_not_launch_anki(self):
         app = object.__new__(gui.AutoAnkiApp)
         app.deck_result_queue = gui.queue.Queue()
@@ -587,7 +923,10 @@ class GuiWorkerTests(unittest.TestCase):
         row = MagicMock()
         app.pipeline_rows = [row]
 
-        app._poll_deck_result()
+        with patch.object(
+                gui.pipeline_store,
+                "save_anki_deck_cache") as save_cache:
+            app._poll_deck_result()
 
         self.assertFalse(app.deck_refresh_in_progress)
         self.assertEqual(
@@ -595,9 +934,51 @@ class GuiWorkerTests(unittest.TestCase):
             ("Parent", "Parent::Child"))
         row.update_deck_options.assert_called_once_with(
             ("Parent", "Parent::Child"))
+        save_cache.assert_called_once_with(
+            ("Parent", "Parent::Child"))
         app.root.after.assert_called_once_with(
             app.DECK_REFRESH_INTERVAL_MS,
             app.refresh_anki_decks)
+
+    def test_separate_deck_mode_does_not_remove_or_regrid_card_rows(self):
+        editor = object.__new__(gui.PipelineEditor)
+        separate_mode = MagicMock()
+        separate_mode.get.return_value = True
+        selected = MagicMock()
+        selected.get.return_value = True
+        container = MagicMock()
+        deck_box = MagicMock()
+        shared_hint = MagicMock()
+        editor.separate_target_deck_variables = {
+            "japanese": separate_mode,
+        }
+        editor.shared_deck_labels = {
+            "japanese": MagicMock(),
+        }
+        editor.target_deck_boxes = {
+            "japanese": MagicMock(),
+        }
+        editor.card_target_deck_containers = {
+            "japanese": {"japanese_vocabulary": container},
+        }
+        editor.card_target_deck_shared_hints = {
+            "japanese": {"japanese_vocabulary": shared_hint},
+        }
+        editor.card_output_variables = {
+            "japanese": {"japanese_vocabulary": selected},
+        }
+        editor.card_target_deck_boxes = {
+            "japanese": {"japanese_vocabulary": deck_box},
+        }
+
+        editor._update_deck_mode_visibility("japanese")
+
+        container.grid.assert_not_called()
+        container.grid_remove.assert_not_called()
+        deck_box.grid.assert_not_called()
+        deck_box.grid_remove.assert_not_called()
+        deck_box.configure.assert_called_once_with(state="normal")
+        shared_hint.place_forget.assert_called_once_with()
 
     def test_pipeline_edits_are_debounced_and_saved_automatically(self):
         app = object.__new__(gui.AutoAnkiApp)

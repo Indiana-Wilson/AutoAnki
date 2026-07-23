@@ -188,7 +188,9 @@ class ImportWorkflowTests(unittest.TestCase):
             result,
             anki_integration.AnkiImportResult(
                 cards_moved=2,
-                target_deck=anki_integration.TARGET_DECK_NAME))
+                target_deck=anki_integration.TARGET_DECK_NAME,
+                target_decks=(
+                    anki_integration.TARGET_DECK_NAME,)))
         ensure_running.assert_called_once_with(client)
         wait_until_ready.assert_called_once_with(client)
         source_query = f'deck:"{templates.DECK_NAME}"'
@@ -256,6 +258,83 @@ class ImportWorkflowTests(unittest.TestCase):
             ])
         sleep.assert_called_once_with(
             anki_integration.MOVE_RETRY_DELAY_SECONDS)
+
+    def test_import_routes_each_note_type_to_its_own_deck(self):
+        client = MagicMock()
+        client.invoke.side_effect = [
+            True,
+            [101],
+            None,
+            [],
+            [202],
+            None,
+            [],
+            [],
+            ["AutoAnki Generated"],
+            None,
+        ]
+        target_decks = (
+            ("AutoAnki English vocabulary", "English::Context"),
+            ("AutoAnki English word to meaning", "English::Recognition"),
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            package_path = self._create_package(temporary_directory)
+            result = anki_integration.import_generated_deck(
+                package_path,
+                target_decks=target_decks,
+                source_deck="AutoAnki Generated",
+                client=client,
+                ensure_running=MagicMock(),
+                wait_until_ready=MagicMock(return_value=[
+                    "English::Context",
+                    "English::Recognition",
+                ]))
+
+        self.assertEqual(result.cards_moved, 2)
+        self.assertEqual(result.target_deck, "Multiple decks")
+        self.assertEqual(
+            result.target_decks,
+            ("English::Context", "English::Recognition"))
+        self.assertEqual(client.invoke.call_args_list, [
+            call("importPackage", path=str(package_path.resolve())),
+            call(
+                "findCards",
+                query=(
+                    'deck:"AutoAnki Generated" '
+                    'note:"AutoAnki English vocabulary"')),
+            call(
+                "changeDeck",
+                cards=[101],
+                deck="English::Context"),
+            call(
+                "findCards",
+                query=(
+                    'deck:"AutoAnki Generated" '
+                    'note:"AutoAnki English vocabulary"')),
+            call(
+                "findCards",
+                query=(
+                    'deck:"AutoAnki Generated" '
+                    'note:"AutoAnki English word to meaning"')),
+            call(
+                "changeDeck",
+                cards=[202],
+                deck="English::Recognition"),
+            call(
+                "findCards",
+                query=(
+                    'deck:"AutoAnki Generated" '
+                    'note:"AutoAnki English word to meaning"')),
+            call(
+                "findCards",
+                query='deck:"AutoAnki Generated"'),
+            call("deckNames"),
+            call(
+                "deleteDecks",
+                decks=["AutoAnki Generated"],
+                cardsToo=True),
+        ])
 
     def test_temporary_deck_is_not_deleted_if_cards_remain(self):
         client = MagicMock()

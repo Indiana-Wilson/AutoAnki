@@ -2,10 +2,14 @@ Define the following Classical Chinese words or expressions.
 
 For each word or expression, provide four short, idiomatic example sentences
 in Classical Chinese. Separate the sentences with the pipe character, |.
-Give a concise English meaning. If an expression has multiple relevant
-meanings, create a separate card entry for each meaning, with examples that
-make that meaning unambiguous. Give the pronunciation in Hanyu Pinyin with tone
-marks.
+Give the pronunciation in Hanyu Pinyin with tone marks.
+
+The response schema determines which definitions are needed. If it contains
+"Meaning", give a concise English definition. If it contains "Native Meaning",
+give a concise definition in Chinese using traditional characters. If both are
+present, they must describe the same sense. If an expression has multiple
+relevant meanings, create a separate card entry for each meaning, with examples
+that make that meaning unambiguous.
 
 In every example sentence, wrap the requested expression in
 <strong>expression</strong>. Preserve traditional Chinese characters unless
