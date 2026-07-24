@@ -872,6 +872,61 @@ def _language_settings_from_data(data):
             saved_languages or shared_fields))
 
 
+def pipeline_to_mapping(pipeline):
+    """Return the stable JSON-compatible representation of one pipeline."""
+    validate_pipelines((pipeline,))
+    return asdict(pipeline)
+
+
+def pipeline_from_mapping(data):
+    """Rebuild one current-version pipeline from retained job metadata."""
+    if isinstance(data, PipelineConfig):
+        validate_pipelines((data,))
+        return data
+    if not isinstance(data, dict):
+        raise TypeError("Pipeline data must be a JSON object.")
+    try:
+        pipeline = PipelineConfig(
+            pipeline_id=data["pipeline_id"],
+            language_key=data["language_key"],
+            cards=tuple(
+                _card_settings_from_data(
+                    card,
+                    data["language_key"])
+                for card in data["cards"]),
+            target_deck=data["target_deck"],
+            generated_deck_id=data["generated_deck_id"],
+            generated_deck_name=data["generated_deck_name"],
+            separate_target_decks=data.get(
+                "separate_target_decks",
+                False),
+            share_field_settings=data.get(
+                "share_field_settings",
+                True),
+            shared_fields=tuple(
+                _field_setting_from_data(field)
+                for field in data.get("shared_fields", ())),
+            shared_field_languages=complete_field_languages(
+                data["language_key"],
+                tuple(
+                    _field_setting_from_data(field)
+                    for field in data.get(
+                        "shared_field_languages",
+                        ()))
+                or tuple(
+                    _field_setting_from_data(field)
+                    for field in data.get("shared_fields", ()))),
+            language_settings=tuple(
+                _language_settings_from_data(settings)
+                for settings in data.get("language_settings", ())),
+        )
+    except (KeyError, TypeError) as error:
+        raise ValueError(
+            "Pipeline settings have an invalid structure.") from error
+    validate_pipelines((pipeline,))
+    return pipeline
+
+
 def load_pipelines(path=None):
     path = Path(path or get_pipeline_config_path())
     try:
@@ -892,44 +947,7 @@ def load_pipelines(path=None):
                 for item in data["pipelines"])
         elif version in (6, PIPELINE_CONFIG_VERSION):
             pipelines = tuple(
-                PipelineConfig(
-                    pipeline_id=item["pipeline_id"],
-                    language_key=item["language_key"],
-                    cards=tuple(
-                        _card_settings_from_data(
-                            card,
-                            item["language_key"])
-                        for card in item["cards"]),
-                    target_deck=item["target_deck"],
-                    generated_deck_id=item["generated_deck_id"],
-                    generated_deck_name=item["generated_deck_name"],
-                    separate_target_decks=item.get(
-                        "separate_target_decks",
-                        False),
-                    share_field_settings=item.get(
-                        "share_field_settings",
-                        True),
-                    shared_fields=tuple(
-                        _field_setting_from_data(field)
-                        for field in item.get("shared_fields", ())),
-                    shared_field_languages=(
-                        complete_field_languages(
-                            item["language_key"],
-                            tuple(
-                                _field_setting_from_data(field)
-                                for field in item.get(
-                                    "shared_field_languages",
-                                    ()))
-                            or tuple(
-                                _field_setting_from_data(field)
-                                for field in item.get(
-                                    "shared_fields",
-                                    ())))),
-                    language_settings=tuple(
-                        _language_settings_from_data(settings)
-                        for settings in item.get(
-                            "language_settings",
-                            ())))
+                pipeline_from_mapping(item)
                 for item in data["pipelines"])
         else:
             raise ValueError(

@@ -41,6 +41,94 @@ instead of using "archaic" when a more precise label is available.
 output/: Stores generated responses and packages at output/response.json and
 output/output.apkg.
 
+Prepared-source generation:
+
+The Generate tab has **Manual Input** and **From Source** modes. Manual Input
+keeps the ordinary scrolling text-box workflow. From Source works from an
+audited, first-occurrence vocabulary and has pages for deck generation, source
+inspection, local PDF/TXT/Markdown preparation, optional Codex CLI retrieval,
+and saved request failures.
+
+Prepared sources with the same title are disambiguated in the dropdown by
+their stable source keys. That display-only suffix is not added to their
+retained title or `Vocabulary from <source>` deck name.
+
+Daodejing and all 100 chapters of Journey to the West are the built-in source
+presets. `src/corpus_pipeline/` retains their Wikisource revision provenance,
+cleans source-specific markup, preserves exact sentence/paragraph contexts,
+uses era-specific CKIP segmentation, ranks unique surface forms by first
+occurrence, proves complete Han-character coverage, and writes audited
+artifacts under `output/corpora/`. Journey's unresolved long spans receive a
+pinned Traditional Jieba refinement. Statistical/dictionary segmentation is
+an ordered candidate vocabulary rather than a lexicographic guarantee, so use
+Inspect Source before authorizing paid definitions.
+
+From Source uses the prepared source's matching Card setup language,
+directions, fields, and response languages. It can send no context, the current
+sentence, current plus neighbouring sentences, or one complete text span per
+request chunk. Identical and overlapping contexts are shared within a request
+rather than copied for every word. Changing the words per request immediately
+updates a local cost estimate that accounts for prompt/schema repetition and
+selected card detail. The configured `gpt-5.4-mini` price and token-limit
+assumptions are dated 24 July 2026 and are not fetched live; see the detailed
+source-generation documentation before treating an estimate as current.
+
+Generation makes one OpenAI request per chunk through a bounded, staggered
+worker pool. Only transient connection/time-out, HTTP 429, and HTTP 5xx
+failures receive bounded automatic backoff. Invalid/refused/incomplete JSON is
+retained for inspection and requires an explicitly authorized individual or
+bulk retry. Successful chunks are never repeated. A complete result is
+imported as `Vocabulary from <source>`; unlike Manual Input's temporary deck,
+this final source deck is not moved, emptied, or deleted.
+
+Each authorized source job saves an immutable request contract containing its
+model, fully composed prompt, strict JSON schema, and `none` reasoning setting.
+Retries reuse it even if an Advanced prompt component changes later. Request
+chunks use cross-process advisory leases, preventing two AutoAnki processes
+from issuing the same saved chunk concurrently. Retry-selected actions remain
+limited to the chosen failed rows.
+
+Each input language retains its own optional list of learned-word sources.
+Every row selects an exact Anki deck, a note type present in that deck, and
+one of that note type's fields. AutoAnki unions the visible field values from
+all rows before filtering. A newly added row copies the preceding row to make
+same-deck setups quick. Card templates are not part of this selector because
+fields belong to notes and a note type may generate several card templates
+from the same stored fields. If no new candidate remains, AutoAnki
+sends nothing to OpenAI and creates no package or deck.
+
+An estimate can reuse a matching read-only Anki result briefly, but confirmed
+generation forces a fresh, ready-collection read immediately before its paid
+plan is saved.
+
+Prepare File is local/OpenAI-free, retains the original and extracted text,
+and currently supports Warring States and Ming Classical Chinese. PDF support
+extracts embedded text with `pypdf`; it does not perform OCR or reliably repair
+multi-column ordering, headers/footers, or broken character maps. The optional
+CKIP/PyTorch/Jieba dependencies are installed separately with
+`requirements-corpus.txt` (CPU) or `requirements-corpus-gpu.txt` (NVIDIA
+CUDA). The base Windows executable does not bundle those large packages,
+downloaded model weights, or the reference corpora.
+
+Local tokenization saves a validated checkpoint after each section. A rerun
+can reuse completed sections, while corrupt, stale, source/model/device/
+implementation-mismatched, or invalid-span checkpoints are recomputed rather
+than trusted. Refinement and the final audit are not skipped.
+
+Codex Retrieve is a separate networked action requiring the Codex CLI, saved
+Codex authentication, and its own checkbox. It runs in a dedicated writable
+job directory and never starts paid card generation. It may consume Codex
+plan/API usage; retrieved editions, licensing, completeness, OCR, and warnings
+must still be inspected.
+
+Cost estimation, local file preparation, corpus CLI operations, and the test
+suite do not call the OpenAI card API. When Anki exclusion is enabled, the
+estimate makes or briefly reuses a read-only AnkiConnect query; actual
+generation forces a fresh read before saving the request plan. See
+`docs/source_generation.md` for the workflow and recovery layout, and
+`docs/corpus_pipeline.md` for source limitations, reference counts, commands,
+and reproducibility details.
+
 Running the user interface:
 
 1. Install Python 3.11 or newer and, from the repository root, create an
@@ -59,8 +147,9 @@ Running the user interface:
 
    .venv\Scripts\python src\gui.py
 
-3. Enter words or notes in the scrolling text box and click
-   "Generate and import".
+3. In Generate > Manual Input, enter words or notes in the scrolling text box
+   and click "Generate and import"; or open Generate > From Source and inspect
+   the source estimate before authorizing a source deck.
 
 The interface uses screen-aware sizing and DPI scaling, rounded card surfaces
 and controls, a non-tiled scrollbar, transient autosave feedback, and explicit
@@ -78,25 +167,27 @@ Open the Card setup tab. Select:
 2. Any of Context sentence → Meaning, Word → Meaning, and Meaning → Word.
 3. The checkbox and response language beside each desired field: Translation,
    Dictionary Meaning, Pronunciation, Part of Speech, Register, and Nuance.
-4. That language's target deck, or enable separate target decks and choose one
-   beside each selected card output.
+4. Leave "Send each card type to the same Anki deck" selected to use the
+   language target deck, or untick it and choose a deck beside each output.
+5. Optionally enable "Omit words already learned in Anki" and configure one
+   or more deck → note type → field sources for that language.
 
 On the Generate tab, explicitly choose the input language from the dropdown
 above the text box. This dropdown—not the Card setup tab most recently
 viewed—controls which language settings the next run uses. The selection is
 saved for the next launch.
 
-Use "Use the same selected fields and response languages for all card types"
-when every selected direction should display the same definition stack. Turn
-it off to configure the six fields independently for each direction. This is
-independent of the shared/separate target-deck setting.
+Both "Send each card type to the same Anki deck" and "Use the same selected
+fields and response languages for all card types" are selected by default.
+Untick either option to configure the corresponding choice independently for
+each card direction.
 
 Response-language menus remain available while their field is unticked. This
 lets a preferred language be prepared and saved without requesting that field;
 only ticked fields enter the OpenAI schema or generated cards.
 
-Each language tab retains its own card selections, shared target deck,
-separate-deck mode, per-card target decks, and field/language choices.
+Each language tab retains its own card selections, target-deck mode,
+per-card target decks, field/language choices, and learned-word sources.
 Switching languages does not replace preferences saved in other tabs.
 
 Translation must target a language other than the source language. Every other
@@ -151,14 +242,19 @@ permissions. Use the "API key" menu to replace or forget the saved key.
 OPENAI_API_KEY can still be set as an environment variable and takes
 precedence over the saved key.
 
-Opening the interface does not call the OpenAI API. Requests are made only
-after "Generate and import" is clicked.
+Opening the interface, inspecting a source, estimating source cost, and
+preparing a local file do not call the OpenAI card API. Manual requests start
+only after "Generate and import" is clicked. Source requests additionally
+require a completed estimate and the paid-authorization checkbox. Codex
+Retrieve is a separate, explicitly authorized network action.
 
-If generation fails or OpenAI returns an incomplete/refused response, the GUI
-shows the failure and does not retry automatically. A new paid request is made
-only if the user explicitly chooses Retry; automatic retries in the OpenAI
-client are disabled. Anki import failures retain the generated package and do
-not prompt for a paid regeneration.
+For Manual Input, generation failure or an incomplete/refused response is
+shown without an automatic retry; a new paid request occurs only if the user
+chooses Retry. From Source adds bounded automatic retries only for transient
+connection/time-out, HTTP 429, and HTTP 5xx failures. Invalid source responses
+stop for inspection and an explicitly authorized retry. The OpenAI client's
+own retry layer is disabled in both workflows. Anki import failures retain the
+generated package and never require regenerating successful OpenAI output.
 
 Automatic Anki import:
 
@@ -169,7 +265,7 @@ AnkiConnect once in Anki:
 2. Enter the add-on code 2055492159.
 3. Restart Anki.
 
-After generating a package, AutoAnki:
+After generating a Manual Input package, AutoAnki:
 
 1. Starts local Anki if AnkiConnect is not already available.
    On Linux/X11, a newly launched Anki window is minimized automatically
@@ -180,6 +276,10 @@ After generating a package, AutoAnki:
 4. Moves every package's cards into the selected target deck, or routes each
    selected card type to its separate target deck when that option is enabled.
 5. Verifies each temporary deck is empty, then deletes it.
+
+A From Source package instead imports its final
+`Vocabulary from <source title>` deck in place. It does not move those cards
+to a Card setup target deck and does not empty or delete the source deck.
 
 Every selected target deck must already exist.
 If Anki is installed under a non-standard command, set
@@ -213,9 +313,9 @@ folder is required.
 
 Building a standalone Windows executable:
 
-PyInstaller can bundle AutoAnki, Python, and all dependencies into one
-AutoAnki.exe. The recipient does not need Python or Git. PyInstaller is not a
-cross-compiler, so perform the Windows build on a Windows computer:
+PyInstaller can bundle AutoAnki, Python, and its ordinary runtime dependencies
+into one AutoAnki.exe. The recipient does not need Python or Git. PyInstaller
+is not a cross-compiler, so perform the Windows build on a Windows computer:
 
 1. Install Python 3.11 or newer on the build computer.
 2. Copy or clone this repository.
@@ -227,3 +327,8 @@ it is code-signed or has established reputation. Build and test the executable
 before distributing it. On Windows, settings and secrets live in
 %APPDATA%\AutoAnki and generated packages live in
 %APPDATA%\AutoAnki\output.
+
+This base build installs only `requirements.txt`; it does not bundle the large
+optional CKIP/PyTorch/Jieba tokenizer stack, Hugging Face model cache, Codex
+CLI, or processed Daodejing/Journey corpora. Those assets require an extended
+packaging/distribution plan. This limitation does not affect Manual Input.

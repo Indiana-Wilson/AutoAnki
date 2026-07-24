@@ -1,0 +1,7 @@
+# Optional NVIDIA CUDA 13.0 stack for historical Chinese segmentation.
+# PyTorch's official selector should be checked if the machine/driver changes.
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+torch==2.13.0 ; sys_platform == "linux" or sys_platform == "win32"
+torch==2.13.0 ; sys_platform == "darwin"
+-r requirements-corpus-base.txt

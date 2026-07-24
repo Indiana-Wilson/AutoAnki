@@ -21,6 +21,9 @@ class RuntimePathTests(unittest.TestCase):
             self.assertEqual(
                 runtime_paths.get_output_directory(),
                 PROJECT_ROOT / "output")
+            self.assertEqual(
+                runtime_paths.get_corpus_output_directory(),
+                PROJECT_ROOT / "output" / "corpora")
 
     def test_frozen_prompts_are_copied_once_and_edits_are_preserved(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -85,6 +88,9 @@ class RuntimePathTests(unittest.TestCase):
                 self.assertEqual(
                     runtime_paths.get_output_directory(),
                     config_root / "output")
+                self.assertEqual(
+                    runtime_paths.get_corpus_output_directory(),
+                    config_root / "output" / "corpora")
 
 
 if __name__ == "__main__":

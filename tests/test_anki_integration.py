@@ -217,6 +217,68 @@ class AnkiStartupTests(unittest.TestCase):
         sleep.assert_called_once_with(0)
 
 
+class VocabularyExclusionTests(unittest.TestCase):
+    def test_reads_exact_visible_terms_from_selected_card_field(self):
+        client = MagicMock()
+        client.invoke.side_effect = [
+            [10, 11],
+            [{"note": 100}, {"note": 101}],
+            [
+                {"fields": {"Word": {"value": "<b>道</b>"}}},
+                {"fields": {"Word": {"value": "無&nbsp;為"}}},
+            ],
+        ]
+
+        terms = anki_integration.read_existing_vocabulary(
+            client,
+            anki_integration.AnkiVocabularySource(
+                deck_name='Retained "Chinese"',
+                note_type_name="AutoAnki Classical Chinese",
+                field_name="Word",
+                card_template_name="Recognition"))
+
+        self.assertEqual(terms, frozenset({"道", "無 為"}))
+        self.assertEqual(client.invoke.call_args_list, [
+            call(
+                "findCards",
+                query=(
+                    'deck:"Retained \\"Chinese\\"" '
+                    'note:"AutoAnki Classical Chinese" '
+                    'card:"Recognition"')),
+            call("cardsInfo", cards=[10, 11]),
+            call("notesInfo", notes=[100, 101]),
+        ])
+
+    def test_lists_note_types_fields_and_templates_without_mutation(self):
+        client = MagicMock()
+        client.invoke.side_effect = [
+            [1, 2],
+            [
+                {"modelName": "Second"},
+                {"modelName": "First"},
+            ],
+            ["Word", "Meaning"],
+            {
+                "Recognition": {},
+                "Production": {},
+            },
+        ]
+
+        self.assertEqual(
+            anki_integration.list_note_types_in_deck(
+                client,
+                "Vocabulary"),
+            ("First", "Second"))
+        self.assertEqual(
+            anki_integration.get_note_type_fields(client, "First"),
+            ("Word", "Meaning"))
+        self.assertEqual(
+            anki_integration.get_note_type_card_templates(
+                client,
+                "First"),
+            ("Production", "Recognition"))
+
+
 class ImportWorkflowTests(unittest.TestCase):
     def _create_package(self, directory):
         package_path = Path(directory) / "output.apkg"
@@ -271,6 +333,30 @@ class ImportWorkflowTests(unittest.TestCase):
                 decks=[templates.DECK_NAME],
                 cardsToo=True),
         ])
+
+    def test_standalone_import_does_not_move_or_delete_the_source_deck(self):
+        client = MagicMock()
+        client.invoke.return_value = True
+        ensure_running = MagicMock()
+        wait_until_ready = MagicMock(
+            return_value=["Vocabulary from Source"])
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            package_path = self._create_package(temporary_directory)
+            result = anki_integration.import_standalone_deck(
+                package_path,
+                client=client,
+                ensure_running=ensure_running,
+                wait_until_ready=wait_until_ready)
+
+        self.assertTrue(result)
+        ensure_running.assert_called_once_with(client)
+        wait_until_ready.assert_called_once_with(client)
+        self.assertEqual(
+            client.invoke.call_args_list,
+            [call(
+                "importPackage",
+                path=str(package_path.resolve()))])
 
     def test_missing_destination_deck_stops_before_import(self):
         client = MagicMock()

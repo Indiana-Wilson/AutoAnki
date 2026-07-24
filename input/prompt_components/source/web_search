@@ -1,0 +1,18 @@
+You may use web search only when the supplied source context and your existing
+knowledge are insufficient to determine a term's meaning, nuance, grammatical
+function, or historically specific register with confidence. Prefer
+authoritative dictionaries, scholarly reference works, and reliable editions
+appropriate to the source language and period. Do not search merely to add
+background detail.
+
+Before searching, identify every supplied term in this batch whose meaning
+remains unclear. Use the single permitted web-search call as one consolidated
+search action covering all of those unclear terms; when the tool supports a
+set of queries within that action, include the queries needed for the whole
+set. Do not spend the only search call on one term while leaving other unclear
+terms unresearched.
+
+Whether or not you search, return the required strict JSON and define every
+supplied term. If the consolidated search still does not resolve a term,
+describe only what the retained context and reliable evidence support; do not
+invent precision.

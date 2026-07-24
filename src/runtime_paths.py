@@ -75,5 +75,10 @@ def get_output_directory():
     return SOURCE_PROJECT_ROOT / "output"
 
 
+def get_corpus_output_directory():
+    """Return persistent storage for corpus snapshots and build runs."""
+    return get_output_directory() / "corpora"
+
+
 def get_words_path():
     return get_resource_root() / "input" / "words"

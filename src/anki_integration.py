@@ -1,5 +1,7 @@
 import base64
 import ctypes
+from html import unescape
+from html.parser import HTMLParser
 import ipaddress
 import json
 import os
@@ -9,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -56,6 +59,39 @@ class AnkiImportResult:
     cards_moved: int
     target_deck: str
     target_decks: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class AnkiVocabularySource:
+    """One note/card field selection used to suppress learned terms."""
+
+    deck_name: str
+    note_type_name: str
+    field_name: str
+    card_template_name: str | None = None
+
+
+class _AnkiFieldTextExtractor(HTMLParser):
+    """Reduce ordinary Anki field HTML to its visible exact text."""
+
+    _BREAK_TAGS = frozenset({
+        "br", "div", "li", "ol", "p", "table", "td", "tr", "ul",
+    })
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_starttag(self, tag, _attrs):
+        if tag.lower() in self._BREAK_TAGS:
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag.lower() in self._BREAK_TAGS:
+            self.parts.append(" ")
+
+    def handle_data(self, data):
+        self.parts.append(data)
 
 
 def normalize_anki_connect_url(url):
@@ -416,6 +452,128 @@ def _note_type_search_query(note_type_name):
     return f'note:"{escaped_name}"'
 
 
+def _card_template_search_query(card_template_name):
+    escaped_name = (
+        card_template_name
+        .replace("\\", "\\\\")
+        .replace('"', '\\"'))
+    return f'card:"{escaped_name}"'
+
+
+def _plain_anki_field_text(value):
+    parser = _AnkiFieldTextExtractor()
+    parser.feed(str(value))
+    parser.close()
+    return unicodedata.normalize(
+        "NFC",
+        " ".join(unescape("".join(parser.parts)).split()),
+    )
+
+
+def list_note_types_in_deck(client, deck_name):
+    """Return only note types represented by at least one note in a deck."""
+    note_ids = client.invoke(
+        "findNotes",
+        query=_deck_search_query(deck_name))
+    names = set()
+    for start in range(0, len(note_ids), 500):
+        for note in client.invoke(
+                "notesInfo",
+                notes=note_ids[start:start + 500]):
+            name = note.get("modelName") if isinstance(note, dict) else None
+            if isinstance(name, str) and name:
+                names.add(name)
+    return tuple(sorted(names))
+
+
+def get_note_type_fields(client, note_type_name):
+    fields = client.invoke(
+        "modelFieldNames",
+        modelName=note_type_name)
+    if not isinstance(fields, list) or not all(
+            isinstance(field, str) and field
+            for field in fields):
+        raise AnkiConnectResponseError(
+            "AnkiConnect returned invalid note-type fields.")
+    return tuple(fields)
+
+
+def get_note_type_card_templates(client, note_type_name):
+    templates = client.invoke(
+        "modelTemplates",
+        modelName=note_type_name)
+    if not isinstance(templates, dict):
+        raise AnkiConnectResponseError(
+            "AnkiConnect returned invalid card templates.")
+    return tuple(sorted(
+        name
+        for name in templates
+        if isinstance(name, str) and name))
+
+
+def read_existing_vocabulary(client, selection):
+    """Read exact visible terms without changing the Anki collection."""
+    if not isinstance(selection, AnkiVocabularySource):
+        selection = AnkiVocabularySource(**selection)
+    if not all((
+            selection.deck_name.strip(),
+            selection.note_type_name.strip(),
+            selection.field_name.strip())):
+        raise ValueError(
+            "Deck, note type, and field are required for vocabulary "
+            "exclusion.")
+
+    query_parts = [
+        _deck_search_query(selection.deck_name),
+        _note_type_search_query(selection.note_type_name),
+    ]
+    if selection.card_template_name:
+        query_parts.append(_card_template_search_query(
+            selection.card_template_name))
+        card_ids = client.invoke(
+            "findCards",
+            query=" ".join(query_parts))
+        note_ids = []
+        for start in range(0, len(card_ids), 500):
+            cards = client.invoke(
+                "cardsInfo",
+                cards=card_ids[start:start + 500])
+            note_ids.extend(
+                card.get("note")
+                for card in cards
+                if isinstance(card, dict)
+                and isinstance(card.get("note"), int))
+        note_ids = list(dict.fromkeys(note_ids))
+    else:
+        note_ids = client.invoke(
+            "findNotes",
+            query=" ".join(query_parts))
+
+    vocabulary = set()
+    for start in range(0, len(note_ids), 500):
+        notes = client.invoke(
+            "notesInfo",
+            notes=note_ids[start:start + 500])
+        for note in notes:
+            fields = note.get("fields") if isinstance(note, dict) else None
+            field = (
+                fields.get(selection.field_name)
+                if isinstance(fields, dict)
+                else None)
+            raw_value = (
+                field.get("value")
+                if isinstance(field, dict)
+                else None)
+            if not isinstance(raw_value, str):
+                raise AnkiConnectResponseError(
+                    f'Anki note is missing field '
+                    f'"{selection.field_name}".')
+            term = _plain_anki_field_text(raw_value)
+            if term:
+                vocabulary.add(term)
+    return frozenset(vocabulary)
+
+
 def import_package(client, package_path):
     """Import locally, or upload through media storage before remote import."""
     package_path = Path(package_path).resolve()
@@ -458,6 +616,27 @@ def import_package(client, package_path):
             "The package was imported, but its temporary remote staging "
             "file could not be removed.") from error
     return imported
+
+
+def import_standalone_deck(
+        package_path,
+        *,
+        client=None,
+        ensure_running=ensure_anki_running,
+        wait_until_ready=wait_for_collection_ready):
+    """Import a source deck in place, without moving or deleting it."""
+    package_path = Path(package_path).resolve()
+    if not package_path.is_file():
+        raise AnkiIntegrationError(
+            f"The generated Anki package does not exist: {package_path}")
+    client = client or AnkiConnectClient()
+    ensure_running(client)
+    wait_until_ready(client)
+    imported = import_package(client, package_path)
+    if imported is not True:
+        raise AnkiIntegrationError(
+            "AnkiConnect reported that package import failed.")
+    return True
 
 
 def _move_matching_cards(

@@ -116,6 +116,49 @@ def _find_refusal(response):
     return None
 
 
+def extract_response_text(response):
+    """Validate one Responses API result and return its structured JSON text.
+
+    This intentionally performs no file writes.  Source-generation workers
+    persist the raw response in their own per-attempt directories instead.
+    """
+    refusal = _find_refusal(response)
+    if refusal:
+        error = OpenAIRefusalError(refusal)
+        error.raw_response_text = _get_response_attribute(
+            response,
+            "output_text",
+            "")
+        raise error
+
+    status = _get_response_attribute(response, "status")
+    if status != "completed":
+        incomplete_details = _get_response_attribute(
+            response,
+            "incomplete_details")
+        reason = _get_response_attribute(
+            incomplete_details,
+            "reason")
+        error = _get_response_attribute(response, "error")
+        detail = reason or error or status or "unknown status"
+        error = OpenAIIncompleteResponseError(
+            f"OpenAI response did not complete: {detail}")
+        error.raw_response_text = _get_response_attribute(
+            response,
+            "output_text",
+            "")
+        raise error
+
+    result = _get_response_attribute(response, "output_text", "")
+    if not isinstance(result, str) or not result.strip():
+        error = OpenAIIncompleteResponseError(
+            "OpenAI returned no card data.")
+        error.raw_response_text = (
+            result if isinstance(result, str) else "")
+        raise error
+    return result
+
+
 def fetch_response(
         words,
         *,
@@ -148,30 +191,11 @@ def fetch_response(
     response = client.responses.create(
         model="gpt-5.4-mini",
         input=prompt_text + words,
+        reasoning={"effort": "none"},
         text={"format": response_format},
     )
 
-    refusal = _find_refusal(response)
-    if refusal:
-        raise OpenAIRefusalError(refusal)
-
-    status = _get_response_attribute(response, "status")
-    if status != "completed":
-        incomplete_details = _get_response_attribute(
-            response,
-            "incomplete_details")
-        reason = _get_response_attribute(
-            incomplete_details,
-            "reason")
-        error = _get_response_attribute(response, "error")
-        detail = reason or error or status or "unknown status"
-        raise OpenAIIncompleteResponseError(
-            f"OpenAI response did not complete: {detail}")
-
-    result = _get_response_attribute(response, "output_text", "")
-    if not isinstance(result, str) or not result.strip():
-        raise OpenAIIncompleteResponseError(
-            "OpenAI returned no card data.")
+    result = extract_response_text(response)
 
     response_path.parent.mkdir(parents=True, exist_ok=True)
     response_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -188,23 +212,10 @@ def fetch_response_file(file_path, **kwargs):
     return fetch_response(words, **kwargs)
 
 
-# Package the notes into a deck
-def process_json_text(
-        text,
-        *,
-        deck=None,
-        output_path=None,
-        pipeline=None,
-        guid_seed=None,
-        **_legacy_arguments):
-    if deck is None:
-        deck = templates.my_deck
-    output_path = Path(output_path or DECK_PATH)
+def validate_generated_cards(text, pipeline=None):
+    """Parse and validate generated data without writing an Anki package."""
     pipeline = pipeline or pipeline_store.default_pipeline()
     pipeline_store.validate_pipelines((pipeline,))
-    language = pipeline_store.get_language(
-        pipeline.language_key)
-    model_language_key = language.model_language_key
     language_settings = pipeline_store.get_language_settings(
         pipeline,
         pipeline.language_key)
@@ -285,6 +296,48 @@ def process_json_text(
                     f'"{direction_name}" has no non-empty meaning fields.')
         validated_notes.append(note_data)
 
+    return validated_notes
+
+
+def validate_generated_response(text, pipeline=None):
+    """Return the canonical response object after structural validation."""
+    return {
+        "cards": validate_generated_cards(text, pipeline),
+    }
+
+
+# Package the notes into a deck
+def process_json_text(
+        text,
+        *,
+        deck=None,
+        output_path=None,
+        pipeline=None,
+        guid_seed=None,
+        due_start=None,
+        **_legacy_arguments):
+    if deck is None:
+        deck = templates.my_deck
+    output_path = Path(output_path or DECK_PATH)
+    pipeline = pipeline or pipeline_store.default_pipeline()
+    pipeline_store.validate_pipelines((pipeline,))
+    language = pipeline_store.get_language(
+        pipeline.language_key)
+    model_language_key = language.model_language_key
+    language_settings = pipeline_store.get_language_settings(
+        pipeline,
+        pipeline.language_key)
+    enabled_cards = pipeline_store.get_enabled_cards(pipeline)
+    validated_notes = validate_generated_cards(text, pipeline)
+    if (
+            due_start is not None
+            and (
+                isinstance(due_start, bool)
+                or not isinstance(due_start, int)
+                or due_start < 1)):
+        raise ValueError(
+            "Anki new-card ordering must start at a positive integer.")
+
     notes_created = 0
     for note_data in validated_notes:
         for card in enabled_cards:
@@ -314,6 +367,11 @@ def process_json_text(
                 "model": selected_card_type.model,
                 "fields": fields,
             }
+            if due_start is not None:
+                # genanki's default is due=0 for every new card. Source decks
+                # set a sequence so Anki's ascending-position gather order
+                # follows the retained first-occurrence/card order.
+                note_arguments["due"] = due_start + notes_created
             if guid_seed is not None:
                 identity_values = [
                     note_data[language.term_field],

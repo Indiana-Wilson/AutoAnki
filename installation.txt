@@ -60,3 +60,143 @@ http://127.0.0.1:8765
 There is no need to change webBindAddress or find the computer's IP address.
 
 Anki should be open, or AutoAnki will attempt to open it automatically.
+
+
+Generate modes and paid actions
+-------------------------------
+
+Generate has two sub-tabs:
+
+* Manual Input: paste/type text and use the ordinary generation workflow.
+* From Source: inspect and generate from a prepared source such as the
+  Daodejing or Journey to the West.
+
+Learned-word filtering is configured per language in Card setup, alongside
+the card fields and target decks. It is then applied automatically by either
+Generate mode.
+
+Opening AutoAnki, calculating a source estimate, inspecting a source, preparing
+a local file, and running the test suite do not call the OpenAI card API.
+From Source displays an estimated range and requires its paid-authorization
+checkbox before it can send one OpenAI request per chunk.
+
+The displayed source price uses AutoAnki's configured gpt-5.4-mini prices and
+limits, labelled with their publication date (24 July 2026). It is not a live
+price lookup. Check current OpenAI pricing/model documentation before relying
+on it later.
+
+When a source run is authorized, AutoAnki saves the exact composed prompt,
+strict JSON schema, model, and reasoning-effort setting used by that job.
+Retries reuse those saved settings even if prompts in Advanced are edited
+afterward. Invalid outputs are not retried automatically; Retry selected and
+Retry all failed each require a new paid confirmation.
+
+Codex Retrieve is different: it is a separately authorized network action
+using the Codex CLI and may consume Codex plan/API usage. It only retrieves
+and prepares a source; it cannot authorize card generation.
+
+
+Optional historical-Chinese source preparation
+----------------------------------------------
+
+The ordinary requirements and build_windows.bat do not install the large
+historical tokenizer stack. From a source checkout, choose ONE of:
+
+CPU:
+
+   .venv\Scripts\python -m pip install -r requirements-corpus.txt
+
+Supported NVIDIA GPU:
+
+   .venv\Scripts\python -m pip install -r requirements-corpus-gpu.txt
+
+The GPU requirements currently use PyTorch's CUDA 13.0 wheel and require a
+compatible NVIDIA driver. Check the current official selector if the hardware,
+driver, Python, or PyTorch version changes:
+
+   https://pytorch.org/get-started/locally/
+
+Verify that the selected environment can see CUDA:
+
+   .venv\Scripts\python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+
+Prepare File currently supports Classical Chinese (Warring States) and
+Classical Chinese (Ming). The pinned CKIP model (roughly 400 MB per selected
+model) downloads to the normal Hugging Face cache on first use. Ming
+preparation can also download the pinned Traditional Jieba dictionary.
+Tokenization progress is checkpointed after each completed source section.
+After a late failure, a rerun can reuse valid completed sections. Corrupt,
+partial, stale, or source/model/device/implementation-mismatched checkpoints
+are ignored and recomputed; final refinement and auditing still run.
+
+PDF preparation extracts existing embedded text; it does not perform OCR.
+Scan/image-only PDFs must be OCRed externally. Always inspect PDF reading
+order, repeated headers/footers, character extraction, and the resulting word
+list before authorizing paid generation. TXT and Markdown files must use
+UTF-8; form feeds divide them into sections.
+
+The base dist\AutoAnki.exe does NOT bundle:
+
+* PyTorch, Transformers, CKIP, or Jieba;
+* downloaded historical-language model weights;
+* the processed Daodejing/Journey reference corpora; or
+* the optional Codex CLI.
+
+Packaging those large/licensed assets requires extending AutoAnki.spec and
+testing a separate Windows distribution. The base executable remains suitable
+for Manual Input. A built-in preset name does not recreate its corpus: its
+audited processed artifacts must also be provisioned in AutoAnki's output
+directory before that preset can be estimated or generated. In a packaged
+Windows build, that corpus directory is:
+
+   %APPDATA%\AutoAnki\output\corpora
+
+
+Optional Codex source retrieval
+-------------------------------
+
+Codex Retrieve requires the Codex CLI to be installed and available on PATH,
+with usable saved authentication. Sign in before launching AutoAnki, for
+example:
+
+   codex login
+
+AutoAnki gives each authorized retrieval a dedicated writable job directory,
+runs Codex with web search and a workspace-write sandbox, validates the
+returned file paths, and saves its event log. This reduces scope but does not
+prove copyright, edition authenticity, completeness, or OCR quality. Review
+the retrieved files, URLs, and warnings before generating cards.
+
+
+From Source Anki behavior
+-------------------------
+
+The optional vocabulary filter is saved independently for every input
+language and can read any number of exact deck, note-type, and field
+combinations through AnkiConnect. It is read-only. Choosing a deck loads the
+note types actually present in that deck; choosing a note type loads its
+fields. Card templates are not selected because fields belong to the note,
+not to one of the cards generated from it. Visible field
+text is compared exactly after HTML/entity/whitespace cleanup and Unicode NFC
+normalization; AutoAnki does not stem or split it. If every candidate is
+already present, no OpenAI request, package, or deck is created.
+
+The estimate may reuse the same read-only lookup for up to 30 seconds. After
+paid generation is confirmed, AutoAnki waits for Anki to be ready and forces a
+fresh lookup immediately before saving the paid source plan.
+
+A completed source run imports a final deck named:
+
+   Vocabulary from [source title]
+
+It is retained in place. Its cards are not moved to another target deck and
+the source deck is not deleted.
+
+If two locally prepared sources share the same title, their dropdown labels
+include different stable source keys. The title itself is retained, so this
+does not add the key to the generated deck name.
+
+Saved request jobs use operating-system advisory locks per chunk so two
+AutoAnki processes do not issue the same paid chunk simultaneously. Completed
+chunks remain reusable, and a failed Deck row can be retried without repeating
+successful OpenAI requests.

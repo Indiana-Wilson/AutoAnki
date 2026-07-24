@@ -1,0 +1,421 @@
+"""Plain-mapping adapters for GUI/controller integration."""
+
+from dataclasses import asdict, replace
+import hashlib
+import hmac
+import json
+import threading
+
+from source_generation.jobs import GenerationJobStore
+from source_generation.models import SourceGenerationConfig
+from source_generation.planning import (
+    MODEL_CONTEXT_WINDOW_TOKENS,
+    MODEL_MAX_OUTPUT_TOKENS,
+    estimate_plan_cost,
+    list_processed_source_summaries,
+    load_processed_source,
+    plan_source_generation,
+)
+from source_generation.requests import (
+    build_source_request_contract,
+    source_request_contract_digest,
+)
+
+
+SOURCE_ESTIMATE_AUTHORIZATION_SCHEMA_VERSION = 1
+
+
+def _estimate_authorization_fingerprint(plan, request_contract, estimate):
+    payload = {
+        "schema_version": SOURCE_ESTIMATE_AUTHORIZATION_SCHEMA_VERSION,
+        "plan_id": plan.plan_id,
+        "execution_policy": {
+            "concurrency": plan.config.concurrency,
+            "request_stagger_ms": plan.config.request_stagger_ms,
+            "max_transient_retries": (
+                plan.config.max_transient_retries),
+        },
+        "request_contract_sha256": source_request_contract_digest(
+            request_contract),
+        # Binding the displayed cost inputs as well as request contents means
+        # a local pricing/estimator update also requires fresh authorization.
+        "estimate": estimate.to_dict(),
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+class SourceGenerationBackend:
+    """Free planning/status callbacks suitable for ``AutoAnkiApp`` hooks.
+
+    No method here makes an OpenAI request. ``create_job`` requires the GUI's
+    explicit paid-confirmation flag but only persists pending request units.
+    A controller may then construct ``GenerationJobRunner`` with its own paid
+    request callable.
+    """
+
+    def __init__(
+            self,
+            *,
+            corpus_root=None,
+            jobs_root=None,
+            exclusion_resolver=None):
+        self.corpus_root = corpus_root
+        self.jobs = GenerationJobStore(jobs_root)
+        self.exclusion_resolver = exclusion_resolver
+        self._loaded_sources = {}
+        self._source_lock = threading.RLock()
+
+    def catalogue(self):
+        preset_names = {
+            "daodejing_huijiao": "Daodejing",
+            "journey_to_the_west": "Journey to the West",
+        }
+        sources = []
+        for source in list_processed_source_summaries(self.corpus_root):
+            value = dict(source)
+            preset_name = preset_names.get(source["key"])
+            value["preset"] = preset_name is not None
+            if preset_name is not None:
+                value["name"] = preset_name
+                value["title"] = preset_name
+            sources.append(value)
+        return {"sources": sources}
+
+    def _load_source(self, source_key, run_path=None):
+        cache_key = (source_key, run_path)
+        with self._source_lock:
+            loaded = self._loaded_sources.get(cache_key)
+            if loaded is None:
+                loaded = load_processed_source(
+                    source_key,
+                    run_path=run_path,
+                    corpus_root=self.corpus_root)
+                self._loaded_sources[cache_key] = loaded
+        return loaded
+
+    def _plan(self, request):
+        config = SourceGenerationConfig.from_mapping(request)
+        loaded = self._load_source(
+            config.source_key,
+            config.run_path)
+        exclusion_requested = bool(request.get("exclude_anki"))
+        exclusions = config.anki_exclusions
+        if exclusion_requested and not exclusions:
+            raise ValueError(
+                "Anki exclusion requires a deck, note type, and field.")
+        if exclusion_requested:
+            if any(
+                    specification.note_type is None
+                    or specification.field_name is None
+                    for specification in exclusions):
+                raise ValueError(
+                    "Anki exclusion requires a deck, note type, and field.")
+            if self.exclusion_resolver is None:
+                raise RuntimeError(
+                    "Anki vocabulary exclusion is not connected.")
+            excluded_words = tuple(sorted({
+                word
+                for specification in exclusions
+                for word in self.exclusion_resolver(
+                    specification,
+                    loaded)
+            }))
+            config = replace(
+                config,
+                excluded_words=excluded_words)
+        plan = plan_source_generation(loaded, config)
+        display_name = str(request.get("source_name", "")).strip()
+        if display_name:
+            plan = replace(
+                plan,
+                source_title=display_name)
+        return loaded, plan
+
+    def preview(self, request):
+        """Return one read-only page of first-occurrence source metadata."""
+        if not isinstance(request, dict):
+            raise TypeError("Source preview request must be an object.")
+        source_key = str(request.get("source_key", "")).strip()
+        if not source_key:
+            raise ValueError("Choose a processed source to inspect.")
+        offset = request.get("offset", 0)
+        limit = request.get("limit", 500)
+        for name, value in (("offset", offset), ("limit", limit)):
+            if (
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value < (0 if name == "offset" else 1)):
+                requirement = (
+                    "a non-negative integer"
+                    if name == "offset"
+                    else "a positive integer")
+                raise ValueError(
+                    f"Source preview {name} must be {requirement}.")
+        if limit > 10000:
+            raise ValueError(
+                "Source preview limit cannot exceed 10,000 words.")
+
+        loaded = self._load_source(
+            source_key,
+            request.get("run_path"))
+        build = loaded.build
+        total = len(build.unique_words)
+        if offset > total:
+            raise ValueError(
+                "Source preview offset is beyond the vocabulary list.")
+        contexts = {
+            context.context_id: context.text
+            for context in build.contexts
+        }
+        sections = {
+            section.section_id: section.title
+            for section in build.snapshot.sections
+        }
+        items = []
+        for word in build.unique_words[offset:offset + limit]:
+            items.append({
+                "rank": word.rank,
+                "term": word.surface,
+                "section_title": sections.get(word.section_id, ""),
+                "previous_sentence": (
+                    contexts.get(word.previous_sentence_id, "")
+                    if word.previous_sentence_id is not None
+                    else ""),
+                "current_sentence": contexts.get(word.sentence_id, ""),
+                "next_sentence": (
+                    contexts.get(word.next_sentence_id, "")
+                    if word.next_sentence_id is not None
+                    else ""),
+            })
+        return {
+            "source_key": loaded.key,
+            "total": total,
+            "offset": offset,
+            "items": items,
+        }
+
+    def estimate(self, request):
+        """GUI ``source_estimator`` callback returning its expected aliases."""
+        _loaded, plan = self._plan(request)
+        pipeline = request.get("pipeline")
+        if pipeline is None:
+            raise ValueError(
+                "Card Setup must provide a generation pipeline.")
+        request_contract = build_source_request_contract(
+            pipeline,
+            chunks=plan.chunks,
+            allow_web_search=bool(request.get("allow_web_search")))
+        estimate = estimate_plan_cost(
+            plan,
+            pipeline,
+            prompt_text=request_contract["composed_prompt"],
+            web_search_enabled=bool(request.get("allow_web_search")))
+        contract_digest = source_request_contract_digest(
+            request_contract)
+        authorization_fingerprint = (
+            _estimate_authorization_fingerprint(
+                plan,
+                request_contract,
+                estimate))
+        result = estimate.to_dict()
+        request_assumptions = estimate.assumptions
+        largest_input = request_assumptions[
+            "largest_request_estimated_input_tokens"]
+        largest_output = request_assumptions[
+            "largest_request_estimated_output_tokens"]
+        high_output = request_assumptions[
+            "largest_request_high_output_tokens"]
+        high_total = request_assumptions[
+            "largest_request_high_total_tokens"]
+        warning = None
+        if high_output > MODEL_MAX_OUTPUT_TOKENS:
+            warning = (
+                "The selected chunk size may exceed the model's maximum "
+                "output. Reduce words per request before generation.")
+        elif high_total > MODEL_CONTEXT_WINDOW_TOKENS:
+            warning = (
+                "The selected context and card detail may exceed the model's "
+                "context window. Reduce words per request or source context.")
+        result.update({
+            "plan_id": plan.plan_id,
+            "request_contract_sha256": contract_digest,
+            "authorization_fingerprint": authorization_fingerprint,
+            "source_key": plan.source_key,
+            "source_name": plan.source_title,
+            "original_candidate_count": plan.original_word_count,
+            "excluded_candidate_count": plan.excluded_word_count,
+            "chunk_size": plan.config.chunk_size,
+            "context_mode": plan.config.context_mode.value,
+            "largest_request_input_tokens": largest_input,
+            "largest_request_output_tokens": largest_output,
+            "largest_request_high_output_tokens": high_output,
+            "largest_request_high_total_tokens": high_total,
+            "request_limit_warning": warning,
+        })
+        return result
+
+    def create_job(self, request):
+        """Persist pending chunks after, but without consuming, authorization."""
+        if request.get("paid_confirmed") is not True:
+            raise PermissionError(
+                "Paid source generation requires explicit confirmation.")
+        _loaded, plan = self._plan(request)
+        pipeline = request.get("pipeline")
+        if pipeline is None:
+            raise ValueError(
+                "Card Setup must provide a generation pipeline.")
+        request_contract = build_source_request_contract(
+            pipeline,
+            chunks=plan.chunks,
+            allow_web_search=bool(request.get("allow_web_search")))
+        estimate = estimate_plan_cost(
+            plan,
+            pipeline,
+            prompt_text=request_contract["composed_prompt"],
+            web_search_enabled=bool(request.get("allow_web_search")))
+        expected_authorization = _estimate_authorization_fingerprint(
+            plan,
+            request_contract,
+            estimate)
+        authorized_estimate = request.get("estimate")
+        if (
+                plan.chunks
+                and (
+                not isinstance(authorized_estimate, dict)
+                or authorized_estimate.get("plan_id") != plan.plan_id
+                or not isinstance(
+                    authorized_estimate.get(
+                        "authorization_fingerprint"),
+                    str)
+                or not hmac.compare_digest(
+                    authorized_estimate["authorization_fingerprint"],
+                    expected_authorization))):
+            raise PermissionError(
+                "The source, learned-word list, prompt, response schema, "
+                "model, or cost estimate changed after authorization. "
+                "Recalculate the estimate and authorize the paid requests "
+                "again. No OpenAI request was made.")
+        high_output = estimate.assumptions[
+            "largest_request_high_output_tokens"]
+        high_total = estimate.assumptions[
+            "largest_request_high_total_tokens"]
+        if high_output > MODEL_MAX_OUTPUT_TOKENS:
+            raise ValueError(
+                "The estimated response for one chunk can exceed "
+                f"{MODEL_MAX_OUTPUT_TOKENS:,} output tokens. Reduce words "
+                "per OpenAI request.")
+        if high_total > MODEL_CONTEXT_WINDOW_TOKENS:
+            raise ValueError(
+                "The estimated input and response for one chunk can exceed "
+                f"{MODEL_CONTEXT_WINDOW_TOKENS:,} total tokens. Reduce the "
+                "chunk size or context.")
+        metadata = {
+            "paid_confirmed_at_creation": True,
+            "authorization_bypassed_for_empty_plan": (
+                not plan.chunks),
+            "pipeline": asdict(pipeline),
+            "request_contract": request_contract,
+            "estimate": {
+                **estimate.to_dict(),
+                "plan_id": plan.plan_id,
+                "request_contract_sha256": (
+                    source_request_contract_digest(
+                        request_contract)),
+                "authorization_fingerprint": expected_authorization,
+            },
+            "output_deck_name": request.get(
+                "output_deck_name",
+                f"Vocabulary from {plan.source_title}"),
+            "keep_imported_deck": bool(
+                request.get("keep_imported_deck", True)),
+            "move_cards_after_import": bool(
+                request.get("move_cards_after_import", False)),
+            "delete_imported_deck": bool(
+                request.get("delete_imported_deck", False)),
+        }
+        return self.jobs.create(
+            plan,
+            request_metadata=metadata,
+            request_contract=request_contract)
+
+    @staticmethod
+    def _row_id(job_id, chunk_id):
+        return f"{job_id}::{chunk_id}"
+
+    @staticmethod
+    def split_row_id(row_id):
+        if not isinstance(row_id, str) or "::" not in row_id:
+            raise ValueError("Select a valid saved source request.")
+        job_id, chunk_id = row_id.split("::", 1)
+        if not job_id or not chunk_id:
+            raise ValueError("Select a valid saved source request.")
+        return job_id, chunk_id
+
+    def job_rows(self):
+        """GUI ``source_jobs_loader`` callback, one row per request chunk."""
+        rows = []
+        for snapshot in self.jobs.list():
+            for chunk in snapshot.chunks:
+                error = chunk.get("last_error") or {}
+                rows.append({
+                    "job_id": self._row_id(
+                        snapshot.job_id,
+                        chunk["chunk_id"]),
+                    "parent_job_id": snapshot.job_id,
+                    "chunk_id": chunk["chunk_id"],
+                    "source_name": snapshot.source_title,
+                    "chunk_label": (
+                        f'{chunk["index"]}/{len(snapshot.chunks)}'),
+                    "worker": chunk.get("worker", "queued"),
+                    "status": chunk["status"],
+                    "attempts": chunk["attempts"],
+                    "detail": error.get("message", ""),
+                    "updated_at": chunk["updated_at"],
+                })
+        return {"jobs": rows}
+
+    def inspect(self, request):
+        """GUI ``source_inspect_callback`` callback."""
+        row_id = (
+            request.get("job_id")
+            if isinstance(request, dict)
+            else request)
+        job_id, chunk_id = self.split_row_id(row_id)
+        return self.jobs.inspect_chunk(job_id, chunk_id)
+
+    def manual_retry_targets(self, request):
+        """Resolve GUI row IDs after its paid-retry confirmation.
+
+        This resets only the requested failed chunks. The controller still
+        injects and runs the paid callable, so merely resolving a target cannot
+        contact OpenAI.
+        """
+        if request.get("paid_confirmed") is not True:
+            raise PermissionError(
+                "Paid source retries require explicit confirmation.")
+        grouped = {}
+        for row_id in request.get("job_ids", ()):
+            job_id, chunk_id = self.split_row_id(row_id)
+            grouped.setdefault(job_id, []).append(chunk_id)
+        result = {}
+        for job_id, chunk_ids in grouped.items():
+            reset = self.jobs.reset_for_manual_retry(
+                job_id,
+                chunk_ids)
+            pending = tuple(
+                chunk_id
+                for chunk_id in self.jobs.chunk_ids(job_id)
+                if (
+                    chunk_id in chunk_ids
+                    and self.jobs.chunk_status(
+                        job_id,
+                        chunk_id)["status"] == "pending"))
+            result[job_id] = tuple(dict.fromkeys(
+                (*reset, *pending)))
+        return result

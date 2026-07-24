@@ -6,7 +6,8 @@ import unittest
 import zipfile
 from dataclasses import replace
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, call, patch
 
 import genanki
 
@@ -167,6 +168,7 @@ class FetchResponseTests(unittest.TestCase):
             client.responses.create.assert_called_once_with(
                 model="gpt-5.4-mini",
                 input="Define: épanouir",
+                reasoning={"effort": "none"},
                 text={"format": process_text.build_response_format(
                     pipeline)})
             self.assertEqual(
@@ -787,6 +789,655 @@ class GenerateDeckTests(unittest.TestCase):
 
 
 class GuiLogicTests(unittest.TestCase):
+    def test_source_chunk_size_accepts_positive_integers_only(self):
+        self.assertEqual(gui.parse_source_chunk_size("500"), 500)
+        self.assertEqual(gui.parse_source_chunk_size(" 50 "), 50)
+
+        for invalid in ("", "0", "-1", "2.5", "ten", "10001"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    gui.parse_source_chunk_size(invalid)
+
+    def test_source_context_options_use_backend_canonical_keys(self):
+        self.assertEqual(
+            tuple(
+                key
+                for key, _label, _description
+                in gui.SOURCE_CONTEXT_OPTIONS),
+            (
+                "none",
+                "sentence",
+                "sentence_neighbors",
+                "chunk_span",
+            ))
+
+    def test_source_catalogue_normalisation_ignores_invalid_and_duplicates(
+            self):
+        options = gui.normalise_source_options((
+            {
+                "key": "prepared_one",
+                "name": "Prepared One",
+                "word_count": 12,
+            },
+            {
+                "key": "prepared_one",
+                "name": "Duplicate",
+                "word_count": 20,
+            },
+            {
+                "key": "",
+                "name": "Missing Key",
+            },
+            {
+                "key": "negative",
+                "name": "Negative",
+                "word_count": -1,
+            },
+        ))
+
+        self.assertEqual(
+            options,
+            (
+                gui.SourceUiOption(
+                    key="prepared_one",
+                    name="Prepared One",
+                    word_count=12),
+            ))
+
+    def test_duplicate_source_titles_receive_stable_keyed_display_labels(self):
+        first = gui.SourceUiOption(
+            key="custom_alpha",
+            name="Shared title")
+        second = gui.SourceUiOption(
+            key="custom_beta",
+            name="Shared title")
+
+        forward = gui.source_option_display_labels((first, second))
+        reversed_order = gui.source_option_display_labels((second, first))
+
+        self.assertEqual(forward, reversed_order)
+        self.assertEqual(
+            forward,
+            {
+                "custom_alpha": "Shared title · custom_alpha",
+                "custom_beta": "Shared title · custom_beta",
+            })
+        self.assertEqual(first.name, second.name)
+
+    def test_duplicate_source_display_labels_select_distinct_source_keys(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        selected = {"label": ""}
+        app.source_selected_label = MagicMock()
+        app.source_selected_label.get.side_effect = (
+            lambda: selected["label"])
+        app.source_selected_label.set.side_effect = (
+            lambda label: selected.__setitem__("label", label))
+        app.source_options = ()
+        app.source_options_by_label = {}
+        app.source_options_by_key = {}
+        app.source_display_labels_by_key = {}
+        app.source_catalog_loader = MagicMock(return_value=(
+            {
+                "key": "custom_alpha",
+                "name": "Shared title",
+            },
+            {
+                "key": "custom_beta",
+                "name": "Shared title",
+            },
+        ))
+        app.source_selector = MagicMock()
+        app.source_preview_selector = MagicMock()
+        app.source_catalog_status = MagicMock()
+        app._source_selection_changed = MagicMock()
+
+        app._load_source_catalogue()
+
+        labels = tuple(
+            label
+            for label, option in app.source_options_by_label.items()
+            if option.name == "Shared title")
+        self.assertEqual(len(labels), 2)
+        selected["label"] = labels[0]
+        first_key = app._selected_source_option().key
+        selected["label"] = labels[1]
+        second_key = app._selected_source_option().key
+        self.assertEqual(
+            {first_key, second_key},
+            {"custom_alpha", "custom_beta"})
+        self.assertTrue(all(
+            app.source_options_by_label[label].name == "Shared title"
+            for label in labels))
+
+    def test_source_preview_contract_preserves_ordered_context_metadata(self):
+        page = gui.normalise_source_preview_response({
+            "source_key": "journey_to_the_west",
+            "total": 24224,
+            "offset": 500,
+            "items": (
+                {
+                    "rank": 501,
+                    "term": "行者",
+                    "section_title": "第003回",
+                    "previous_sentence": "前句。",
+                    "current_sentence": "行者在此。",
+                    "next_sentence": "後句。",
+                },
+                {
+                    "rank": 502,
+                    "term": "在此",
+                    "section_title": "第003回",
+                    "previous_sentence": None,
+                    "current_sentence": "行者在此。",
+                    "next_sentence": "",
+                },
+            ),
+        })
+
+        self.assertEqual(page.source_key, "journey_to_the_west")
+        self.assertEqual(page.total, 24224)
+        self.assertEqual(page.offset, 500)
+        self.assertEqual(
+            tuple(item.rank for item in page.items),
+            (501, 502))
+        self.assertEqual(page.items[0].section_title, "第003回")
+        self.assertEqual(page.items[0].previous_sentence, "前句。")
+        self.assertEqual(page.items[1].previous_sentence, "")
+
+    def test_source_preview_contract_rejects_unordered_or_overflowing_pages(
+            self):
+        base = {
+            "source_key": "fixture",
+            "total": 2,
+            "offset": 0,
+            "items": (
+                {
+                    "rank": 2,
+                    "term": "甲",
+                    "section_title": "一",
+                    "previous_sentence": "",
+                    "current_sentence": "甲。",
+                    "next_sentence": "",
+                },
+                {
+                    "rank": 1,
+                    "term": "乙",
+                    "section_title": "一",
+                    "previous_sentence": "",
+                    "current_sentence": "乙。",
+                    "next_sentence": "",
+                },
+            ),
+        }
+        with self.assertRaisesRegex(ValueError, "strictly ordered"):
+            gui.normalise_source_preview_response(base)
+
+        overflowing = dict(base)
+        overflowing["offset"] = 2
+        overflowing["items"] = base["items"][:1]
+        with self.assertRaisesRegex(ValueError, "beyond"):
+            gui.normalise_source_preview_response(overflowing)
+
+    def test_source_preview_loader_runs_off_tk_thread_with_small_mapping(
+            self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.source_preview_loader = MagicMock(return_value={
+            "source_key": "fixture",
+            "total": 0,
+            "offset": 0,
+            "items": (),
+        })
+        app._selected_source_option = MagicMock(
+            return_value=gui.SourceUiOption(
+                key="fixture",
+                name="Fixture"))
+        app.source_preview_page_size = MagicMock(
+            get=MagicMock(return_value="500"))
+        app.source_preview_generation = 0
+        app.source_preview_pending = set()
+        app.source_preview_polling = False
+        app.source_preview_result_queue = gui.queue.Queue()
+        app.source_preview_status = MagicMock()
+        app._update_source_preview_navigation = MagicMock()
+        app.root = MagicMock()
+
+        with patch.object(gui.threading, "Thread") as thread_class:
+            worker = thread_class.return_value
+            app._request_source_preview(offset=0)
+
+            app.source_preview_loader.assert_not_called()
+            worker.start.assert_called_once_with()
+            target = thread_class.call_args.kwargs["target"]
+            target()
+
+        app.source_preview_loader.assert_called_once_with({
+            "source_key": "fixture",
+            "offset": 0,
+            "limit": 500,
+        })
+        generation, request, outcome, value = (
+            app.source_preview_result_queue.get_nowait())
+        self.assertEqual(generation, 1)
+        self.assertEqual(
+            request,
+            {
+                "source_key": "fixture",
+                "offset": 0,
+                "limit": 500,
+            })
+        self.assertEqual(outcome, "success")
+        self.assertEqual(value["items"], ())
+
+    def test_manual_input_filter_contract_uses_each_nonblank_line(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.get_generation_language = MagicMock(
+            return_value=pipeline_store.get_language("french"))
+        app._selected_anki_exclusions = MagicMock(return_value=(
+            {
+                "deck": "Known vocabulary",
+                "model": "Vocabulary",
+                "field": "Word",
+            },
+            {
+                "deck": "Archive",
+                "model": "Old Vocabulary",
+                "field": "Term",
+            },
+        ))
+
+        request = app._manual_input_filter_request(
+            "  déjà vu  \n\n行者\nthird item  ")
+
+        self.assertEqual(
+            request,
+            {
+                "text": "  déjà vu  \n\n行者\nthird item  ",
+                "candidates": ("déjà vu", "行者", "third item"),
+                "anki_exclusions": (
+                    {
+                        "deck": "Known vocabulary",
+                        "model": "Vocabulary",
+                        "field": "Word",
+                    },
+                    {
+                        "deck": "Archive",
+                        "model": "Old Vocabulary",
+                        "field": "Term",
+                    },
+                ),
+            })
+        app._selected_anki_exclusions.assert_called_once_with("french")
+
+    def test_manual_input_filter_callback_starts_off_tk_thread(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.input_text = MagicMock()
+        app.input_text.get.return_value = "known\nnew\n"
+        app.save_pipeline_rows = MagicMock(return_value=("pipeline",))
+        app.get_generation_language = MagicMock(
+            return_value=pipeline_store.get_language("english"))
+        app._language_filter = MagicMock(
+            return_value=MagicMock(enabled=True))
+        request = {
+            "text": "known\nnew",
+            "candidates": ("known", "new"),
+            "anki_exclusion": {
+                "deck": "Known",
+                "model": "Basic",
+                "card_template_name": None,
+                "field": "Front",
+            },
+        }
+        app._manual_input_filter_request = MagicMock(
+            return_value=request)
+        app.manual_input_filter_callback = MagicMock(return_value={
+            "filtered_text": "new",
+            "excluded_count": 1,
+            "remaining_count": 1,
+        })
+        app._set_generation_busy = MagicMock()
+        app._set_status = MagicMock()
+        app.root = MagicMock()
+        app.result_queue = gui.queue.Queue()
+
+        with patch.object(gui.threading, "Thread") as thread_class:
+            worker = thread_class.return_value
+            app.start_generation()
+
+            app.manual_input_filter_callback.assert_not_called()
+            worker.start.assert_called_once_with()
+            target = thread_class.call_args.kwargs["target"]
+            args = thread_class.call_args.kwargs["args"]
+            target(*args)
+
+        app.manual_input_filter_callback.assert_called_once_with(request)
+        app._language_filter.assert_called_once_with("english")
+        outcome, value = app.result_queue.get_nowait()
+        self.assertEqual(outcome, "manual_filter_complete")
+        self.assertEqual(value[0].filtered_text, "new")
+
+    def test_zero_remaining_manual_lines_never_start_a_pipeline(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.result_queue = gui.queue.Queue()
+        app.result_queue.put((
+            "manual_filter_complete",
+            (
+                gui.ManualInputFilterResult(
+                    filtered_text="",
+                    excluded_count=2,
+                    remaining_count=0),
+                ("pipeline",),
+            ),
+        ))
+        app._set_generation_busy = MagicMock()
+        app._set_status = MagicMock()
+        app._start_pipeline_generation = MagicMock()
+        app.root = MagicMock()
+
+        with patch.object(gui.messagebox, "showinfo") as showinfo:
+            app._poll_result()
+
+        showinfo.assert_called_once()
+        app._start_pipeline_generation.assert_not_called()
+        app._set_generation_busy.assert_called_once_with(False)
+
+    def test_manual_input_filter_rejects_inconsistent_counts(self):
+        with self.assertRaisesRegex(ValueError, "remaining_count"):
+            gui.normalise_manual_input_filter_response(
+                {
+                    "filtered_text": "one\ntwo",
+                    "excluded_count": 1,
+                    "remaining_count": 1,
+                },
+                2)
+        with self.assertRaisesRegex(ValueError, "requested lines"):
+            gui.normalise_manual_input_filter_response(
+                {
+                    "filtered_text": "one",
+                    "excluded_count": 0,
+                    "remaining_count": 1,
+                },
+                2)
+
+    def test_file_preparation_languages_match_supported_tokenizers(self):
+        self.assertEqual(
+            gui.PREPARABLE_SOURCE_LANGUAGE_NAMES,
+            (
+                "Classical Chinese (Warring States)",
+                "Classical Chinese (Ming)",
+            ))
+
+    def test_scheduling_estimate_immediately_invalidates_inflight_result(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.source_estimate_price = MagicMock()
+        app.source_estimate_detail = MagicMock()
+        app.source_estimate_generation = 4
+        app.source_estimate_result = {"candidate_count": 500}
+        app.source_paid_authorized = MagicMock()
+        app.source_estimate_after_id = None
+        app._update_source_generate_button_state = MagicMock()
+        app.root = MagicMock()
+        app.root.after.return_value = "replacement-estimate"
+
+        app._schedule_source_estimate()
+
+        self.assertEqual(app.source_estimate_generation, 5)
+        self.assertIsNone(app.source_estimate_result)
+        app.source_paid_authorized.set.assert_called_once_with(False)
+        app.root.after.assert_called_once_with(
+            250,
+            app._refresh_source_estimate)
+        self.assertEqual(
+            app.source_estimate_after_id,
+            "replacement-estimate")
+
+    def test_source_estimate_formats_range_and_accounting(self):
+        price, detail = gui.format_source_estimate({
+            "estimated_cost_low_usd": 2.345,
+            "estimated_cost_high_usd": 4.678,
+            "candidate_count": 922,
+            "request_count": 2,
+            "input_tokens": 12345,
+            "output_tokens": 67890,
+            "largest_request_input_tokens": 7000,
+            "largest_request_output_tokens": 34000,
+            "request_limit_warning": "Reduce this request.",
+        })
+
+        self.assertEqual(price, "A$3.36–A$6.71")
+        self.assertIn("922 new words", detail)
+        self.assertIn("2 requests", detail)
+        self.assertIn("12,345 estimated input tokens", detail)
+        self.assertIn("67,890 estimated output tokens", detail)
+        self.assertIn(
+            "largest request ≈ 7,000 input / 34,000 output",
+            detail)
+        self.assertIn(
+            "automatic transient retries are not included",
+            detail)
+        self.assertIn("Reduce this request", detail)
+
+    def test_learned_filter_note_types_are_applied_to_the_selected_row(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        row = {
+            "note_var": MagicMock(
+                get=MagicMock(return_value="Basic")),
+            "field_var": MagicMock(),
+            "note_box": MagicMock(),
+            "field_box": MagicMock(),
+        }
+        app.source_exclusion_status = MagicMock()
+        app._request_learned_filter_options = MagicMock()
+        app._save_learned_filter_rows = MagicMock()
+
+        app._apply_learned_filter_options(
+            row,
+            "note_types",
+            {"note_types": ("Basic", "Cloze")})
+
+        row["note_box"].configure.assert_called_once_with(
+            values=("Basic", "Cloze"),
+            state="readonly")
+        app._request_learned_filter_options.assert_called_once_with(
+            row,
+            "note_type_details",
+            "Basic")
+        app.source_exclusion_status.set.assert_called_once_with(
+            "Loaded 2 note types from the deck.")
+
+    def test_learned_filter_fields_follow_the_selected_note_type(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        row = {
+            "field_var": MagicMock(
+                get=MagicMock(return_value="Front")),
+            "field_box": MagicMock(),
+        }
+        app.source_exclusion_status = MagicMock()
+        app._save_learned_filter_rows = MagicMock()
+
+        app._apply_learned_filter_options(
+            row,
+            "note_type_details",
+            {
+                "fields": ("Front", "Back"),
+                "templates": ("Card 1", "Card 2"),
+            })
+
+        row["field_box"].configure.assert_called_once_with(
+            values=("Back", "Front"),
+            state="readonly")
+        app.source_exclusion_status.set.assert_called_once_with(
+            "Loaded 2 fields from the note type.")
+
+    def test_learned_filter_deck_selection_uses_row_specific_async_contract(
+            self):
+        app = object.__new__(gui.AutoAnkiApp)
+        row = {
+            "deck_var": MagicMock(
+                get=MagicMock(return_value="Learned French")),
+            "note_var": MagicMock(),
+            "field_var": MagicMock(),
+            "note_box": MagicMock(),
+            "field_box": MagicMock(),
+        }
+        app._request_learned_filter_options = MagicMock()
+        app._save_learned_filter_rows = MagicMock()
+
+        app._learned_filter_deck_selected(row)
+
+        app._request_learned_filter_options.assert_called_once_with(
+            row,
+            "note_types",
+            "Learned French")
+        row["note_var"].set.assert_called_once_with("")
+        row["field_var"].set.assert_called_once_with("")
+
+    def test_learned_filter_note_selection_requests_fields_for_that_row(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        row = {
+            "note_var": MagicMock(
+                get=MagicMock(return_value="Vocabulary")),
+            "field_var": MagicMock(),
+            "field_box": MagicMock(),
+        }
+        app._request_learned_filter_options = MagicMock()
+        app._save_learned_filter_rows = MagicMock()
+
+        app._learned_filter_note_selected(row)
+
+        app._request_learned_filter_options.assert_called_once_with(
+            row,
+            "note_type_details",
+            "Vocabulary")
+
+    def test_source_request_includes_context_card_setup_and_safe_deck_policy(
+            self):
+        app = object.__new__(gui.AutoAnkiApp)
+        option = gui.SourceUiOption(
+            key="journey_to_the_west",
+            name="Journey to the West",
+            source_language_key="classical_chinese_ming")
+        app._selected_source_option = MagicMock(return_value=option)
+        app.source_chunk_size = MagicMock(
+            get=MagicMock(return_value="200"))
+        app.source_concurrency = MagicMock(
+            get=MagicMock(return_value="6"))
+        app.source_request_stagger_ms = MagicMock(
+            get=MagicMock(return_value="100"))
+        app.source_context_label = MagicMock(
+            get=MagicMock(
+                return_value=gui.SOURCE_CONTEXT_LABELS[
+                    "sentence_neighbors"]))
+        app.source_language_label = MagicMock(
+            get=MagicMock(
+                return_value="Classical Chinese (Ming)"))
+        app.source_allow_web_search = MagicMock(
+            get=MagicMock(return_value=True))
+        pipeline = configured_pipeline("classical_chinese_ming")
+        app.get_pipeline_configs = MagicMock(
+            return_value=(pipeline,))
+        app._selected_anki_exclusions = MagicMock(return_value=(
+            {
+                "deck": "Learned",
+                "model": "Basic",
+                "field": "Word",
+            },
+            {
+                "deck": "Learned",
+                "model": "Classical Chinese",
+                "field": "Expression",
+            },
+        ))
+
+        request = app._source_request()
+
+        self.assertEqual(request["chunk_size"], 200)
+        self.assertEqual(request["concurrency"], 6)
+        self.assertEqual(request["request_stagger_ms"], 100)
+        self.assertEqual(
+            request["context_mode"],
+            "sentence_neighbors")
+        self.assertTrue(request["allow_web_search"])
+        self.assertEqual(
+            request["pipeline"].language_key,
+            "classical_chinese_ming")
+        self.assertEqual(
+            request["anki_exclusions"],
+            (
+                {
+                    "deck": "Learned",
+                    "model": "Basic",
+                    "field": "Word",
+                },
+                {
+                    "deck": "Learned",
+                    "model": "Classical Chinese",
+                    "field": "Expression",
+                },
+            ))
+        self.assertEqual(
+            request["output_deck_name"],
+            "Vocabulary from Journey to the West")
+        self.assertEqual(
+            request["source_name"],
+            "Journey to the West")
+        self.assertTrue(request["keep_imported_deck"])
+        self.assertFalse(request["move_cards_after_import"])
+        self.assertFalse(request["delete_imported_deck"])
+
+    def test_zero_new_source_words_never_dispatch_paid_generation(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.root = MagicMock()
+        app.source_paid_authorized = MagicMock(
+            get=MagicMock(return_value=True))
+        app._source_request = MagicMock(return_value={"source_key": "x"})
+        app.source_estimate_result = {"candidate_count": 0}
+        app._dispatch_source_action = MagicMock()
+
+        with patch.object(gui.messagebox, "showinfo") as showinfo:
+            app._start_source_generation()
+
+        showinfo.assert_called_once()
+        app._dispatch_source_action.assert_not_called()
+
+    def test_failed_source_retry_requires_manual_paid_authorization(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.root = MagicMock()
+        app.source_retry_callback = MagicMock()
+        app._dispatch_source_action = MagicMock()
+        records = ({"job_id": "chunk-1"},)
+
+        with patch.object(
+                gui.messagebox,
+                "askyesno",
+                return_value=False):
+            app._confirm_and_retry_source_jobs(records)
+
+        app._dispatch_source_action.assert_not_called()
+
+        with patch.object(
+                gui.messagebox,
+                "askyesno",
+                return_value=True):
+            app._confirm_and_retry_source_jobs(records)
+
+        app._dispatch_source_action.assert_called_once_with(
+            "retry",
+            app.source_retry_callback,
+            {
+                "job_ids": ("chunk-1",),
+                "paid_confirmed": True,
+            })
+
+    def test_recoverable_finalize_row_is_retryable_in_the_gui(self):
+        self.assertTrue(gui.AutoAnkiApp._source_job_is_retryable({
+            "job_id": "saved-job::finalize",
+            "status": "failed",
+        }))
+        self.assertFalse(gui.AutoAnkiApp._source_job_is_retryable({
+            "job_id": "saved-job::finalize",
+            "status": "pending",
+        }))
+
     def test_language_selectors_fit_the_longest_available_label(self):
         longest_label = max(
             (
@@ -905,17 +1556,43 @@ class GuiLogicTests(unittest.TestCase):
 
         editor.target_deck_boxes[
             "english"].configure.assert_called_with(
-                state="disabled")
+                state="normal")
         editor.shared_field_containers[
             "english"].grid_remove.assert_called_once()
         for direction in pipeline_store.list_directions():
             editor.direction_target_deck_boxes[
                 "english"][direction.key].configure.assert_called_with(
-                    state="normal")
+                    state="disabled")
             editor.per_card_field_containers[
                 "english"][direction.key].grid.assert_called_once()
         editor._refresh_layout_geometry.assert_called_once_with(
             "english")
+
+    def test_target_deck_mousewheel_scrolls_page_without_changing_deck(self):
+        editor = object.__new__(gui.PipelineEditor)
+        shared_box = MagicMock()
+        first_card_box = MagicMock()
+        second_card_box = MagicMock()
+        editor.target_deck_boxes = {"english": shared_box}
+        editor.direction_target_deck_boxes = {
+            "english": {
+                "context": first_card_box,
+                "word_to_meaning": second_card_box,
+            },
+        }
+        editor.app = MagicMock()
+
+        editor.bind_target_deck_mousewheel()
+
+        for box in (shared_box, first_card_box, second_card_box):
+            self.assertEqual(
+                tuple(call.args[0] for call in box.bind.call_args_list),
+                ("<MouseWheel>", "<Button-4>", "<Button-5>"))
+        callback = shared_box.bind.call_args_list[0].args[1]
+        result = callback(SimpleNamespace(delta=-120, num=None))
+        editor.app.pipeline_scroll_frame.canvas.yview_scroll \
+            .assert_called_once_with(1, "units")
+        self.assertEqual(result, "break")
 
     def test_field_language_menus_remain_available_when_field_is_unticked(
             self):

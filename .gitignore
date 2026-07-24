@@ -1,4 +1,7 @@
 output/output.apkg
+output/corpora/
+output/codex_source_jobs/
+output/source_generation_jobs/
 .idea/
 .venv/
 __pycache__/

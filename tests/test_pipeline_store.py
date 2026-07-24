@@ -127,6 +127,10 @@ class PipelineStoreTests(unittest.TestCase):
             pipeline_store.PIPELINE_CONFIG_VERSION)
         self.assertIn("shared_fields", raw["pipelines"][0])
         self.assertIn("cards", raw["pipelines"][0])
+        self.assertEqual(
+            pipeline_store.pipeline_from_mapping(
+                pipeline_store.pipeline_to_mapping(french)),
+            french)
 
     def test_unselected_field_language_is_saved_without_selecting_field(self):
         pipeline = pipeline_store.default_pipeline()
@@ -525,6 +529,8 @@ class PromptComponentTests(unittest.TestCase):
                 "core",
                 "ending",
                 "directions/context",
+                "source/batch",
+                "source/web_search",
                 *{
                     f"fields/{field.key}"
                     for field in pipeline_store.list_field_options()

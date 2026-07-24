@@ -1,0 +1,8 @@
+# Optional dependencies for historical Chinese word segmentation.
+# This reproducible default uses CPU PyTorch. For a supported NVIDIA GPU,
+# install requirements-corpus-gpu.txt instead.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.13.0+cpu ; sys_platform == "linux" or sys_platform == "win32"
+torch==2.13.0 ; sys_platform == "darwin"
+-r requirements-corpus-base.txt

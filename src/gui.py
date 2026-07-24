@@ -1,18 +1,439 @@
+import json
 import queue
 import threading
 import tkinter as tk
+from dataclasses import dataclass
 from dataclasses import replace
 from pathlib import Path
+from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import simpledialog
 from tkinter import ttk
 
 import anki_integration
 import credential_store
+import learned_filter_store
 import pipeline_runner
 import pipeline_store
 import prompt_builder
 import process_text
+
+
+SOURCE_CONTEXT_OPTIONS = (
+    (
+        "none",
+        "No source context",
+        "Send only the ordered vocabulary for each request.",
+    ),
+    (
+        "sentence",
+        "Current sentence",
+        (
+            "Share each distinct sentence once, then point every overlapping "
+            "word to it."
+        ),
+    ),
+    (
+        "sentence_neighbors",
+        "Current ± previous and next sentence",
+        (
+            "Merge overlapping three-sentence windows and send each resulting "
+            "context only once."
+        ),
+    ),
+    (
+        "chunk_span",
+        "Complete source span for the chunk",
+        (
+            "Send one continuous span from the earliest first occurrence to "
+            "the latest first occurrence in each chunk."
+        ),
+    ),
+)
+SOURCE_CONTEXT_LABELS = {
+    key: label
+    for key, label, _description in SOURCE_CONTEXT_OPTIONS
+}
+SOURCE_CONTEXT_KEYS_BY_LABEL = {
+    label: key
+    for key, label, _description in SOURCE_CONTEXT_OPTIONS
+}
+SOURCE_CONTEXT_DESCRIPTIONS = {
+    key: description
+    for key, _label, description in SOURCE_CONTEXT_OPTIONS
+}
+
+
+@dataclass(frozen=True)
+class SourceUiOption:
+    """One prepared source presented by the Generate UI."""
+
+    key: str
+    name: str
+    word_count: int | None = None
+    section_count: int | None = None
+    source_language_key: str = ""
+    preset: bool = False
+
+
+@dataclass(frozen=True)
+class SourcePreviewItem:
+    """One ordered vocabulary candidate and its retained local context."""
+
+    rank: int
+    term: str
+    section_title: str
+    previous_sentence: str
+    current_sentence: str
+    next_sentence: str
+
+
+@dataclass(frozen=True)
+class SourcePreviewPage:
+    """A validated page returned by the source-preview callback."""
+
+    source_key: str
+    total: int
+    offset: int
+    items: tuple[SourcePreviewItem, ...]
+
+
+@dataclass(frozen=True)
+class ManualInputFilterResult:
+    """Validated result of an exact learned-word lookup."""
+
+    filtered_text: str
+    excluded_count: int
+    remaining_count: int
+
+
+BUILT_IN_SOURCE_OPTIONS = (
+    SourceUiOption(
+        key="daodejing_huijiao",
+        name="Daodejing",
+        word_count=922,
+        section_count=81,
+        source_language_key="classical_chinese_warring_states",
+        preset=True),
+    SourceUiOption(
+        key="journey_to_the_west",
+        name="Journey to the West",
+        word_count=24224,
+        section_count=100,
+        source_language_key="classical_chinese_ming",
+        preset=True),
+)
+
+PREPARABLE_SOURCE_LANGUAGE_NAMES = (
+    "Classical Chinese (Warring States)",
+    "Classical Chinese (Ming)",
+)
+
+
+def normalise_source_preview_response(value):
+    """Validate the small mapping contract used by the source inspector."""
+    if not isinstance(value, dict):
+        raise TypeError("Source preview results must be returned as an object.")
+
+    source_key = value.get("source_key")
+    if not isinstance(source_key, str) or not source_key.strip():
+        raise ValueError("Source preview results require a source_key.")
+    source_key = source_key.strip()
+
+    total = value.get("total")
+    offset = value.get("offset")
+    for name, number in (("total", total), ("offset", offset)):
+        if (
+                isinstance(number, bool)
+                or not isinstance(number, int)
+                or number < 0):
+            raise ValueError(
+                f"Source preview {name} must be a non-negative integer.")
+    if offset > total:
+        raise ValueError(
+            "Source preview offset cannot be greater than its total.")
+
+    raw_items = value.get("items")
+    if not isinstance(raw_items, (tuple, list)):
+        raise ValueError("Source preview items must be a list.")
+    if offset + len(raw_items) > total:
+        raise ValueError(
+            "Source preview items extend beyond the reported total.")
+    if offset < total and not raw_items:
+        raise ValueError(
+            "Source preview returned an empty page before the end.")
+
+    items = []
+    last_rank = 0
+    for raw_item in raw_items:
+        if not isinstance(raw_item, dict):
+            raise ValueError("Every source preview item must be an object.")
+        rank = raw_item.get("rank")
+        if (
+                isinstance(rank, bool)
+                or not isinstance(rank, int)
+                or rank < 1
+                or rank <= last_rank):
+            raise ValueError(
+                "Source preview ranks must be positive and strictly ordered.")
+        term = raw_item.get("term")
+        if not isinstance(term, str) or not term.strip():
+            raise ValueError(
+                "Every source preview item requires a non-empty term.")
+        text_fields = {}
+        for field_name in (
+                "section_title",
+                "previous_sentence",
+                "current_sentence",
+                "next_sentence"):
+            field_value = raw_item.get(field_name, "")
+            if field_value is None:
+                field_value = ""
+            if not isinstance(field_value, str):
+                raise ValueError(
+                    "Source preview sentence and section values must be text.")
+            text_fields[field_name] = field_value.strip()
+        items.append(SourcePreviewItem(
+            rank=rank,
+            term=term.strip(),
+            **text_fields))
+        last_rank = rank
+
+    return SourcePreviewPage(
+        source_key=source_key,
+        total=total,
+        offset=offset,
+        items=tuple(items))
+
+
+def normalise_manual_input_filter_response(value, candidate_count):
+    """Validate the learned-word filter without touching OpenAI."""
+    if not isinstance(value, dict):
+        raise TypeError("Manual-input filter results must be an object.")
+    if (
+            isinstance(candidate_count, bool)
+            or not isinstance(candidate_count, int)
+            or candidate_count < 0):
+        raise ValueError("Candidate count must be a non-negative integer.")
+    filtered_text = value.get("filtered_text")
+    if not isinstance(filtered_text, str):
+        raise ValueError(
+            "Manual-input filter results require filtered_text.")
+    excluded_count = value.get("excluded_count")
+    remaining_count = value.get("remaining_count")
+    for name, number in (
+            ("excluded_count", excluded_count),
+            ("remaining_count", remaining_count)):
+        if (
+                isinstance(number, bool)
+                or not isinstance(number, int)
+                or number < 0):
+            raise ValueError(
+                f"Manual-input filter {name} must be a non-negative integer.")
+    filtered_candidates = tuple(
+        line.strip()
+        for line in filtered_text.splitlines()
+        if line.strip())
+    if len(filtered_candidates) != remaining_count:
+        raise ValueError(
+            "Manual-input filter remaining_count does not match "
+            "filtered_text.")
+    if excluded_count + remaining_count != candidate_count:
+        raise ValueError(
+            "Manual-input filter counts do not match the requested lines.")
+    return ManualInputFilterResult(
+        filtered_text="\n".join(filtered_candidates),
+        excluded_count=excluded_count,
+        remaining_count=remaining_count)
+
+
+def parse_source_chunk_size(value, *, maximum=10000):
+    """Validate the request size without accepting booleans or decimals."""
+    text = str(value).strip()
+    if not text or not text.isdecimal():
+        raise ValueError("Chunk size must be a positive whole number.")
+    chunk_size = int(text)
+    if chunk_size < 1:
+        raise ValueError("Chunk size must be at least 1.")
+    if chunk_size > maximum:
+        raise ValueError(
+            f"Chunk size cannot exceed {maximum:,} words per request.")
+    return chunk_size
+
+
+def parse_request_stagger_ms(value, *, maximum=60000):
+    """Validate an optional delay between starting paid requests."""
+    text = str(value).strip()
+    if not text or not text.isdecimal():
+        raise ValueError(
+            "Request stagger must be a non-negative whole number.")
+    stagger_ms = int(text)
+    if stagger_ms > maximum:
+        raise ValueError(
+            f"Request stagger cannot exceed {maximum:,} milliseconds.")
+    return stagger_ms
+
+
+def normalise_source_options(items):
+    """Coerce backend catalogue entries into stable, unique UI records."""
+    options = []
+    seen_keys = set()
+    for item in items:
+        if isinstance(item, SourceUiOption):
+            option = item
+        elif isinstance(item, dict):
+            option = SourceUiOption(
+                key=str(
+                    item.get("key", item.get("source_key", ""))).strip(),
+                name=str(
+                    item.get("name", item.get("title", ""))).strip(),
+                word_count=item.get("word_count"),
+                section_count=item.get("section_count"),
+                source_language_key=str(
+                    item.get(
+                        "source_language_key",
+                        item.get("language_key", ""))).strip(),
+                preset=bool(item.get("preset", False)))
+        else:
+            option = SourceUiOption(
+                key=str(getattr(
+                    item,
+                    "key",
+                    getattr(item, "source_key", ""))).strip(),
+                name=str(getattr(
+                    item,
+                    "name",
+                    getattr(item, "title", ""))).strip(),
+                word_count=getattr(item, "word_count", None),
+                section_count=getattr(item, "section_count", None),
+                source_language_key=str(
+                    getattr(
+                        item,
+                        "source_language_key",
+                        getattr(item, "language_key", ""))).strip(),
+                preset=bool(getattr(item, "preset", False)))
+        if not option.key or not option.name or option.key in seen_keys:
+            continue
+        if (
+                option.word_count is not None
+                and (
+                    isinstance(option.word_count, bool)
+                    or not isinstance(option.word_count, int)
+                    or option.word_count < 0)):
+            continue
+        if (
+                option.section_count is not None
+                and (
+                    isinstance(option.section_count, bool)
+                    or not isinstance(option.section_count, int)
+                    or option.section_count < 0)):
+            continue
+        seen_keys.add(option.key)
+        options.append(option)
+    return tuple(options)
+
+
+def source_option_display_labels(options):
+    """Return a stable, unique combobox label for every prepared-source key.
+
+    Titles remain uncluttered when they are unique. If two prepared sources
+    share a title, their immutable source keys disambiguate them without
+    changing the title used for requests or output deck names.
+    """
+    options = tuple(options)
+    title_counts = {}
+    for option in options:
+        title_counts[option.name] = title_counts.get(option.name, 0) + 1
+
+    labels_by_key = {}
+    used_labels = set()
+    for option in sorted(options, key=lambda item: (item.key, item.name)):
+        if title_counts[option.name] > 1:
+            base_label = f"{option.name} · {option.key}"
+        else:
+            base_label = option.name
+        label = base_label
+        suffix = 2
+        while label in used_labels:
+            label = f"{base_label} · {suffix}"
+            suffix += 1
+        labels_by_key[option.key] = label
+        used_labels.add(label)
+    return labels_by_key
+
+
+def format_source_estimate(estimate):
+    """Return concise price and accounting text for mapping/object results."""
+    if estimate is None:
+        return (
+            "Estimate unavailable",
+            "Change an option to calculate an offline estimate.")
+
+    def read(name, default=None):
+        if isinstance(estimate, dict):
+            return estimate.get(name, default)
+        return getattr(estimate, name, default)
+
+    low = read("estimated_cost_low_aud")
+    high = read("estimated_cost_high_aud")
+    exact = read("estimated_cost_aud")
+    if low is None and high is None and exact is None:
+        # Compatibility for estimators created before AUD aliases were added.
+        aud_per_usd = float(read("usd_to_aud_rate", 1.0 / 0.6975))
+        usd_low = read("estimated_cost_low_usd")
+        usd_high = read("estimated_cost_high_usd")
+        usd_exact = read("estimated_cost_usd")
+        low = None if usd_low is None else float(usd_low) * aud_per_usd
+        high = None if usd_high is None else float(usd_high) * aud_per_usd
+        exact = None if usd_exact is None else float(usd_exact) * aud_per_usd
+    if low is not None or high is not None:
+        low = float(low if low is not None else high)
+        high = float(high if high is not None else low)
+        price = f"A${low:,.2f}–A${high:,.2f}"
+    elif exact is not None:
+        price = f"A${float(exact):,.2f}"
+    else:
+        price = "Estimate unavailable"
+
+    request_count = read("request_count")
+    candidate_count = read("candidate_count")
+    input_tokens = read("input_tokens")
+    output_tokens = read("output_tokens")
+    details = []
+    if candidate_count is not None:
+        details.append(f"{int(candidate_count):,} new words")
+    if request_count is not None:
+        details.append(f"{int(request_count):,} requests")
+    if input_tokens is not None:
+        details.append(f"{int(input_tokens):,} estimated input tokens")
+    if output_tokens is not None:
+        details.append(f"{int(output_tokens):,} estimated output tokens")
+    largest_input = read("largest_request_input_tokens")
+    largest_output = read("largest_request_output_tokens")
+    if largest_input is not None and largest_output is not None:
+        details.append(
+            "largest request ≈ "
+            f"{int(largest_input):,} input / "
+            f"{int(largest_output):,} output tokens")
+    if details:
+        details.append("automatic transient retries are not included")
+    assumptions = read("assumptions", {})
+    if (
+            isinstance(assumptions, dict)
+            and assumptions.get("web_search_enabled")):
+        details.append(
+            "web-search range assumes zero to one search per request")
+    if isinstance(assumptions, dict) and assumptions.get("aud_exchange_rate"):
+        details.append(str(assumptions["aud_exchange_rate"]))
+    detail = " · ".join(details)
+    if not detail:
+        detail = str(read(
+            "description",
+            "Offline estimate based on the selected card setup."))
+    warning = read("request_limit_warning")
+    if warning:
+        detail = f"Reduce the chunk size — {warning} {detail}"
+    return price, detail
 
 
 def language_selector_width():
@@ -435,7 +856,7 @@ class _LegacyPipelineEditor:
             if language_key is not None
             else tuple(self.card_target_deck_containers))
         for current_language_key in language_keys:
-            separate = self.separate_target_deck_variables[
+            separate = not self.separate_target_deck_variables[
                 current_language_key].get()
             shared_label = self.shared_deck_labels[current_language_key]
             shared_box = self.target_deck_boxes[current_language_key]
@@ -541,12 +962,12 @@ class _LegacyPipelineEditor:
             pady=(0, 12))
         destination.columnconfigure(1, weight=1)
         separate_target_decks = tk.BooleanVar(
-            value=settings.separate_target_decks)
+            value=not settings.separate_target_decks)
         self.separate_target_deck_variables[
             language.key] = separate_target_decks
         split_decks_button = ttk.Checkbutton(
             destination,
-            text="Send each card type to a separate Anki deck",
+            text="Send each card type to the same Anki deck",
             variable=separate_target_decks,
             command=lambda key=language.key: (
                 self._deck_mode_changed(key)),
@@ -792,7 +1213,7 @@ class _LegacyPipelineEditor:
                     target_deck=self.target_deck_variables[
                         language.key].get().strip(),
                     separate_target_decks=(
-                        self.separate_target_deck_variables[
+                        not self.separate_target_deck_variables[
                             language.key].get()),
                     card_type_target_decks=card_type_target_decks))
         active_settings = next(
@@ -839,6 +1260,8 @@ class PipelineEditor:
         self.target_deck_boxes = {}
         self.separate_target_deck_variables = {}
         self.share_field_settings_variables = {}
+        self.learned_filter_enabled_variables = {}
+        self.learned_filter_summary_variables = {}
         self.direction_enabled_variables = {}
         self.card_output_variables = self.direction_enabled_variables
         self.direction_target_deck_variables = {}
@@ -1045,13 +1468,15 @@ class PipelineEditor:
             pady=(0, 10))
         controls.columnconfigure(1, weight=1)
 
-        separate_decks = tk.BooleanVar(
-            value=settings.separate_target_decks)
-        self.separate_target_deck_variables[language.key] = separate_decks
+        same_deck = tk.BooleanVar(
+            value=not settings.separate_target_decks)
+        # Retain the existing attribute name for internal/test compatibility;
+        # its UI value now expresses the positive, user-facing choice.
+        self.separate_target_deck_variables[language.key] = same_deck
         ttk.Checkbutton(
             controls,
-            text="Send each card type to a separate Anki deck",
-            variable=separate_decks,
+            text="Send each card type to the same Anki deck",
+            variable=same_deck,
             command=lambda key=language.key: (
                 self._layout_mode_changed(key)),
             style="Panel.TCheckbutton").grid(
@@ -1114,9 +1539,58 @@ class PipelineEditor:
                 columnspan=2,
                 sticky="w",
                 pady=(5, 0))
-        self._trace(separate_decks)
+        learned_settings = self.app._language_filter(language.key)
+        learned_enabled = tk.BooleanVar(
+            value=learned_settings.enabled)
+        learned_summary = tk.StringVar()
+        self.learned_filter_enabled_variables[
+            language.key] = learned_enabled
+        self.learned_filter_summary_variables[
+            language.key] = learned_summary
+        learned_controls = ttk.Frame(
+            controls,
+            style="Panel.TFrame")
+        learned_controls.grid(
+            row=4,
+            column=0,
+            columnspan=2,
+            sticky="ew",
+            pady=(12, 0))
+        learned_controls.columnconfigure(1, weight=1)
+        ttk.Checkbutton(
+            learned_controls,
+            text="Omit words already learned in Anki",
+            variable=learned_enabled,
+            command=lambda key=language.key: (
+                self._learned_filter_changed(key)),
+            style="Panel.TCheckbutton").grid(
+                row=0,
+                column=0,
+                sticky="w")
+        ttk.Label(
+            learned_controls,
+            textvariable=learned_summary,
+            style="Muted.TLabel",
+            wraplength=520).grid(
+                row=0,
+                column=1,
+                sticky="e",
+                padx=(12, 0))
+        ttk.Button(
+            learned_controls,
+            text="Choose decks and fields…",
+            command=lambda key=language.key: (
+                self.app._open_learned_filter_dialog(key)),
+            style="CompactSecondary.TButton",
+            cursor="hand2").grid(
+                row=0,
+                column=2,
+                sticky="e",
+                padx=(12, 0))
+        self._trace(same_deck)
         self._trace(share_fields)
         self._trace(target_deck)
+        self._update_learned_filter_summary(language.key)
 
         shared_surface = RoundedPanel(
             content,
@@ -1315,6 +1789,35 @@ class PipelineEditor:
         self.app.schedule_pipeline_save()
         self.app._update_pipeline_status()
 
+    def _learned_filter_changed(self, language_key):
+        self.app._set_language_filter_enabled(
+            language_key,
+            self.learned_filter_enabled_variables[
+                language_key].get())
+        self._update_learned_filter_summary(language_key)
+
+    def _update_learned_filter_summary(self, language_key):
+        settings = self.app._language_filter(language_key)
+        self.learned_filter_enabled_variables[
+            language_key].set(settings.enabled)
+        complete = sum(source.complete for source in settings.sources)
+        if not settings.enabled:
+            text = "Off for this language"
+        elif not complete:
+            text = "On · add a deck, note type, and field"
+        else:
+            text = (
+                f"{complete} learned field"
+                f"{'' if complete == 1 else 's'} configured")
+            if complete != len(settings.sources):
+                text += " · one row is incomplete"
+        self.learned_filter_summary_variables[
+            language_key].set(text)
+
+    def refresh_learned_filter_controls(self):
+        for language in pipeline_store.list_settings_languages():
+            self._update_learned_filter_summary(language.key)
+
     def _field_controls_changed(self, language_key):
         self._update_field_box_states(language_key)
         self.app.schedule_pipeline_save()
@@ -1337,8 +1840,9 @@ class PipelineEditor:
                 box.configure(state="readonly")
 
     def _update_visibility(self, language_key):
-        separate = self.separate_target_deck_variables[
+        same_deck = self.separate_target_deck_variables[
             language_key].get()
+        separate = not same_deck
         sharing = self.share_field_settings_variables[
             language_key].get()
         if separate:
@@ -1442,7 +1946,7 @@ class PipelineEditor:
                 target_deck=self.target_deck_variables[
                     language.key].get().strip(),
                 separate_target_decks=(
-                    self.separate_target_deck_variables[
+                    not self.separate_target_deck_variables[
                         language.key].get()),
                 share_field_settings=(
                     self.share_field_settings_variables[
@@ -1466,6 +1970,28 @@ class PipelineEditor:
         for boxes in self.direction_target_deck_boxes.values():
             for box in boxes.values():
                 box.configure(values=deck_options)
+
+    def bind_target_deck_mousewheel(self):
+        """Scroll Card Setup without changing a deck under the pointer."""
+        scroll_frame = self.app.pipeline_scroll_frame
+
+        def scroll_page(event):
+            amount = wheel_scroll_amount(event)
+            if amount:
+                scroll_frame.canvas.yview_scroll(amount, "units")
+            # Stop ttk::combobox's class binding from selecting the previous
+            # or next deck after the page-scroll handler has run.
+            return "break"
+
+        for box in (
+                *self.target_deck_boxes.values(),
+                *(
+                    box
+                    for boxes in self.direction_target_deck_boxes.values()
+                    for box in boxes.values())):
+            box.bind("<MouseWheel>", scroll_page)
+            box.bind("<Button-4>", scroll_page)
+            box.bind("<Button-5>", scroll_page)
 
     def destroy(self):
         for variable, trace_id in self.variable_traces:
@@ -1494,7 +2020,20 @@ class AutoAnkiApp:
             root,
             pipeline_executor=None,
             pipeline_loader=None,
-            pipeline_saver=None):
+            pipeline_saver=None,
+            source_catalog_loader=None,
+            source_estimator=None,
+            source_generate_callback=None,
+            source_prepare_callback=None,
+            source_codex_callback=None,
+            source_jobs_loader=None,
+            source_retry_callback=None,
+            source_inspect_callback=None,
+            source_anki_options_loader=None,
+            source_preview_loader=None,
+            manual_input_filter_callback=None,
+            learned_filter_loader=None,
+            learned_filter_saver=None):
         self.root = root
         try:
             native_scaling = float(
@@ -1509,15 +2048,46 @@ class AutoAnkiApp:
             pipeline_loader or pipeline_store.load_pipelines)
         self.pipeline_saver = (
             pipeline_saver or pipeline_store.save_pipelines)
+        # Source-generation hooks are deliberately injected. Merely opening
+        # the UI can only perform catalogue/job reads and offline estimation;
+        # paid generation, PDF processing, and Codex retrieval require an
+        # explicit button press.
+        self.source_catalog_loader = source_catalog_loader
+        self.source_estimator = source_estimator
+        self.source_generate_callback = source_generate_callback
+        self.source_prepare_callback = source_prepare_callback
+        self.source_codex_callback = source_codex_callback
+        self.source_jobs_loader = source_jobs_loader
+        self.source_retry_callback = source_retry_callback
+        self.source_inspect_callback = source_inspect_callback
+        self.source_anki_options_loader = source_anki_options_loader
+        self.source_preview_loader = source_preview_loader
+        self.manual_input_filter_callback = manual_input_filter_callback
+        self.learned_filter_loader = (
+            learned_filter_loader
+            or learned_filter_store.load_language_filters)
+        self.learned_filter_saver = (
+            learned_filter_saver
+            or learned_filter_store.save_language_filters)
         self.result_queue = queue.Queue()
         self.deck_result_queue = queue.Queue()
         self.connection_result_queue = queue.Queue()
+        self.source_action_result_queue = queue.Queue()
+        self.source_anki_options_queue = queue.Queue()
+        self.source_preview_result_queue = queue.Queue()
         self.pipeline_rows = []
         self.pipeline_save_after_id = None
         self.pipeline_notice_after_id = None
         self.deck_refresh_in_progress = False
         self.deck_launch_requested = False
         self.generation_in_progress = False
+        self.source_action_in_progress = False
+        self.source_estimate_after_id = None
+        self.source_anki_options_pending = 0
+        self.source_anki_options_polling = False
+        self.source_preview_generation = 0
+        self.source_preview_pending = set()
+        self.source_preview_polling = False
 
         root.title("AutoAnki")
         root.configure(background=self.WINDOW_BACKGROUND)
@@ -1543,6 +2113,26 @@ class AutoAnkiApp:
             value=anki_settings.api_key or "")
         self.anki_connection_status = tk.StringVar(
             value=connection_status)
+        # These variables mirror the active Manual and From Source language.
+        # The actual retained configuration is language-specific and may
+        # contain any number of deck/note-type/field combinations.
+        self.source_exclude_enabled = tk.BooleanVar(value=False)
+        self.manual_filter_enabled = tk.BooleanVar(value=False)
+        self.source_exclusion_status = tk.StringVar(
+            value="Learned-word filter is off.")
+        self.manual_filter_summary = tk.StringVar(
+            value="Learned-word filter is off")
+        try:
+            self.learned_filter_settings = tuple(
+                self.learned_filter_loader())
+            self.learned_filter_load_error = None
+        except (OSError, TypeError, ValueError) as error:
+            self.learned_filter_settings = ()
+            self.learned_filter_load_error = error
+        self.learned_filter_dialog = None
+        self.learned_filter_dialog_language_key = None
+        self.learned_filter_rows = []
+        self.learned_filter_rows_by_id = {}
 
         try:
             loaded_pipelines = tuple(self.pipeline_loader())
@@ -2034,6 +2624,22 @@ class AutoAnkiApp:
             bordercolor="#EEF3F1",
             padding=(12, 8),
             font=("DejaVu Sans", 9, "bold"))
+        style.configure(
+            "CompactSecondary.TButton",
+            background="#EEF3F1",
+            foreground=self.ACCENT,
+            bordercolor="#C8D8D4",
+            lightcolor="#EEF3F1",
+            darkcolor="#EEF3F1",
+            padding=(9, 4),
+            font=("DejaVu Sans", 9, "bold"))
+        style.map(
+            "CompactSecondary.TButton",
+            background=[
+                ("active", "#DDEBE7"),
+                ("pressed", "#D2E3DE"),
+                ("disabled", "#F1F3F2")],
+            foreground=[("disabled", self.TEXT_SECONDARY)])
         rounded_button_style(
             "Accent.TButton",
             "AutoAnkiPrimaryRounded.button",
@@ -2109,6 +2715,39 @@ class AutoAnkiApp:
                             }),
                     ],
                 })])
+        style.configure(
+            "App.TEntry",
+            fieldbackground=self.PANEL_BACKGROUND,
+            foreground=self.TEXT_PRIMARY,
+            bordercolor=self.LINE,
+            lightcolor=self.LINE,
+            darkcolor=self.LINE,
+            padding=8)
+        style.map(
+            "App.TEntry",
+            bordercolor=[("focus", self.ACCENT)])
+        style.configure(
+            "Jobs.Treeview",
+            background=self.PANEL_BACKGROUND,
+            fieldbackground=self.PANEL_BACKGROUND,
+            foreground=self.TEXT_PRIMARY,
+            rowheight=30,
+            borderwidth=0,
+            font=("DejaVu Sans", 9))
+        style.map(
+            "Jobs.Treeview",
+            background=[("selected", "#D7E9E5")],
+            foreground=[("selected", self.TEXT_PRIMARY)])
+        style.configure(
+            "Jobs.Treeview.Heading",
+            background=self.PALE,
+            foreground=self.TEXT_PRIMARY,
+            relief=tk.FLAT,
+            font=("DejaVu Sans", 9, "bold"),
+            padding=(8, 7))
+        style.map(
+            "Jobs.Treeview.Heading",
+            background=[("active", "#DDEBE7")])
         style.configure(
             "TNotebook",
             background=self.WINDOW_BACKGROUND,
@@ -2255,6 +2894,38 @@ class AutoAnkiApp:
 
     def _build_generate_tab(self):
         tab = self.generate_tab
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+
+        self.generate_notebook = ttk.Notebook(tab)
+        self.generate_notebook.grid(
+            row=0,
+            column=0,
+            sticky="nsew")
+        self.manual_generate_tab = ttk.Frame(
+            self.generate_notebook,
+            padding=(4, 14, 4, 4),
+            style="App.TFrame")
+        self.from_source_tab = ttk.Frame(
+            self.generate_notebook,
+            padding=(4, 14, 4, 4),
+            style="App.TFrame")
+        self.generate_notebook.add(
+            self.manual_generate_tab,
+            text="Manual Input")
+        self.generate_notebook.add(
+            self.from_source_tab,
+            text="From Source")
+        self.generate_notebook.bind(
+            "<<NotebookTabChanged>>",
+            self._generate_mode_changed,
+            add="+")
+
+        self._build_manual_generate_tab()
+        self._build_from_source_tab()
+
+    def _build_manual_generate_tab(self):
+        tab = self.manual_generate_tab
         tab.columnconfigure(0, weight=1)
         tab.rowconfigure(0, weight=1)
 
@@ -2490,6 +3161,3197 @@ class AutoAnkiApp:
                 column=1,
                 sticky="w",
                 padx=(14, 0))
+
+    def _build_from_source_tab(self):
+        tab = self.from_source_tab
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+
+        self.source_options = ()
+        self.source_options_by_label = {}
+        self.source_options_by_key = {}
+        self.source_display_labels_by_key = {}
+        self.source_selected_label = tk.StringVar()
+        self.source_language_label = tk.StringVar()
+        self.source_chunk_size = tk.StringVar(value="30")
+        self.source_concurrency = tk.StringVar(value="8")
+        self.source_request_stagger_ms = tk.StringVar(value="100")
+        self.source_allow_web_search = tk.BooleanVar(value=False)
+        self.source_context_label = tk.StringVar(
+            value=SOURCE_CONTEXT_LABELS["sentence"])
+        self.source_context_description = tk.StringVar()
+        self.source_summary = tk.StringVar()
+        self.source_deck_notice = tk.StringVar()
+        self.source_catalog_status = tk.StringVar()
+        self.source_estimate_price = tk.StringVar(
+            value="Estimate unavailable")
+        self.source_estimate_detail = tk.StringVar(
+            value="Select a prepared source to calculate an estimate.")
+        self.source_estimate_result = None
+        self.source_estimate_generation = 0
+        self.source_estimate_pending = set()
+        self.source_estimate_polling = False
+        self.source_estimate_result_queue = queue.Queue()
+        self.source_zero_notice_shown = False
+        self.source_paid_authorized = tk.BooleanVar(value=False)
+        self.source_action_status = tk.StringVar(value="No source job running.")
+        self.source_preview_page_size = tk.StringVar(value="100")
+        self.source_preview_status = tk.StringVar(
+            value="Choose a prepared source, then load its local metadata.")
+        self.source_preview_page_data = None
+        self.source_preview_by_tree_id = {}
+
+        self.source_notebook = ttk.Notebook(tab)
+        self.source_notebook.grid(
+            row=0,
+            column=0,
+            sticky="nsew")
+        self.source_generate_page = ttk.Frame(
+            self.source_notebook,
+            style="App.TFrame")
+        self.source_preview_page = ttk.Frame(
+            self.source_notebook,
+            padding=(4, 14, 4, 4),
+            style="App.TFrame")
+        self.source_prepare_page = ttk.Frame(
+            self.source_notebook,
+            style="App.TFrame")
+        self.source_codex_page = ttk.Frame(
+            self.source_notebook,
+            style="App.TFrame")
+        self.source_jobs_page = ttk.Frame(
+            self.source_notebook,
+            padding=(4, 14, 4, 4),
+            style="App.TFrame")
+        self.source_notebook.add(
+            self.source_generate_page,
+            text="Generate Deck")
+        self.source_notebook.add(
+            self.source_preview_page,
+            text="Inspect Source")
+        self.source_notebook.add(
+            self.source_prepare_page,
+            text="Prepare File")
+        self.source_notebook.add(
+            self.source_codex_page,
+            text="Codex Retrieve")
+        self.source_notebook.add(
+            self.source_jobs_page,
+            text="Jobs & Failures")
+        self.source_notebook.bind(
+            "<<NotebookTabChanged>>",
+            self._source_page_changed,
+            add="+")
+
+        self._build_source_generate_page()
+        self._build_source_preview_page()
+        self._build_source_prepare_page()
+        self._build_source_codex_page()
+        self._build_source_jobs_page()
+        self._load_source_catalogue()
+        self._update_source_context_description()
+        self._update_source_exclusion_controls()
+        self._update_source_generate_button_state()
+
+    def _source_header(self, parent, title, body):
+        surface = RoundedPanel(
+            parent,
+            fill=self.PALE,
+            outline="#C8DDD8",
+            background=self.WINDOW_BACKGROUND,
+            radius=20,
+            inset=14)
+        surface.grid(
+            row=0,
+            column=0,
+            sticky="ew")
+        header = surface.interior
+        header.columnconfigure(0, weight=1)
+        tk.Label(
+            header,
+            text=title,
+            background=self.PALE,
+            foreground=self.TEXT_PRIMARY,
+            font=("DejaVu Sans", 11, "bold")).grid(
+                row=0,
+                column=0,
+                sticky="w")
+        tk.Label(
+            header,
+            text=body,
+            background=self.PALE,
+            foreground=self.TEXT_SECONDARY,
+            font=("DejaVu Sans", 9),
+            wraplength=1100,
+            anchor="w",
+            justify="left").grid(
+                row=1,
+                column=0,
+                sticky="ew",
+                pady=(4, 0))
+        return surface
+
+    def _build_source_generate_page(self):
+        page = self.source_generate_page
+        page.columnconfigure(0, weight=1)
+        page.rowconfigure(0, weight=1)
+        viewport = ScrollableFrame(
+            page,
+            background=self.WINDOW_BACKGROUND,
+            frame_style="App.TFrame")
+        viewport.grid(row=0, column=0, sticky="nsew")
+        self.source_generate_viewport = viewport
+        content = viewport.content
+        content.columnconfigure(0, weight=1)
+
+        self._source_header(
+            content,
+            "GENERATE FROM A PREPARED SOURCE",
+            (
+                "The source is already tokenized in first-occurrence order. "
+                "Card detail and response languages come from Card setup; "
+                "context is deduplicated before it is sent."
+            ))
+
+        config_surface = RoundedPanel(
+            content,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.WINDOW_BACKGROUND,
+            radius=24,
+            inset=18)
+        config_surface.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        config = config_surface.interior
+        config.columnconfigure(1, weight=1)
+
+        ttk.Label(
+            config,
+            text="PREPARED SOURCE",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        self.source_selector = ttk.Combobox(
+            config,
+            textvariable=self.source_selected_label,
+            state="readonly",
+            style="App.TCombobox",
+            width=42)
+        self.source_selector.grid(
+            row=0,
+            column=1,
+            sticky="ew")
+        self.source_selector.bind(
+            "<<ComboboxSelected>>",
+            self._source_selection_changed,
+            add="+")
+        self.source_selector.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Button(
+            config,
+            text="Refresh",
+            command=self._refresh_source_catalogue,
+            style="Secondary.TButton",
+            cursor="hand2").grid(
+                row=0,
+                column=2,
+                sticky="e",
+                padx=(10, 0))
+
+        ttk.Label(
+            config,
+            textvariable=self.source_summary,
+            style="Muted.TLabel",
+            wraplength=950).grid(
+                row=1,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(7, 14))
+
+        ttk.Label(
+            config,
+            text="SOURCE LANGUAGE / REGISTER",
+            style="FieldLabel.TLabel").grid(
+                row=2,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        self.source_language_selector = ttk.Combobox(
+            config,
+            textvariable=self.source_language_label,
+            values=tuple(
+                language.name
+                for language in pipeline_store.list_languages()),
+            state="readonly",
+            style="App.TCombobox",
+            width=language_selector_width())
+        self.source_language_selector.grid(
+            row=2,
+            column=1,
+            columnspan=2,
+            sticky="ew")
+        self.source_language_selector.bind(
+            "<<ComboboxSelected>>",
+            lambda _event: self._schedule_source_estimate(),
+            add="+")
+        self.source_language_selector.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+
+        ttk.Label(
+            config,
+            text="CONTEXT PER WORD",
+            style="FieldLabel.TLabel").grid(
+                row=3,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        context_box = ttk.Combobox(
+            config,
+            textvariable=self.source_context_label,
+            values=tuple(
+                label
+                for _key, label, _description
+                in SOURCE_CONTEXT_OPTIONS),
+            state="readonly",
+            style="App.TCombobox",
+            width=42)
+        context_box.grid(
+            row=3,
+            column=1,
+            columnspan=2,
+            sticky="ew")
+        context_box.bind(
+            "<<ComboboxSelected>>",
+            self._source_context_changed,
+            add="+")
+        context_box.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Label(
+            config,
+            textvariable=self.source_context_description,
+            style="Muted.TLabel",
+            wraplength=950).grid(
+                row=4,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(7, 14))
+
+        ttk.Label(
+            config,
+            text="WORDS PER OPENAI REQUEST",
+            style="FieldLabel.TLabel").grid(
+                row=5,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        self.source_chunk_entry = ttk.Entry(
+            config,
+            textvariable=self.source_chunk_size,
+            width=14,
+            style="App.TEntry")
+        self.source_chunk_entry.grid(
+            row=5,
+            column=1,
+            sticky="w")
+        self.source_chunk_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Label(
+            config,
+            text=(
+                "Smaller chunks repeat the instructions more often; larger "
+                "chunks reduce prompt overhead but produce larger responses."
+            ),
+            style="Muted.TLabel",
+            wraplength=570).grid(
+                row=5,
+                column=2,
+                sticky="w",
+                padx=(12, 0))
+
+        rate_controls = ttk.Frame(
+            config,
+            style="Panel.TFrame")
+        rate_controls.grid(
+            row=6,
+            column=0,
+            columnspan=3,
+            sticky="ew",
+            pady=(14, 0))
+        ttk.Label(
+            rate_controls,
+            text="MAX PARALLEL REQUESTS",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(0, 8))
+        concurrency_entry = ttk.Entry(
+            rate_controls,
+            textvariable=self.source_concurrency,
+            width=7,
+            style="App.TEntry")
+        concurrency_entry.grid(
+            row=0,
+            column=1,
+            sticky="w")
+        concurrency_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Label(
+            rate_controls,
+            text="MINIMUM START STAGGER (MS)",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=2,
+                sticky="w",
+                padx=(24, 8))
+        stagger_entry = ttk.Entry(
+            rate_controls,
+            textvariable=self.source_request_stagger_ms,
+            width=9,
+            style="App.TEntry")
+        stagger_entry.grid(
+            row=0,
+            column=3,
+            sticky="w")
+        stagger_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Label(
+            config,
+            text=(
+                "The default starts eight workers, with requests launched no "
+                "faster than the stagger permits. Account limits vary; the "
+                "coordinator observes OpenAI rate-limit responses and backs "
+                "off automatically. Connection/time-out, HTTP 429, and HTTP "
+                "5xx failures may retry without asking; retry costs are not "
+                "included in the estimate."
+            ),
+            style="Muted.TLabel",
+            wraplength=950).grid(
+                row=7,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(7, 0))
+
+        ttk.Checkbutton(
+            config,
+            text=(
+                "Allow one web search per request when the meaning is unclear"
+            ),
+            variable=self.source_allow_web_search,
+            command=self._schedule_source_estimate,
+            style="Panel.TCheckbutton").grid(
+                row=8,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(14, 0))
+        ttk.Label(
+            config,
+            text=(
+                "The model decides whether a search is necessary. The cost "
+                "range includes at most one search call and a conservative "
+                "search-content allowance for every request."
+            ),
+            style="Muted.TLabel",
+            wraplength=950).grid(
+                row=9,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(5, 0))
+
+        estimate_surface = RoundedPanel(
+            content,
+            fill=self.PALE,
+            outline="#C8DDD8",
+            background=self.WINDOW_BACKGROUND,
+            radius=22,
+            inset=16)
+        estimate_surface.grid(
+            row=2,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        estimate = estimate_surface.interior
+        estimate.columnconfigure(0, weight=1)
+        tk.Label(
+            estimate,
+            text="ESTIMATED OPENAI COST",
+            background=self.PALE,
+            foreground=self.TEXT_SECONDARY,
+            font=("DejaVu Sans", 8, "bold")).grid(
+                row=0,
+                column=0,
+                sticky="w")
+        tk.Label(
+            estimate,
+            textvariable=self.source_estimate_price,
+            background=self.PALE,
+            foreground=self.TEXT_PRIMARY,
+            font=("DejaVu Sans", 19, "bold")).grid(
+                row=1,
+                column=0,
+                sticky="w",
+                pady=(3, 0))
+        tk.Label(
+            estimate,
+            textvariable=self.source_estimate_detail,
+            background=self.PALE,
+            foreground=self.TEXT_SECONDARY,
+            font=("DejaVu Sans", 9),
+            wraplength=1000,
+            justify="left").grid(
+                row=2,
+                column=0,
+                sticky="ew",
+                pady=(5, 0))
+
+        actions_surface = RoundedPanel(
+            content,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.WINDOW_BACKGROUND,
+            radius=22,
+            inset=16)
+        actions_surface.grid(
+            row=3,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        actions = actions_surface.interior
+        actions.columnconfigure(0, weight=1)
+        ttk.Label(
+            actions,
+            textvariable=self.source_deck_notice,
+            style="Section.TLabel",
+            wraplength=850).grid(
+                row=0,
+                column=0,
+                columnspan=2,
+                sticky="w")
+        ttk.Label(
+            actions,
+            text=(
+                "The imported source deck is retained as-is. AutoAnki will "
+                "not move its cards into another deck or delete it."
+            ),
+            style="Muted.TLabel",
+            wraplength=920).grid(
+                row=1,
+                column=0,
+                columnspan=2,
+                sticky="w",
+                pady=(4, 12))
+        ttk.Checkbutton(
+            actions,
+            text=(
+                "I authorise the paid OpenAI requests shown in this estimate"
+            ),
+            variable=self.source_paid_authorized,
+            command=self._update_source_generate_button_state,
+            style="Panel.TCheckbutton").grid(
+                row=2,
+                column=0,
+                sticky="w")
+        self.source_generate_button = ttk.Button(
+            actions,
+            text="Generate and import source deck",
+            command=self._start_source_generation,
+            state=tk.DISABLED,
+            style="Accent.TButton",
+            cursor="hand2")
+        self.source_generate_button.grid(
+            row=2,
+            column=1,
+            sticky="e",
+            padx=(14, 0))
+        ttk.Label(
+            content,
+            textvariable=self.source_action_status,
+            style="Status.TLabel",
+            wraplength=1080).grid(
+                row=4,
+                column=0,
+                sticky="w",
+                pady=(10, 0))
+
+        for variable in (
+                self.source_language_label,
+                self.source_chunk_size,
+                self.source_concurrency,
+                self.source_request_stagger_ms):
+            variable.trace_add(
+                "write",
+                self._schedule_source_estimate)
+        viewport.bind_mousewheel_tree()
+
+    def _build_source_preview_page(self):
+        page = self.source_preview_page
+        page.columnconfigure(0, weight=1)
+        page.rowconfigure(2, weight=1)
+
+        preview_header = tk.Frame(
+            page,
+            background=self.PALE,
+            highlightbackground="#C8DDD8",
+            highlightthickness=1,
+            padx=14,
+            pady=9)
+        preview_header.grid(
+            row=0,
+            column=0,
+            sticky="ew")
+        tk.Label(
+            preview_header,
+            text="INSPECT A PREPARED SOURCE",
+            background=self.PALE,
+            foreground=self.TEXT_PRIMARY,
+            font=("DejaVu Sans", 11, "bold")).pack(
+                anchor="w")
+        tk.Label(
+            preview_header,
+            text=(
+                "Browse first-occurrence order, chapter or section, and "
+                "retained surrounding sentences. This local read never "
+                "calls OpenAI or Anki."
+            ),
+            background=self.PALE,
+            foreground=self.TEXT_SECONDARY,
+            font=("DejaVu Sans", 9),
+            wraplength=1100,
+            anchor="w",
+            justify="left").pack(
+                anchor="w",
+                pady=(3, 0))
+
+        controls = tk.Frame(
+            page,
+            background=self.PANEL_BACKGROUND,
+            highlightbackground=self.LINE,
+            highlightthickness=1,
+            padx=13,
+            pady=9)
+        controls.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        controls.columnconfigure(1, weight=1)
+
+        ttk.Label(
+            controls,
+            text="PREPARED SOURCE",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        self.source_preview_selector = ttk.Combobox(
+            controls,
+            textvariable=self.source_selected_label,
+            state="readonly",
+            style="App.TCombobox",
+            width=42)
+        self.source_preview_selector.grid(
+            row=0,
+            column=1,
+            sticky="ew")
+        self.source_preview_selector.bind(
+            "<<ComboboxSelected>>",
+            self._source_preview_selection_changed,
+            add="+")
+        self.source_preview_selector.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+
+        ttk.Label(
+            controls,
+            text="ROWS PER PAGE",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=2,
+                sticky="w",
+                padx=(18, 8))
+        preview_page_entry = ttk.Entry(
+            controls,
+            textvariable=self.source_preview_page_size,
+            width=9,
+            style="App.TEntry")
+        preview_page_entry.grid(
+            row=0,
+            column=3,
+            sticky="w")
+        preview_page_entry.bind(
+            "<Return>",
+            self._reload_source_preview_from_start,
+            add="+")
+        preview_page_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        self.source_preview_load_button = ttk.Button(
+            controls,
+            text="Load page",
+            command=self._reload_source_preview_from_start,
+            state=(
+                tk.NORMAL
+                if self.source_preview_loader is not None
+                else tk.DISABLED),
+            style="CompactSecondary.TButton",
+            cursor="hand2")
+        self.source_preview_load_button.grid(
+            row=0,
+            column=4,
+            sticky="e",
+            padx=(10, 0))
+
+        ttk.Label(
+            controls,
+            text=(
+                "A page contains local metadata only. The default 500 rows "
+                "matches the default OpenAI chunk size, but changing it does "
+                "not generate cards or alter the source."
+            ),
+            style="Muted.TLabel",
+            wraplength=1000).grid(
+                row=1,
+                column=0,
+                columnspan=5,
+                sticky="w",
+                pady=(7, 0))
+
+        preview_body = tk.Frame(
+            page,
+            background=self.WINDOW_BACKGROUND)
+        preview_body.grid(
+            row=2,
+            column=0,
+            sticky="nsew",
+            pady=(10, 0))
+        preview_body.columnconfigure(0, weight=3)
+        preview_body.columnconfigure(1, weight=2)
+        preview_body.rowconfigure(0, weight=1)
+
+        table = tk.Frame(
+            preview_body,
+            background=self.PANEL_BACKGROUND,
+            highlightbackground=self.LINE,
+            highlightthickness=1,
+            padx=8,
+            pady=8)
+        table.grid(
+            row=0,
+            column=0,
+            sticky="nsew")
+        table.columnconfigure(0, weight=1)
+        table.rowconfigure(0, weight=1)
+        columns = ("rank", "term", "section")
+        self.source_preview_tree = ttk.Treeview(
+            table,
+            columns=columns,
+            show="headings",
+            selectmode="browse",
+            height=5,
+            style="Jobs.Treeview")
+        self.source_preview_tree.heading("rank", text="First-seen rank")
+        self.source_preview_tree.heading("term", text="Word")
+        self.source_preview_tree.heading(
+            "section",
+            text="Chapter / section")
+        self.source_preview_tree.column(
+            "rank",
+            width=105,
+            minwidth=90,
+            stretch=False,
+            anchor="e")
+        self.source_preview_tree.column(
+            "term",
+            width=165,
+            minwidth=130,
+            stretch=False)
+        self.source_preview_tree.column(
+            "section",
+            width=320,
+            minwidth=260,
+            stretch=True)
+        preview_table_scrollbar = RoundedScrollbar(
+            table,
+            command=self.source_preview_tree.yview,
+            background=self.PANEL_BACKGROUND,
+            active=self.ACCENT)
+        self.source_preview_tree.configure(
+            yscrollcommand=preview_table_scrollbar.set)
+        self.source_preview_tree.grid(
+            row=0,
+            column=0,
+            sticky="nsew")
+        preview_table_scrollbar.grid(
+            row=0,
+            column=1,
+            sticky="ns",
+            padx=(7, 0))
+        self.source_preview_tree.bind(
+            "<<TreeviewSelect>>",
+            self._source_preview_item_selected,
+            add="+")
+
+        detail = tk.Frame(
+            preview_body,
+            background=self.PANEL_BACKGROUND,
+            highlightbackground=self.LINE,
+            highlightthickness=1,
+            padx=8,
+            pady=8)
+        detail.grid(
+            row=0,
+            column=1,
+            sticky="nsew",
+            padx=(10, 0))
+        detail.columnconfigure(0, weight=1)
+        detail.rowconfigure(1, weight=1)
+        self.source_preview_detail_title = tk.StringVar(
+            value="SELECT A WORD TO INSPECT ITS RETAINED CONTEXT")
+        ttk.Label(
+            detail,
+            textvariable=self.source_preview_detail_title,
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=7,
+                pady=(4, 5))
+        self.source_preview_detail = tk.Text(
+            detail,
+            height=4,
+            width=40,
+            wrap=tk.WORD,
+            font=("DejaVu Sans", 10),
+            background=self.PANEL_BACKGROUND,
+            foreground=self.TEXT_PRIMARY,
+            selectbackground="#D7E9E5",
+            selectforeground=self.TEXT_PRIMARY,
+            relief=tk.FLAT,
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=6,
+            state=tk.DISABLED)
+        self.source_preview_detail.tag_configure(
+            "heading",
+            foreground=self.ACCENT,
+            font=("DejaVu Sans", 9, "bold"),
+            spacing1=7,
+            spacing3=3)
+        self.source_preview_detail.tag_configure(
+            "current",
+            foreground=self.TEXT_PRIMARY,
+            font=("DejaVu Sans", 10, "bold"),
+            lmargin1=8,
+            lmargin2=8,
+            spacing3=4)
+        self.source_preview_detail.tag_configure(
+            "context",
+            foreground=self.TEXT_PRIMARY,
+            lmargin1=8,
+            lmargin2=8,
+            spacing3=4)
+        preview_detail_scrollbar = RoundedScrollbar(
+            detail,
+            command=self.source_preview_detail.yview,
+            background=self.PANEL_BACKGROUND,
+            active=self.ACCENT)
+        self.source_preview_detail.configure(
+            yscrollcommand=preview_detail_scrollbar.set)
+        self.source_preview_detail.grid(
+            row=1,
+            column=0,
+            sticky="nsew")
+        preview_detail_scrollbar.grid(
+            row=1,
+            column=1,
+            sticky="ns")
+        self.source_preview_detail.bind(
+            "<FocusOut>",
+            self._clear_text_selection,
+            add="+")
+
+        navigation = ttk.Frame(page, style="App.TFrame")
+        navigation.grid(
+            row=3,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        navigation.columnconfigure(2, weight=1)
+        self.source_preview_previous_button = ttk.Button(
+            navigation,
+            text="Previous page",
+            command=self._source_preview_previous_page,
+            state=tk.DISABLED,
+            style="CompactSecondary.TButton",
+            cursor="hand2")
+        self.source_preview_previous_button.grid(
+            row=0,
+            column=0,
+            sticky="w")
+        self.source_preview_next_button = ttk.Button(
+            navigation,
+            text="Next page",
+            command=self._source_preview_next_page,
+            state=tk.DISABLED,
+            style="CompactSecondary.TButton",
+            cursor="hand2")
+        self.source_preview_next_button.grid(
+            row=0,
+            column=1,
+            sticky="w",
+            padx=(8, 0))
+        ttk.Label(
+            navigation,
+            textvariable=self.source_preview_status,
+            style="Status.TLabel",
+            wraplength=850).grid(
+                row=0,
+                column=2,
+                sticky="e",
+                padx=(14, 0))
+
+    def _build_source_prepare_page(self):
+        page = self.source_prepare_page
+        page.columnconfigure(0, weight=1)
+        page.rowconfigure(0, weight=1)
+        viewport = ScrollableFrame(
+            page,
+            background=self.WINDOW_BACKGROUND,
+            frame_style="App.TFrame")
+        viewport.grid(row=0, column=0, sticky="nsew")
+        content = viewport.content
+        content.columnconfigure(0, weight=1)
+        self._source_header(
+            content,
+            "PREPARE A PDF OR TEXT FILE",
+            (
+                "Extract and tokenize a local source without calling OpenAI "
+                "or creating cards. When preparation succeeds, it appears in "
+                "the Generate Deck source list."
+            ))
+
+        self.source_file_path = tk.StringVar()
+        self.source_file_title = tk.StringVar()
+        self.source_file_language = tk.StringVar(
+            value="Classical Chinese (Warring States)")
+        self.source_file_use_gpu = tk.BooleanVar(value=True)
+        form_surface = RoundedPanel(
+            content,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.WINDOW_BACKGROUND,
+            radius=24,
+            inset=18)
+        form_surface.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        form = form_surface.interior
+        form.columnconfigure(1, weight=1)
+
+        ttk.Label(
+            form,
+            text="PDF OR TEXT FILE",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        file_entry = ttk.Entry(
+            form,
+            textvariable=self.source_file_path,
+            style="App.TEntry")
+        file_entry.grid(
+            row=0,
+            column=1,
+            sticky="ew")
+        file_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Button(
+            form,
+            text="Choose file…",
+            command=self._choose_source_file,
+            style="Secondary.TButton",
+            cursor="hand2").grid(
+                row=0,
+                column=2,
+                padx=(10, 0))
+
+        ttk.Label(
+            form,
+            text="SOURCE TITLE",
+            style="FieldLabel.TLabel").grid(
+                row=1,
+                column=0,
+                sticky="w",
+                pady=(12, 0),
+                padx=(0, 12))
+        title_entry = ttk.Entry(
+            form,
+            textvariable=self.source_file_title,
+            style="App.TEntry")
+        title_entry.grid(
+            row=1,
+            column=1,
+            columnspan=2,
+            sticky="ew",
+            pady=(12, 0))
+        title_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+
+        ttk.Label(
+            form,
+            text="LANGUAGE / ERA",
+            style="FieldLabel.TLabel").grid(
+                row=2,
+                column=0,
+                sticky="w",
+                pady=(12, 0),
+                padx=(0, 12))
+        language_box = ttk.Combobox(
+            form,
+            textvariable=self.source_file_language,
+            values=PREPARABLE_SOURCE_LANGUAGE_NAMES,
+            state="readonly",
+            width=language_selector_width(),
+            style="App.TCombobox")
+        language_box.grid(
+            row=2,
+            column=1,
+            columnspan=2,
+            sticky="ew",
+            pady=(12, 0))
+        language_box.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Checkbutton(
+            form,
+            text=(
+                "Use the NVIDIA GPU when optional CUDA tokenizer support "
+                "is installed"
+            ),
+            variable=self.source_file_use_gpu,
+            style="Panel.TCheckbutton").grid(
+                row=3,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(14, 0))
+        ttk.Label(
+            form,
+            text=(
+                "GPU support is opportunistic: preparation falls back to "
+                "the CPU rather than failing when CUDA is unavailable."
+            ),
+            style="Muted.TLabel",
+            wraplength=920).grid(
+                row=4,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(5, 12))
+        action_row = ttk.Frame(form, style="Panel.TFrame")
+        action_row.grid(
+            row=5,
+            column=0,
+            columnspan=3,
+            sticky="ew")
+        action_row.columnconfigure(0, weight=1)
+        ttk.Label(
+            action_row,
+            text="No OpenAI request or Anki import occurs in this step.",
+            style="Muted.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w")
+        self.source_prepare_button = ttk.Button(
+            action_row,
+            text="Prepare source",
+            command=self._start_source_preparation,
+            state=(
+                tk.NORMAL
+                if self.source_prepare_callback is not None
+                else tk.DISABLED),
+            style="Accent.TButton",
+            cursor="hand2")
+        self.source_prepare_button.grid(
+            row=0,
+            column=1,
+            sticky="e",
+            padx=(12, 0))
+        if self.source_prepare_callback is None:
+            ttk.Label(
+                content,
+                text=(
+                    "File preparation is not connected in this build yet; "
+                    "the controls are safe to inspect."
+                ),
+                style="Status.TLabel").grid(
+                    row=2,
+                    column=0,
+                    sticky="w",
+                    pady=(10, 0))
+        viewport.bind_mousewheel_tree()
+
+    def _build_source_codex_page(self):
+        page = self.source_codex_page
+        page.columnconfigure(0, weight=1)
+        page.rowconfigure(0, weight=1)
+        viewport = ScrollableFrame(
+            page,
+            background=self.WINDOW_BACKGROUND,
+            frame_style="App.TFrame")
+        viewport.grid(row=0, column=0, sticky="nsew")
+        content = viewport.content
+        content.columnconfigure(0, weight=1)
+        self._source_header(
+            content,
+            "ASK CODEX TO RETRIEVE A SOURCE",
+            (
+                "Name the prepared source, then describe the exact work, "
+                "edition, and retrieval requirements below. Codex does "
+                "nothing until you review the request, tick the authorization "
+                "box, and press Retrieve and prepare."
+            ))
+
+        self.source_codex_language = tk.StringVar(
+            value="Classical Chinese (Warring States)")
+        self.source_codex_title = tk.StringVar()
+        self.source_codex_authorized = tk.BooleanVar(value=False)
+        request_surface = RoundedPanel(
+            content,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.WINDOW_BACKGROUND,
+            radius=24,
+            inset=16)
+        request_surface.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        request_panel = request_surface.interior
+        request_panel.columnconfigure(0, weight=1)
+
+        toolbar = ttk.Frame(
+            request_panel,
+            style="Panel.TFrame")
+        toolbar.grid(row=0, column=0, sticky="ew")
+        toolbar.columnconfigure(0, weight=1)
+        toolbar.columnconfigure(1, weight=1)
+        ttk.Label(
+            toolbar,
+            text="RETRIEVAL REQUEST",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w")
+        ttk.Label(
+            toolbar,
+            text="LANGUAGE / ERA",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=1,
+                sticky="e",
+                padx=(16, 8))
+        codex_language_box = ttk.Combobox(
+            toolbar,
+            textvariable=self.source_codex_language,
+            values=PREPARABLE_SOURCE_LANGUAGE_NAMES,
+            state="readonly",
+            width=language_selector_width(),
+            style="App.TCombobox")
+        codex_language_box.grid(
+            row=0,
+            column=2,
+            sticky="e")
+        codex_language_box.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Label(
+            toolbar,
+            text="SOURCE TITLE",
+            style="FieldLabel.TLabel").grid(
+                row=1,
+                column=0,
+                sticky="w",
+                pady=(10, 0))
+        codex_title_entry = ttk.Entry(
+            toolbar,
+            textvariable=self.source_codex_title,
+            style="App.TEntry")
+        codex_title_entry.grid(
+            row=1,
+            column=1,
+            columnspan=2,
+            sticky="ew",
+            pady=(10, 0))
+        codex_title_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+
+        text_surface = RoundedPanel(
+            request_panel,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.PANEL_BACKGROUND,
+            radius=20,
+            inset=5)
+        text_surface.grid(
+            row=3,
+            column=0,
+            sticky="ew",
+            pady=(5, 0))
+        ttk.Label(
+            request_panel,
+            text="SOURCE DESCRIPTION / RETRIEVAL REQUIREMENTS (REQUIRED)",
+            style="FieldLabel.TLabel").grid(
+                row=2,
+                column=0,
+                sticky="w",
+                pady=(14, 0))
+        text_editor = text_surface.interior
+        text_editor.columnconfigure(0, weight=1)
+        self.source_codex_text = tk.Text(
+            text_editor,
+            height=11,
+            wrap=tk.WORD,
+            undo=True,
+            font=("DejaVu Sans", 10),
+            background=self.PANEL_BACKGROUND,
+            foreground=self.TEXT_PRIMARY,
+            insertbackground=self.TEXT_PRIMARY,
+            selectbackground="#D7E9E5",
+            selectforeground=self.TEXT_PRIMARY,
+            relief=tk.FLAT,
+            borderwidth=0,
+            highlightthickness=0,
+            padx=12,
+            pady=10)
+        codex_scrollbar = RoundedScrollbar(
+            text_editor,
+            command=self.source_codex_text.yview,
+            background=self.PANEL_BACKGROUND,
+            active=self.ACCENT)
+        self.source_codex_text.configure(
+            yscrollcommand=codex_scrollbar.set)
+        self.source_codex_text.grid(row=0, column=0, sticky="nsew")
+        codex_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.source_codex_text.bind(
+            "<FocusOut>",
+            self._clear_text_selection,
+            add="+")
+
+        ttk.Label(
+            request_panel,
+            text=(
+                "Describe what Codex should retrieve—for example the desired "
+                "edition, original script or language, chapter range, "
+                "acceptable sources, completeness requirements, and anything "
+                "that must be excluded."
+            ),
+            style="Muted.TLabel",
+            wraplength=980).grid(
+                row=4,
+                column=0,
+                sticky="w",
+                pady=(6, 0))
+
+        ttk.Checkbutton(
+            request_panel,
+            text=(
+                "Allow Codex to search for and download source text for "
+                "this request"
+            ),
+            variable=self.source_codex_authorized,
+            command=self._update_source_codex_button_state,
+            style="Panel.TCheckbutton").grid(
+                row=5,
+                column=0,
+                sticky="w",
+                pady=(14, 0))
+        action_row = ttk.Frame(
+            request_panel,
+            style="Panel.TFrame")
+        action_row.grid(
+            row=6,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        action_row.columnconfigure(0, weight=1)
+        ttk.Label(
+            action_row,
+            text=(
+                "This retrieves and tokenizes a source only. It never starts "
+                "OpenAI card generation."
+            ),
+            style="Muted.TLabel",
+            wraplength=800).grid(
+                row=0,
+                column=0,
+                sticky="w")
+        self.source_codex_button = ttk.Button(
+            action_row,
+            text="Retrieve and prepare",
+            command=self._start_source_codex_retrieval,
+            state=tk.DISABLED,
+            style="Accent.TButton",
+            cursor="hand2")
+        self.source_codex_button.grid(
+            row=0,
+            column=1,
+            sticky="e",
+            padx=(12, 0))
+        viewport.bind_mousewheel_tree()
+
+    def _build_source_jobs_page(self):
+        page = self.source_jobs_page
+        page.columnconfigure(0, weight=1)
+        page.rowconfigure(1, weight=3)
+        page.rowconfigure(3, weight=2)
+        self._source_header(
+            page,
+            "REQUEST JOBS AND FAILURES",
+            (
+                "Completed chunks are retained. Connection failures may be "
+                "recovered automatically by the backend; invalid responses "
+                "remain stopped until you inspect and explicitly retry them."
+            ))
+
+        table_surface = RoundedPanel(
+            page,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.WINDOW_BACKGROUND,
+            radius=22,
+            inset=10)
+        table_surface.grid(
+            row=1,
+            column=0,
+            sticky="nsew",
+            pady=(10, 0))
+        table = table_surface.interior
+        table.columnconfigure(0, weight=1)
+        table.rowconfigure(0, weight=1)
+        columns = (
+            "source",
+            "chunk",
+            "worker",
+            "status",
+            "attempts",
+            "detail",
+        )
+        self.source_jobs_tree = ttk.Treeview(
+            table,
+            columns=columns,
+            show="headings",
+            selectmode="extended",
+            style="Jobs.Treeview")
+        headings = {
+            "source": "Source",
+            "chunk": "Chunk",
+            "worker": "Worker",
+            "status": "Status",
+            "attempts": "Attempts",
+            "detail": "Latest detail",
+        }
+        widths = {
+            "source": 230,
+            "chunk": 105,
+            "worker": 90,
+            "status": 125,
+            "attempts": 75,
+            "detail": 520,
+        }
+        for column in columns:
+            self.source_jobs_tree.heading(
+                column,
+                text=headings[column])
+            self.source_jobs_tree.column(
+                column,
+                width=widths[column],
+                minwidth=60,
+                stretch=column in {"source", "detail"})
+        jobs_scrollbar = RoundedScrollbar(
+            table,
+            command=self.source_jobs_tree.yview,
+            background=self.PANEL_BACKGROUND,
+            active=self.ACCENT)
+        self.source_jobs_tree.configure(
+            yscrollcommand=jobs_scrollbar.set)
+        self.source_jobs_tree.grid(
+            row=0,
+            column=0,
+            sticky="nsew")
+        jobs_scrollbar.grid(
+            row=0,
+            column=1,
+            sticky="ns",
+            padx=(7, 0))
+        self.source_jobs_tree.tag_configure(
+            "failed",
+            foreground=self.ERROR)
+        self.source_jobs_tree.tag_configure(
+            "running",
+            foreground=self.WARNING)
+        self.source_jobs_tree.tag_configure(
+            "completed",
+            foreground=self.ACCENT)
+        self.source_job_by_tree_id = {}
+
+        actions = ttk.Frame(page, style="App.TFrame")
+        actions.grid(
+            row=2,
+            column=0,
+            sticky="ew",
+            pady=(10, 0))
+        actions.columnconfigure(4, weight=1)
+        ttk.Button(
+            actions,
+            text="Refresh",
+            command=self._refresh_source_jobs,
+            style="Secondary.TButton",
+            cursor="hand2").grid(
+                row=0,
+                column=0,
+                sticky="w")
+        self.source_inspect_button = ttk.Button(
+            actions,
+            text="Inspect selected",
+            command=self._inspect_selected_source_job,
+            style="Secondary.TButton",
+            cursor="hand2")
+        self.source_inspect_button.grid(
+            row=0,
+            column=1,
+            sticky="w",
+            padx=(8, 0))
+        self.source_retry_selected_button = ttk.Button(
+            actions,
+            text="Retry selected…",
+            command=self._retry_selected_source_jobs,
+            state=(
+                tk.NORMAL
+                if self.source_retry_callback is not None
+                else tk.DISABLED),
+            style="Secondary.TButton",
+            cursor="hand2")
+        self.source_retry_selected_button.grid(
+            row=0,
+            column=2,
+            sticky="w",
+            padx=(8, 0))
+        self.source_retry_all_button = ttk.Button(
+            actions,
+            text="Retry all failed…",
+            command=self._retry_all_source_jobs,
+            state=(
+                tk.NORMAL
+                if self.source_retry_callback is not None
+                else tk.DISABLED),
+            style="Secondary.TButton",
+            cursor="hand2")
+        self.source_retry_all_button.grid(
+            row=0,
+            column=3,
+            sticky="w",
+            padx=(8, 0))
+        ttk.Label(
+            actions,
+            textvariable=self.source_action_status,
+            style="Status.TLabel",
+            wraplength=470).grid(
+                row=0,
+                column=4,
+                sticky="e",
+                padx=(12, 0))
+
+        inspect_surface = RoundedPanel(
+            page,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.WINDOW_BACKGROUND,
+            radius=22,
+            inset=8)
+        inspect_surface.grid(
+            row=3,
+            column=0,
+            sticky="nsew",
+            pady=(10, 0))
+        inspect_panel = inspect_surface.interior
+        inspect_panel.columnconfigure(0, weight=1)
+        inspect_panel.rowconfigure(1, weight=1)
+        ttk.Label(
+            inspect_panel,
+            text="INSPECTED REQUEST / RESPONSE",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=7,
+                pady=(4, 5))
+        self.source_job_inspection = tk.Text(
+            inspect_panel,
+            height=8,
+            wrap=tk.WORD,
+            font=("DejaVu Sans Mono", 9),
+            background=self.PANEL_BACKGROUND,
+            foreground=self.TEXT_PRIMARY,
+            selectbackground="#D7E9E5",
+            selectforeground=self.TEXT_PRIMARY,
+            relief=tk.FLAT,
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=6,
+            state=tk.DISABLED)
+        inspect_scrollbar = RoundedScrollbar(
+            inspect_panel,
+            command=self.source_job_inspection.yview,
+            background=self.PANEL_BACKGROUND,
+            active=self.ACCENT)
+        self.source_job_inspection.configure(
+            yscrollcommand=inspect_scrollbar.set)
+        self.source_job_inspection.grid(
+            row=1,
+            column=0,
+            sticky="nsew")
+        inspect_scrollbar.grid(
+            row=1,
+            column=1,
+            sticky="ns")
+        self.source_job_inspection.bind(
+            "<FocusOut>",
+            self._clear_text_selection,
+            add="+")
+
+    def _source_preview_request(self, offset=0):
+        option = self._selected_source_option()
+        page_size = parse_source_chunk_size(
+            self.source_preview_page_size.get())
+        if (
+                isinstance(offset, bool)
+                or not isinstance(offset, int)
+                or offset < 0):
+            raise ValueError(
+                "Source preview offset must be a non-negative integer.")
+        return {
+            "source_key": option.key,
+            "offset": offset,
+            "limit": page_size,
+        }
+
+    def _source_preview_selection_changed(self, _event=None):
+        self._source_selection_changed()
+        self._clear_source_preview(
+            "Loading the selected source’s local metadata…")
+        self._request_source_preview(offset=0)
+
+    def _reload_source_preview_from_start(self, _event=None):
+        self._request_source_preview(offset=0)
+
+    def _request_source_preview(self, *, offset):
+        if self.source_preview_loader is None:
+            self.source_preview_status.set(
+                "Source inspection is unavailable in this build.")
+            self._update_source_preview_navigation()
+            return
+        try:
+            request = self._source_preview_request(offset)
+        except ValueError as error:
+            self.source_preview_status.set(str(error))
+            self._update_source_preview_navigation()
+            return
+
+        self.source_preview_generation += 1
+        generation = self.source_preview_generation
+        self.source_preview_pending.add(generation)
+        self.source_preview_status.set(
+            "Loading local vocabulary metadata…")
+        self._update_source_preview_navigation()
+
+        def load_in_background():
+            try:
+                value = self.source_preview_loader(request)
+            except Exception as error:
+                self.source_preview_result_queue.put((
+                    generation,
+                    request,
+                    "error",
+                    error,
+                ))
+            else:
+                self.source_preview_result_queue.put((
+                    generation,
+                    request,
+                    "success",
+                    value,
+                ))
+
+        threading.Thread(
+            target=load_in_background,
+            daemon=True).start()
+        if not self.source_preview_polling:
+            self.source_preview_polling = True
+            self.root.after(
+                self.POLL_INTERVAL_MS,
+                self._poll_source_preview)
+
+    def _poll_source_preview(self):
+        try:
+            generation, request, outcome, value = (
+                self.source_preview_result_queue.get_nowait())
+        except queue.Empty:
+            if self.source_preview_pending:
+                self.root.after(
+                    self.POLL_INTERVAL_MS,
+                    self._poll_source_preview)
+            else:
+                self.source_preview_polling = False
+                self._update_source_preview_navigation()
+            return
+
+        self.source_preview_pending.discard(generation)
+        if generation == self.source_preview_generation:
+            if outcome == "error":
+                self.source_preview_status.set(
+                    f"Could not load source preview · {value}")
+            else:
+                try:
+                    page = normalise_source_preview_response(value)
+                    if page.source_key != request["source_key"]:
+                        raise ValueError(
+                            "Source preview returned data for another source.")
+                    if page.offset != request["offset"]:
+                        raise ValueError(
+                            "Source preview returned a different page offset.")
+                    selected_key = self._selected_source_option().key
+                    if selected_key != request["source_key"]:
+                        raise ValueError(
+                            "The selected source changed while loading.")
+                except (TypeError, ValueError) as error:
+                    self.source_preview_status.set(
+                        f"Invalid source preview · {error}")
+                else:
+                    self._apply_source_preview(page)
+
+        if self.source_preview_pending:
+            self.root.after(
+                self.POLL_INTERVAL_MS,
+                self._poll_source_preview)
+        else:
+            self.source_preview_polling = False
+            self._update_source_preview_navigation()
+
+    def _apply_source_preview(self, page):
+        for item_id in self.source_preview_tree.get_children():
+            self.source_preview_tree.delete(item_id)
+        self.source_preview_by_tree_id = {}
+        self.source_preview_page_data = page
+        for index, item in enumerate(page.items):
+            item_id = f"source_preview_{index}"
+            self.source_preview_tree.insert(
+                "",
+                tk.END,
+                iid=item_id,
+                values=(
+                    f"{item.rank:,}",
+                    item.term,
+                    item.section_title or "—",
+                ))
+            self.source_preview_by_tree_id[item_id] = item
+
+        if page.items:
+            first = page.offset + 1
+            last = page.offset + len(page.items)
+            self.source_preview_status.set(
+                f"Showing {first:,}–{last:,} of {page.total:,} candidates · "
+                "local metadata only")
+            first_id = "source_preview_0"
+            self.source_preview_tree.selection_set(first_id)
+            self.source_preview_tree.focus(first_id)
+            self.source_preview_tree.see(first_id)
+            self._show_source_preview_item(page.items[0])
+        else:
+            self.source_preview_status.set(
+                "This prepared source has no vocabulary candidates.")
+            self.source_preview_detail_title.set(
+                "NO VOCABULARY CANDIDATES")
+            self._replace_source_preview_detail(
+                (("heading", "Source metadata"),),
+                (("context", "Nothing is available to inspect."),))
+        self._update_source_preview_navigation()
+
+    def _clear_source_preview(self, status=None):
+        if hasattr(self, "source_preview_tree"):
+            for item_id in self.source_preview_tree.get_children():
+                self.source_preview_tree.delete(item_id)
+        self.source_preview_page_data = None
+        self.source_preview_by_tree_id = {}
+        if hasattr(self, "source_preview_detail_title"):
+            self.source_preview_detail_title.set(
+                "SELECT A WORD TO INSPECT ITS RETAINED CONTEXT")
+        if hasattr(self, "source_preview_detail"):
+            self._replace_source_preview_detail(
+                (("heading", "Source metadata"),),
+                ((
+                    "context",
+                    "Load a page and select an ordered vocabulary candidate.",
+                ),))
+        if status is not None:
+            self.source_preview_status.set(status)
+        self._update_source_preview_navigation()
+
+    def _source_preview_item_selected(self, _event=None):
+        selection = self.source_preview_tree.selection()
+        if not selection:
+            return
+        item = self.source_preview_by_tree_id.get(selection[0])
+        if item is not None:
+            self._show_source_preview_item(item)
+
+    def _show_source_preview_item(self, item):
+        self.source_preview_detail_title.set(
+            f"#{item.rank:,}  ·  {item.term}")
+        section_title = item.section_title or "Not recorded"
+        previous = item.previous_sentence or "Not available"
+        current = item.current_sentence or "Not available"
+        following = item.next_sentence or "Not available"
+        self._replace_source_preview_detail(
+            (
+                ("heading", "CHAPTER / SECTION"),
+                ("context", section_title),
+                ("heading", "PREVIOUS SENTENCE"),
+                ("context", previous),
+                ("heading", "CURRENT SENTENCE"),
+                ("current", current),
+                ("heading", "NEXT SENTENCE"),
+                ("context", following),
+            ))
+
+    def _replace_source_preview_detail(self, *groups):
+        self.source_preview_detail.configure(state=tk.NORMAL)
+        self.source_preview_detail.delete("1.0", tk.END)
+        for group in groups:
+            for tag, text in group:
+                self.source_preview_detail.insert(
+                    tk.END,
+                    f"{text}\n",
+                    tag)
+        self.source_preview_detail.configure(state=tk.DISABLED)
+        self.source_preview_detail.yview_moveto(0)
+
+    def _source_preview_previous_page(self):
+        page = self.source_preview_page_data
+        if page is None:
+            return
+        try:
+            page_size = parse_source_chunk_size(
+                self.source_preview_page_size.get())
+        except ValueError as error:
+            self.source_preview_status.set(str(error))
+            return
+        self._request_source_preview(
+            offset=max(0, page.offset - page_size))
+
+    def _source_preview_next_page(self):
+        page = self.source_preview_page_data
+        if page is None:
+            return
+        next_offset = page.offset + len(page.items)
+        if next_offset < page.total:
+            self._request_source_preview(offset=next_offset)
+
+    def _update_source_preview_navigation(self):
+        if not hasattr(self, "source_preview_previous_button"):
+            return
+        busy = (
+            self.source_preview_generation
+            in self.source_preview_pending)
+        available = self.source_preview_loader is not None
+        self.source_preview_load_button.configure(
+            state=tk.NORMAL if available and not busy else tk.DISABLED)
+        page = self.source_preview_page_data
+        previous_enabled = (
+            available
+            and not busy
+            and page is not None
+            and page.offset > 0)
+        next_enabled = (
+            available
+            and not busy
+            and page is not None
+            and page.offset + len(page.items) < page.total)
+        self.source_preview_previous_button.configure(
+            state=tk.NORMAL if previous_enabled else tk.DISABLED)
+        self.source_preview_next_button.configure(
+            state=tk.NORMAL if next_enabled else tk.DISABLED)
+
+    def _load_source_catalogue(self):
+        selected_option = self.source_options_by_label.get(
+            self.source_selected_label.get())
+        selected_key = (
+            selected_option.key
+            if selected_option is not None
+            else None)
+        loaded = ()
+        error = None
+        if self.source_catalog_loader is not None:
+            try:
+                loaded = self.source_catalog_loader()
+                if isinstance(loaded, dict):
+                    loaded = loaded.get("sources", ())
+            except Exception as caught_error:
+                error = caught_error
+                loaded = ()
+        merged = {
+            option.key: option
+            for option in BUILT_IN_SOURCE_OPTIONS
+        }
+        merged.update({
+            option.key: option
+            for option in normalise_source_options(loaded)
+        })
+        self.source_options = tuple(merged.values())
+        self.source_options_by_key = {
+            option.key: option
+            for option in self.source_options
+        }
+        self.source_display_labels_by_key = source_option_display_labels(
+            self.source_options)
+        self.source_options_by_label = {
+            self.source_display_labels_by_key[option.key]: option
+            for option in self.source_options
+        }
+        labels = tuple(
+            self.source_display_labels_by_key[option.key]
+            for option in self.source_options)
+        self.source_selector.configure(values=labels)
+        self.source_preview_selector.configure(values=labels)
+        if selected_key in self.source_display_labels_by_key:
+            self.source_selected_label.set(
+                self.source_display_labels_by_key[selected_key])
+        elif (
+                self.source_selected_label.get()
+                not in self.source_options_by_label):
+            self.source_selected_label.set(
+                labels[0] if labels else "")
+        if error is not None:
+            self.source_catalog_status.set(
+                f"Could not refresh processed sources · {error}")
+        else:
+            self.source_catalog_status.set(
+                f"{len(labels)} prepared sources available")
+        self._source_selection_changed()
+
+    def _refresh_source_catalogue(self):
+        self._load_source_catalogue()
+        self.source_action_status.set(
+            self.source_catalog_status.get())
+
+    def _selected_source_option(self):
+        option = self.source_options_by_label.get(
+            self.source_selected_label.get())
+        if option is None:
+            raise ValueError("Select a prepared source.")
+        return option
+
+    def _source_selection_changed(self, _event=None):
+        option = None
+        try:
+            option = self._selected_source_option()
+        except ValueError:
+            self.source_summary.set("No prepared source selected.")
+            self.source_deck_notice.set(
+                "Select a source to choose the output deck.")
+        else:
+            if option.source_language_key:
+                try:
+                    source_language = pipeline_store.get_language(
+                        option.source_language_key)
+                except ValueError:
+                    self.source_language_label.set("")
+                else:
+                    self.source_language_label.set(source_language.name)
+            summary = []
+            if option.word_count is not None:
+                summary.append(
+                    f"{option.word_count:,} unique candidate words")
+            if option.section_count is not None:
+                summary.append(
+                    f"{option.section_count:,} source sections")
+            summary.append(
+                "built-in preset"
+                if option.preset
+                else "locally prepared source")
+            self.source_summary.set(" · ".join(summary))
+            self.source_deck_notice.set(
+                f'Creates and imports “Vocabulary from {option.name}”.')
+        if (
+                self.source_preview_page_data is not None
+                and (
+                    option is None
+                    or self.source_preview_page_data.source_key
+                    != option.key)):
+            self._clear_source_preview(
+                "The source changed. Load a page to inspect it.")
+        self.source_paid_authorized.set(False)
+        self.source_zero_notice_shown = False
+        self._sync_learned_filter_controls()
+        self._schedule_source_estimate()
+
+    def _source_context_changed(self, _event=None):
+        self._update_source_context_description()
+        self.source_paid_authorized.set(False)
+        self._schedule_source_estimate()
+
+    def _update_source_context_description(self):
+        key = SOURCE_CONTEXT_KEYS_BY_LABEL.get(
+            self.source_context_label.get(),
+            "sentence")
+        self.source_context_description.set(
+            SOURCE_CONTEXT_DESCRIPTIONS[key])
+
+    def _manual_filter_changed(self):
+        language_key = self.get_generation_language().key
+        self._set_language_filter_enabled(
+            language_key,
+            self.manual_filter_enabled.get())
+        self._update_manual_filter_summary()
+
+    def _manual_filter_selection_changed(self, *_args):
+        self._update_manual_filter_summary()
+
+    def _update_manual_filter_summary(self):
+        settings = self._language_filter(
+            self.get_generation_language().key)
+        if not settings.enabled:
+            summary = "Learned-word filter is off"
+        else:
+            complete = sum(source.complete for source in settings.sources)
+            summary = (
+                f"{complete} learned field"
+                f"{'' if complete == 1 else 's'} configured")
+            if complete != len(settings.sources) or not complete:
+                summary += " · finish the incomplete row"
+        self.manual_filter_summary.set(summary)
+
+    def _open_manual_filter_dialog(self):
+        self._open_learned_filter_dialog(
+            self.get_generation_language().key)
+
+    def _open_source_filter_dialog(self):
+        option = self._selected_source_option()
+        self._open_learned_filter_dialog(option.source_language_key)
+
+    def _language_filter(self, language_key):
+        return learned_filter_store.get_language_filter(
+            self.learned_filter_settings,
+            language_key)
+
+    def _save_language_filter(self, settings):
+        self.learned_filter_settings = (
+            learned_filter_store.replace_language_filter(
+                self.learned_filter_settings,
+                settings))
+        try:
+            self.learned_filter_saver(self.learned_filter_settings)
+        except OSError as error:
+            messagebox.showerror(
+                "Could not save learned-word settings",
+                str(error),
+                parent=self.root)
+        self._sync_learned_filter_controls()
+        for editor in getattr(self, "pipeline_rows", ()):
+            refresh = getattr(
+                editor,
+                "refresh_learned_filter_controls",
+                None)
+            if refresh is not None:
+                refresh()
+        if hasattr(self, "source_paid_authorized"):
+            self.source_paid_authorized.set(False)
+        if hasattr(self, "source_estimate_price"):
+            self._schedule_source_estimate()
+
+    def _set_language_filter_enabled(self, language_key, enabled):
+        settings = self._language_filter(language_key)
+        self._save_language_filter(
+            learned_filter_store.LanguageLearnedFilter(
+                language_key=settings.language_key,
+                enabled=bool(enabled),
+                sources=settings.sources))
+
+    def _sync_learned_filter_controls(self):
+        try:
+            manual = self._language_filter(
+                self.get_generation_language().key)
+            self.manual_filter_enabled.set(manual.enabled)
+            self._update_manual_filter_summary()
+        except (AttributeError, ValueError):
+            pass
+        try:
+            option = self._selected_source_option()
+            source = self._language_filter(option.source_language_key)
+            self.source_exclude_enabled.set(source.enabled)
+            complete = sum(item.complete for item in source.sources)
+            if not source.enabled:
+                status = "Learned-word filter is off for this language."
+            elif complete:
+                status = (
+                    f"{complete} learned field"
+                    f"{'' if complete == 1 else 's'} configured for "
+                    f"{pipeline_store.get_language(option.source_language_key).name}.")
+            else:
+                status = (
+                    "Filtering is enabled, but no complete learned field is "
+                    "configured.")
+            self.source_exclusion_status.set(status)
+        except (AttributeError, ValueError):
+            pass
+
+    def _open_learned_filter_dialog(self, language_key):
+        language_key = learned_filter_store.settings_language_key(
+            language_key)
+        self.refresh_anki_decks(launch_if_needed=True)
+        existing = getattr(self, "manual_filter_dialog", None)
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    self._close_learned_filter_dialog()
+            except tk.TclError:
+                pass
+
+        dialog = tk.Toplevel(self.root)
+        self.manual_filter_dialog = dialog
+        self.learned_filter_dialog = dialog
+        self.learned_filter_dialog_language_key = language_key
+        language_name = pipeline_store.get_language(language_key).name
+        dialog.title(f"Learned-word filter · {language_name}")
+        dialog.configure(background=self.WINDOW_BACKGROUND)
+        dialog.transient(self.root)
+        dialog.resizable(True, True)
+        dialog.minsize(1100, 650)
+        dialog.protocol(
+            "WM_DELETE_WINDOW",
+            self._close_learned_filter_dialog)
+
+        outer = ttk.Frame(
+            dialog,
+            padding=(22, 20),
+            style="App.TFrame")
+        outer.pack(fill="both", expand=True)
+        surface = RoundedPanel(
+            outer,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.WINDOW_BACKGROUND,
+            radius=24,
+            inset=18)
+        surface.pack(fill="both", expand=True)
+        panel = surface.interior
+        panel.columnconfigure(0, weight=1)
+        panel.rowconfigure(3, weight=1)
+
+        ttk.Label(
+            panel,
+            text=f"OMIT {language_name.upper()} WORDS ALREADY LEARNED",
+            style="Section.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w")
+        ttk.Label(
+            panel,
+            text=(
+                "Each row contributes one Anki field. The union of every row "
+                "is checked before any paid request. A note type owns its "
+                "fields; card templates are deliberately irrelevant here."
+            ),
+            style="Muted.TLabel",
+            wraplength=1080).grid(
+                row=1,
+                column=0,
+                sticky="w",
+                pady=(5, 12))
+        settings = self._language_filter(language_key)
+        enabled_variable = tk.BooleanVar(value=settings.enabled)
+        ttk.Checkbutton(
+            panel,
+            text="Enable the learned-word filter",
+            variable=enabled_variable,
+            command=lambda: self._set_language_filter_enabled(
+                language_key,
+                enabled_variable.get()),
+            style="Panel.TCheckbutton").grid(
+                row=2,
+                column=0,
+                sticky="w")
+
+        rows_view = ScrollableFrame(
+            panel,
+            background=self.PANEL_BACKGROUND,
+            frame_style="Panel.TFrame")
+        rows_view.grid(
+            row=3,
+            column=0,
+            sticky="nsew",
+            pady=(12, 0))
+        self.learned_filter_rows_container = rows_view.content
+        self.learned_filter_rows_container.columnconfigure(0, weight=1)
+        self.learned_filter_rows = []
+        self.learned_filter_rows_by_id = {}
+        sources = settings.sources or (
+            learned_filter_store.LearnedWordSource(),)
+        for source in sources:
+            self._add_learned_filter_row(source=source, save=False)
+        rows_view.bind_mousewheel_tree()
+
+        footer = ttk.Frame(panel, style="Panel.TFrame")
+        footer.grid(row=4, column=0, sticky="ew", pady=(14, 0))
+        footer.columnconfigure(1, weight=1)
+        ttk.Button(
+            footer,
+            text="+ Add another learned field",
+            command=self._add_learned_filter_row,
+            style="Secondary.TButton",
+            cursor="hand2").grid(row=0, column=0, sticky="w")
+        ttk.Button(
+            footer,
+            text="Done",
+            command=self._close_learned_filter_dialog,
+            style="Accent.TButton",
+            cursor="hand2").grid(row=0, column=2, sticky="e")
+        dialog.update_idletasks()
+        width = max(dialog.winfo_reqwidth(), 1240)
+        height = max(dialog.winfo_reqheight(), 760)
+        x_position = max(
+            self.root.winfo_rootx()
+            + (self.root.winfo_width() - width) // 2,
+            0)
+        y_position = max(
+            self.root.winfo_rooty()
+            + (self.root.winfo_height() - height) // 2,
+            0)
+        dialog.geometry(
+            f"{width}x{height}+{x_position}+{y_position}")
+        dialog.grab_set()
+
+    def _close_learned_filter_dialog(self):
+        dialog = getattr(self, "learned_filter_dialog", None)
+        self.learned_filter_rows_by_id = {}
+        self.learned_filter_rows = []
+        self.learned_filter_dialog_language_key = None
+        self.learned_filter_dialog = None
+        self.manual_filter_dialog = None
+        if dialog is not None:
+            try:
+                if dialog.winfo_exists():
+                    dialog.destroy()
+            except tk.TclError:
+                pass
+
+    def _add_learned_filter_row(self, source=None, *, save=True):
+        if source is None:
+            source = learned_filter_store.source_for_new_row(
+                tuple(
+                    self._learned_filter_source_from_row(row)
+                    for row in self.learned_filter_rows))
+        else:
+            source = learned_filter_store.LearnedWordSource.from_mapping(
+                source)
+        row_id = f"learned_{id(source)}_{len(self.learned_filter_rows)}"
+        surface = RoundedPanel(
+            self.learned_filter_rows_container,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.PANEL_BACKGROUND,
+            radius=18,
+            inset=14)
+        surface.grid(
+            row=len(self.learned_filter_rows),
+            column=0,
+            sticky="ew",
+            pady=(0, 12))
+        frame = surface.interior
+        frame.columnconfigure(0, weight=1)
+        deck_var = tk.StringVar(value=source.deck_name)
+        note_var = tk.StringVar(value=source.note_type)
+        field_var = tk.StringVar(value=source.field_name)
+        title_var = tk.StringVar(
+            value=f"LEARNED SOURCE {len(self.learned_filter_rows) + 1}")
+        ttk.Label(
+            frame,
+            textvariable=title_var,
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                pady=(0, 10))
+        remove_button = ttk.Button(
+            frame,
+            text="Remove",
+            style="CompactSecondary.TButton",
+            cursor="hand2")
+        remove_button.grid(
+            row=0,
+            column=1,
+            sticky="e",
+            pady=(0, 10))
+        for row_number, text in (
+                (1, "ANKI DECK"),
+                (3, "NOTE TYPE"),
+                (5, "FIELD")):
+            ttk.Label(
+                frame,
+                text=text,
+                style="FieldLabel.TLabel").grid(
+                    row=row_number,
+                    column=0,
+                    columnspan=2,
+                    sticky="w",
+                    pady=(0, 4))
+        deck_box = ttk.Combobox(
+            frame,
+            textvariable=deck_var,
+            values=self.deck_options,
+            state="readonly",
+            style="App.TCombobox")
+        note_box = ttk.Combobox(
+            frame,
+            textvariable=note_var,
+            values=(() if not source.note_type else (source.note_type,)),
+            state=("readonly" if source.deck_name else "disabled"),
+            style="App.TCombobox")
+        field_box = ttk.Combobox(
+            frame,
+            textvariable=field_var,
+            values=(() if not source.field_name else (source.field_name,)),
+            state=("readonly" if source.note_type else "disabled"),
+            style="App.TCombobox")
+        for row_number, box in (
+                (2, deck_box),
+                (4, note_box),
+                (6, field_box)):
+            box.grid(
+                row=row_number,
+                column=0,
+                columnspan=2,
+                sticky="ew",
+                pady=(0, 11 if row_number < 6 else 0))
+            box.bind(
+                "<FocusOut>",
+                self._clear_entry_selection,
+                add="+")
+        row = {
+            "id": row_id,
+            "frame": surface,
+            "surface": surface,
+            "deck_var": deck_var,
+            "note_var": note_var,
+            "field_var": field_var,
+            "title_var": title_var,
+            "deck_box": deck_box,
+            "note_box": note_box,
+            "field_box": field_box,
+        }
+        self.learned_filter_rows.append(row)
+        self.learned_filter_rows_by_id[row_id] = row
+        remove_button.configure(
+            command=lambda selected=row: (
+                self._remove_learned_filter_row(selected)))
+        deck_box.bind(
+            "<<ComboboxSelected>>",
+            lambda _event, selected=row: (
+                self._learned_filter_deck_selected(selected)),
+            add="+")
+        note_box.bind(
+            "<<ComboboxSelected>>",
+            lambda _event, selected=row: (
+                self._learned_filter_note_selected(selected)),
+            add="+")
+        field_box.bind(
+            "<<ComboboxSelected>>",
+            lambda _event: self._save_learned_filter_rows(),
+            add="+")
+        if source.deck_name:
+            self._request_learned_filter_options(
+                row,
+                "note_types",
+                source.deck_name)
+        if save:
+            self._save_learned_filter_rows()
+        return row
+
+    @staticmethod
+    def _learned_filter_source_from_row(row):
+        return learned_filter_store.LearnedWordSource(
+            deck_name=row["deck_var"].get().strip(),
+            note_type=row["note_var"].get().strip(),
+            field_name=row["field_var"].get().strip())
+
+    def _save_learned_filter_rows(self):
+        if self.learned_filter_dialog_language_key is None:
+            return
+        existing = self._language_filter(
+            self.learned_filter_dialog_language_key)
+        self._save_language_filter(
+            learned_filter_store.LanguageLearnedFilter(
+                language_key=existing.language_key,
+                enabled=existing.enabled,
+                sources=tuple(
+                    self._learned_filter_source_from_row(row)
+                    for row in self.learned_filter_rows)))
+
+    def _remove_learned_filter_row(self, row):
+        row["frame"].destroy()
+        self.learned_filter_rows.remove(row)
+        self.learned_filter_rows_by_id.pop(row["id"], None)
+        for index, remaining in enumerate(self.learned_filter_rows):
+            remaining["frame"].grid_configure(row=index)
+            remaining["title_var"].set(
+                f"LEARNED SOURCE {index + 1}")
+        self._save_learned_filter_rows()
+
+    def _learned_filter_deck_selected(self, row):
+        row["note_var"].set("")
+        row["field_var"].set("")
+        row["note_box"].configure(values=(), state="disabled")
+        row["field_box"].configure(values=(), state="disabled")
+        self._save_learned_filter_rows()
+        deck = row["deck_var"].get().strip()
+        if deck:
+            self._request_learned_filter_options(
+                row,
+                "note_types",
+                deck)
+
+    def _learned_filter_note_selected(self, row):
+        row["field_var"].set("")
+        row["field_box"].configure(values=(), state="disabled")
+        self._save_learned_filter_rows()
+        note_type = row["note_var"].get().strip()
+        if note_type:
+            self._request_learned_filter_options(
+                row,
+                "note_type_details",
+                note_type)
+
+    def _request_learned_filter_options(self, row, action, value):
+        if self.source_anki_options_loader is None:
+            self.source_exclusion_status.set(
+                "Anki option discovery is unavailable.")
+            return
+        request = (
+            {"action": "note_types", "deck": value}
+            if action == "note_types"
+            else {
+                "action": "note_type_details",
+                "note_type": value,
+            })
+        self.source_anki_options_pending += 1
+
+        def load_in_background():
+            try:
+                result = self.source_anki_options_loader(request)
+            except Exception as error:
+                outcome = ("error", error)
+            else:
+                outcome = ("success", result)
+            self.source_anki_options_queue.put((
+                row["id"],
+                action,
+                value,
+                *outcome,
+            ))
+
+        threading.Thread(
+            target=load_in_background,
+            daemon=True).start()
+        if not self.source_anki_options_polling:
+            self.source_anki_options_polling = True
+            self.root.after(
+                self.POLL_INTERVAL_MS,
+                self._poll_source_anki_options)
+
+    def _source_exclusion_changed(self):
+        option = self._selected_source_option()
+        self._set_language_filter_enabled(
+            option.source_language_key,
+            self.source_exclude_enabled.get())
+        self.source_zero_notice_shown = False
+
+    def _update_source_exclusion_controls(self):
+        self._sync_learned_filter_controls()
+
+    def _poll_source_anki_options(self):
+        try:
+            row_id, action, requested_value, outcome, value = (
+                self.source_anki_options_queue.get_nowait())
+        except queue.Empty:
+            if self.source_anki_options_pending:
+                self.root.after(
+                    self.POLL_INTERVAL_MS,
+                    self._poll_source_anki_options)
+            else:
+                self.source_anki_options_polling = False
+            return
+        self.source_anki_options_pending = max(
+            0,
+            self.source_anki_options_pending - 1)
+        row = self.learned_filter_rows_by_id.get(row_id)
+        current_value = (
+            row["deck_var"].get().strip()
+            if row is not None and action == "note_types"
+            else (
+                row["note_var"].get().strip()
+                if row is not None
+                else None))
+        if row is not None and current_value == requested_value:
+            if outcome == "error":
+                self.source_exclusion_status.set(
+                    f"Could not load Anki options · {value}")
+            else:
+                try:
+                    self._apply_learned_filter_options(
+                        row,
+                        action,
+                        value)
+                except (TypeError, ValueError) as error:
+                    self.source_exclusion_status.set(
+                        f"Anki returned invalid options · {error}")
+        if self.source_anki_options_pending:
+            self.root.after(
+                self.POLL_INTERVAL_MS,
+                self._poll_source_anki_options)
+        else:
+            self.source_anki_options_polling = False
+
+    def _apply_learned_filter_options(self, row, action, value):
+        if not isinstance(value, dict):
+            raise TypeError("Anki options must be returned as an object.")
+
+        def text_values(key):
+            items = value.get(key, ())
+            if (
+                    not isinstance(items, (tuple, list))
+                    or not all(
+                        isinstance(item, str) and item.strip()
+                        for item in items)):
+                raise ValueError(
+                    f"{key.replace('_', ' ').title()} must be text values.")
+            return tuple(sorted(set(items)))
+
+        if action == "note_types":
+            note_types = text_values("note_types")
+            current = row["note_var"].get().strip()
+            if current not in note_types:
+                row["note_var"].set("")
+                row["field_var"].set("")
+            row["note_box"].configure(
+                values=note_types,
+                state="readonly")
+            row["field_box"].configure(
+                values=(),
+                state="disabled")
+            self.source_exclusion_status.set(
+                f"Loaded {len(note_types):,} note types from the deck.")
+            if current and current in note_types:
+                self._request_learned_filter_options(
+                    row,
+                    "note_type_details",
+                    current)
+            self._save_learned_filter_rows()
+            return
+        if action != "note_type_details":
+            raise ValueError(f"Unknown Anki option action: {action}")
+        fields = text_values("fields")
+        current = row["field_var"].get().strip()
+        if current not in fields:
+            row["field_var"].set("")
+        row["field_box"].configure(
+            values=fields,
+            state="readonly")
+        self.source_exclusion_status.set(
+            f"Loaded {len(fields):,} fields from the note type.")
+        self._save_learned_filter_rows()
+
+    def _selected_anki_exclusions(self, language_key):
+        settings = self._language_filter(language_key)
+        if not settings.enabled:
+            return ()
+        if not settings.sources:
+            raise ValueError(
+                "Add at least one learned-word deck, note type, and field.")
+        if not all(source.complete for source in settings.sources):
+            raise ValueError(
+                "Finish or remove every incomplete learned-word row.")
+        return tuple(
+            source.to_exclusion_mapping()
+            for source in settings.sources)
+
+    def _manual_input_filter_request(self, text):
+        candidates = tuple(
+            line.strip()
+            for line in text.splitlines()
+            if line.strip())
+        if not candidates:
+            raise ValueError("Enter at least one nonblank line.")
+        return {
+            "text": text,
+            "candidates": candidates,
+            "anki_exclusions": self._selected_anki_exclusions(
+                self.get_generation_language().key),
+        }
+
+    def _source_request(self):
+        option = self._selected_source_option()
+        chunk_size = parse_source_chunk_size(
+            self.source_chunk_size.get())
+        concurrency = parse_source_chunk_size(
+            self.source_concurrency.get(),
+            maximum=64)
+        request_stagger_ms = parse_request_stagger_ms(
+            self.source_request_stagger_ms.get())
+        context_mode = SOURCE_CONTEXT_KEYS_BY_LABEL.get(
+            self.source_context_label.get())
+        if context_mode is None:
+            raise ValueError("Select a source context option.")
+        selected_language_key = option.source_language_key
+        language_variable = getattr(self, "source_language_label", None)
+        if language_variable is not None:
+            selected_language_name = language_variable.get().strip()
+            if selected_language_name:
+                selected_language_key = self._language_key_for_name(
+                    selected_language_name)
+        if not selected_language_key:
+            raise ValueError("Select the source language and historical era.")
+        pipelines = self.get_pipeline_configs()
+        if selected_language_key:
+            source_pipelines = []
+            for pipeline in pipelines:
+                settings = pipeline_store.get_language_settings(
+                    pipeline,
+                    selected_language_key)
+                settings_by_key = {
+                    item.language_key: item
+                    for item in pipeline.language_settings
+                }
+                settings_by_key[settings.language_key] = settings
+                source_pipelines.append(
+                    pipeline_store.replace_active_language_settings(
+                        pipeline,
+                        settings,
+                        tuple(settings_by_key.values()),
+                        active_language_key=(
+                            selected_language_key)))
+            pipelines = pipeline_store.validate_pipelines(
+                source_pipelines)
+        exclusions = self._selected_anki_exclusions(
+            selected_language_key)
+        return {
+            "source_key": option.key,
+            "source_name": option.name,
+            "source_language_key": selected_language_key,
+            "chunk_size": chunk_size,
+            "context_mode": context_mode,
+            "concurrency": concurrency,
+            "request_stagger_ms": request_stagger_ms,
+            "max_transient_retries": 3,
+            "allow_web_search": bool(
+                getattr(
+                    self,
+                    "source_allow_web_search",
+                    False).get()
+                if hasattr(
+                    getattr(self, "source_allow_web_search", None),
+                    "get")
+                else False),
+            "pipeline": pipelines[0] if pipelines else None,
+            "pipelines": pipelines,
+            "anki_exclusions": exclusions,
+            "exclude_anki": bool(exclusions),
+            "output_deck_name": f"Vocabulary from {option.name}",
+            "keep_imported_deck": True,
+            "move_cards_after_import": False,
+            "delete_imported_deck": False,
+        }
+
+    def _schedule_source_estimate(self, *_args):
+        if not hasattr(self, "source_estimate_price"):
+            return
+        # Invalidate every already-running estimator immediately, rather than
+        # waiting for the debounced replacement to start. Otherwise an older
+        # result can briefly repopulate the price and enable authorization
+        # during this 250 ms window.
+        self.source_estimate_generation += 1
+        self.source_estimate_result = None
+        self.source_paid_authorized.set(False)
+        self._update_source_generate_button_state()
+        if self.source_estimate_after_id is not None:
+            try:
+                self.root.after_cancel(
+                    self.source_estimate_after_id)
+            except tk.TclError:
+                pass
+        self.source_estimate_price.set("Calculating…")
+        self.source_estimate_detail.set(
+            "Offline estimate; this does not contact OpenAI.")
+        self.source_estimate_after_id = self.root.after(
+            250,
+            self._refresh_source_estimate)
+
+    def _refresh_source_estimate(self):
+        self.source_estimate_after_id = None
+        if self.source_estimator is None:
+            self.source_estimate_price.set("Estimate unavailable")
+            self.source_estimate_detail.set(
+                "The source estimator is not connected in this build.")
+            self._update_source_generate_button_state()
+            return
+        try:
+            request = self._source_request()
+        except (OSError, ValueError) as error:
+            self.source_estimate_price.set("Check the options")
+            self.source_estimate_detail.set(str(error))
+            self._update_source_generate_button_state()
+            return
+
+        self.source_estimate_generation += 1
+        generation = self.source_estimate_generation
+        self.source_estimate_pending.add(generation)
+
+        def estimate_in_background():
+            try:
+                value = self.source_estimator(request)
+            except Exception as error:
+                self.source_estimate_result_queue.put(
+                    (generation, "error", error))
+            else:
+                self.source_estimate_result_queue.put(
+                    (generation, "success", value))
+
+        threading.Thread(
+            target=estimate_in_background,
+            daemon=True).start()
+        if not self.source_estimate_polling:
+            self.source_estimate_polling = True
+            self.root.after(
+                self.POLL_INTERVAL_MS,
+                self._poll_source_estimate)
+
+    def _poll_source_estimate(self):
+        try:
+            generation, outcome, value = (
+                self.source_estimate_result_queue.get_nowait())
+        except queue.Empty:
+            if self.source_estimate_pending:
+                self.root.after(
+                    self.POLL_INTERVAL_MS,
+                    self._poll_source_estimate)
+            else:
+                self.source_estimate_polling = False
+            return
+        self.source_estimate_pending.discard(generation)
+        if generation != self.source_estimate_generation:
+            if self.source_estimate_pending:
+                self.root.after(
+                    self.POLL_INTERVAL_MS,
+                    self._poll_source_estimate)
+            else:
+                self.source_estimate_polling = False
+            return
+        if outcome == "error":
+            self.source_estimate_result = None
+            self.source_estimate_price.set("Estimate failed")
+            self.source_estimate_detail.set(str(value))
+        else:
+            self.source_estimate_result = value
+            price, detail = format_source_estimate(value)
+            self.source_estimate_price.set(price)
+            self.source_estimate_detail.set(detail)
+            if (
+                    self._estimate_candidate_count(value) == 0
+                    and self.source_exclude_enabled.get()
+                    and not self.source_zero_notice_shown):
+                self.source_zero_notice_shown = True
+                messagebox.showinfo(
+                    "No new vocabulary",
+                    (
+                        "Every candidate word is already present in the "
+                        "selected Anki field. No OpenAI request or deck will "
+                        "be created."
+                    ),
+                    parent=self.root)
+        self._update_source_generate_button_state()
+        if self.source_estimate_pending:
+            self.root.after(
+                self.POLL_INTERVAL_MS,
+                self._poll_source_estimate)
+        else:
+            self.source_estimate_polling = False
+
+    @staticmethod
+    def _estimate_candidate_count(estimate):
+        if estimate is None:
+            return None
+        if isinstance(estimate, dict):
+            return estimate.get("candidate_count")
+        return getattr(estimate, "candidate_count", None)
+
+    @staticmethod
+    def _estimate_limit_warning(estimate):
+        if estimate is None:
+            return None
+        if isinstance(estimate, dict):
+            return estimate.get("request_limit_warning")
+        return getattr(estimate, "request_limit_warning", None)
+
+    def _update_source_generate_button_state(self):
+        if not hasattr(self, "source_generate_button"):
+            return
+        candidate_count = self._estimate_candidate_count(
+            self.source_estimate_result)
+        available = (
+            self.source_generate_callback is not None
+            and self.source_estimate_result is not None
+            and candidate_count != 0
+            and not self._estimate_limit_warning(
+                self.source_estimate_result)
+            and self.source_paid_authorized.get()
+            and not self.source_action_in_progress)
+        self.source_generate_button.configure(
+            state=tk.NORMAL if available else tk.DISABLED)
+
+    def _update_source_codex_button_state(self):
+        available = (
+            self.source_codex_callback is not None
+            and self.source_codex_authorized.get()
+            and not self.source_action_in_progress)
+        self.source_codex_button.configure(
+            state=tk.NORMAL if available else tk.DISABLED)
+
+    def _start_source_generation(self):
+        if not self.source_paid_authorized.get():
+            messagebox.showwarning(
+                "Paid requests not authorized",
+                "Tick the paid-request authorization before generating.",
+                parent=self.root)
+            return
+        try:
+            request = self._source_request()
+        except (OSError, ValueError) as error:
+            messagebox.showerror(
+                "Cannot start source generation",
+                str(error),
+                parent=self.root)
+            return
+        candidate_count = self._estimate_candidate_count(
+            self.source_estimate_result)
+        if candidate_count == 0:
+            messagebox.showinfo(
+                "No new vocabulary",
+                (
+                    "Every candidate word is already present in the selected "
+                    "Anki field. No OpenAI request or deck was created."
+                ),
+                parent=self.root)
+            return
+        request["paid_confirmed"] = True
+        request["estimate"] = self.source_estimate_result
+        self._dispatch_source_action(
+            "generate",
+            self.source_generate_callback,
+            request)
+
+    def _choose_source_file(self):
+        selected = filedialog.askopenfilename(
+            parent=self.root,
+            title="Choose a source file",
+            filetypes=(
+                ("Supported sources", "*.pdf *.txt *.md"),
+                ("PDF files", "*.pdf"),
+                ("Text files", "*.txt *.md"),
+                ("All files", "*.*"),
+            ))
+        if not selected:
+            return
+        path = Path(selected)
+        self.source_file_path.set(str(path))
+        if not self.source_file_title.get().strip():
+            self.source_file_title.set(path.stem)
+
+    def _language_key_for_name(self, name):
+        for language in pipeline_store.list_languages():
+            if language.name == name:
+                return language.key
+        raise ValueError("Select a valid language and historical era.")
+
+    def _start_source_preparation(self):
+        path = Path(
+            self.source_file_path.get().strip()).expanduser()
+        if not path.is_file():
+            messagebox.showerror(
+                "Source file not found",
+                "Choose an existing PDF, TXT, or Markdown file.",
+                parent=self.root)
+            return
+        if path.suffix.lower() not in {".pdf", ".txt", ".md"}:
+            messagebox.showerror(
+                "Unsupported source file",
+                "Choose a PDF, TXT, or Markdown file.",
+                parent=self.root)
+            return
+        title = self.source_file_title.get().strip()
+        if not title:
+            messagebox.showerror(
+                "Source title required",
+                "Enter the title that should appear in the source list.",
+                parent=self.root)
+            return
+        try:
+            language_key = self._language_key_for_name(
+                self.source_file_language.get())
+        except ValueError as error:
+            messagebox.showerror(
+                "Language required",
+                str(error),
+                parent=self.root)
+            return
+        self._dispatch_source_action(
+            "prepare",
+            self.source_prepare_callback,
+            {
+                "path": str(path.resolve()),
+                "title": title,
+                "language_key": language_key,
+                "prefer_cuda": self.source_file_use_gpu.get(),
+                "generate_cards": False,
+            })
+
+    def _start_source_codex_retrieval(self):
+        request_text = self.source_codex_text.get(
+            "1.0",
+            tk.END).strip()
+        if not request_text:
+            messagebox.showwarning(
+                "Describe the source",
+                "Enter the edition and text you want Codex to retrieve.",
+                parent=self.root)
+            return
+        source_title = self.source_codex_title.get().strip()
+        if not source_title:
+            messagebox.showwarning(
+                "Source title required",
+                "Enter the title that should appear in the prepared list.",
+                parent=self.root)
+            return
+        if not self.source_codex_authorized.get():
+            messagebox.showwarning(
+                "Retrieval not authorized",
+                "Tick the retrieval authorization before starting Codex.",
+                parent=self.root)
+            return
+        try:
+            language_key = self._language_key_for_name(
+                self.source_codex_language.get())
+        except ValueError as error:
+            messagebox.showerror(
+                "Language required",
+                str(error),
+                parent=self.root)
+            return
+        self._dispatch_source_action(
+            "codex",
+            self.source_codex_callback,
+            {
+                "request": request_text,
+                "description": request_text,
+                "title": source_title,
+                "source_title": source_title,
+                "language_key": language_key,
+                "retrieval_authorized": True,
+                "generate_cards": False,
+            })
+
+    def _dispatch_source_action(self, action, callback, request):
+        if callback is None:
+            messagebox.showerror(
+                "Feature not connected",
+                "This source action is not connected in this build.",
+                parent=self.root)
+            return
+        if self.source_action_in_progress:
+            messagebox.showwarning(
+                "Source action already running",
+                "Wait for the current source action to finish.",
+                parent=self.root)
+            return
+        self._set_source_action_busy(True)
+        labels = {
+            "generate": "Starting paid source-generation jobs…",
+            "prepare": "Preparing and tokenizing the source…",
+            "codex": "Codex is retrieving and preparing the source…",
+            "retry": "Retrying the explicitly selected failed jobs…",
+            "inspect": "Loading saved request and response details…",
+        }
+        self.source_action_status.set(
+            labels.get(action, "Starting source action…"))
+
+        def action_in_background():
+            try:
+                result = callback(request)
+            except Exception as error:
+                self.source_action_result_queue.put(
+                    (action, "error", error))
+            else:
+                self.source_action_result_queue.put(
+                    (action, "success", result))
+
+        threading.Thread(
+            target=action_in_background,
+            daemon=True).start()
+        self.root.after(
+            self.POLL_INTERVAL_MS,
+            self._poll_source_action_result)
+
+    def _set_source_action_busy(self, busy):
+        self.source_action_in_progress = busy
+        if hasattr(self, "source_prepare_button"):
+            self.source_prepare_button.configure(
+                state=(
+                    tk.DISABLED
+                    if busy or self.source_prepare_callback is None
+                    else tk.NORMAL))
+        if hasattr(self, "source_codex_button"):
+            self._update_source_codex_button_state()
+        if hasattr(self, "source_retry_selected_button"):
+            retry_state = (
+                tk.DISABLED
+                if busy or self.source_retry_callback is None
+                else tk.NORMAL)
+            self.source_retry_selected_button.configure(
+                state=retry_state)
+            self.source_retry_all_button.configure(
+                state=retry_state)
+        self._update_source_generate_button_state()
+
+    def _poll_source_action_result(self):
+        try:
+            action, outcome, value = (
+                self.source_action_result_queue.get_nowait())
+        except queue.Empty:
+            self._refresh_source_jobs(show_errors=False)
+            self.root.after(
+                1000,
+                self._poll_source_action_result)
+            return
+        self._set_source_action_busy(False)
+        if outcome == "error":
+            self.source_action_status.set(
+                f"Source action failed · {value}")
+            messagebox.showerror(
+                "Source action failed",
+                str(value),
+                parent=self.root)
+            self._refresh_source_jobs(show_errors=False)
+            if action == "generate":
+                # The backend fails closed when the source plan, prompt,
+                # schema, model, learned-word snapshot, or displayed estimate
+                # changed after authorization. Always refresh and require a
+                # new tick after a failed generation attempt.
+                self.source_paid_authorized.set(False)
+                self._schedule_source_estimate()
+            return
+
+        if action == "inspect":
+            self._show_source_job_inspection(value)
+            self.source_action_status.set(
+                "Loaded the saved request and response.")
+            return
+        if action in {"prepare", "codex"}:
+            self._load_source_catalogue()
+        self._refresh_source_jobs(show_errors=False)
+        if isinstance(value, dict):
+            message = value.get("message")
+        else:
+            message = getattr(value, "message", None)
+        self.source_action_status.set(
+            message or {
+                "generate": (
+                    "Generation coordinator finished. Inspect Jobs & "
+                    "Failures for per-chunk results."
+                ),
+                "prepare": "Source preparation finished.",
+                "codex": "Codex retrieval and source preparation finished.",
+                "retry": "Selected retries finished.",
+            }.get(action, "Source action finished."))
+        requires_attention = (
+            isinstance(value, dict)
+            and bool(value.get("requires_attention")))
+        no_new_vocabulary = (
+            isinstance(value, dict)
+            and bool(value.get("no_new_vocabulary")))
+        if no_new_vocabulary and action == "generate":
+            messagebox.showinfo(
+                "No new vocabulary",
+                (
+                    f"{message or 'No new vocabulary remains.'}\n\n"
+                    "No OpenAI request was sent and no Anki deck was "
+                    "created."
+                ),
+                parent=self.root)
+        if requires_attention and action in {"generate", "retry"}:
+            self.source_notebook.select(self.source_jobs_page)
+            messagebox.showwarning(
+                "Source requests need attention",
+                (
+                    f"{message or 'One or more source requests failed.'}\n\n"
+                    "Nothing invalid was retried automatically. In Jobs & "
+                    "Failures you can inspect the retained response, retry "
+                    "selected requests, or retry all failed requests."
+                ),
+                parent=self.root)
+        self._schedule_source_estimate()
+
+    def _refresh_source_jobs(self, *, show_errors=True):
+        if self.source_jobs_loader is None:
+            if show_errors:
+                self.source_action_status.set(
+                    "Saved source jobs are not connected in this build.")
+            return
+        try:
+            jobs = self.source_jobs_loader()
+            if isinstance(jobs, dict):
+                jobs = jobs.get("jobs", ())
+            jobs = tuple(jobs)
+        except Exception as error:
+            if show_errors:
+                messagebox.showerror(
+                    "Could not load source jobs",
+                    str(error),
+                    parent=self.root)
+            self.source_action_status.set(
+                f"Could not load source jobs · {error}")
+            return
+        for item_id in self.source_jobs_tree.get_children():
+            self.source_jobs_tree.delete(item_id)
+        self.source_job_by_tree_id = {}
+        for index, job in enumerate(jobs):
+            def read(name, default=""):
+                if isinstance(job, dict):
+                    return job.get(name, default)
+                return getattr(job, name, default)
+
+            job_id = str(read("job_id", read("id", index)))
+            source = str(read(
+                "source_name",
+                read("source", "")))
+            chunk = read(
+                "chunk_label",
+                read("chunk", read("chunk_index", "")))
+            worker = read(
+                "worker",
+                read("worker_id", "—"))
+            status = str(read("status", "unknown"))
+            attempts = read("attempts", read("attempt_count", 0))
+            detail = str(read(
+                "detail",
+                read("error", read("message", ""))))
+            tree_id = f"source_job_{index}"
+            self.source_jobs_tree.insert(
+                "",
+                tk.END,
+                iid=tree_id,
+                values=(
+                    source,
+                    chunk,
+                    worker,
+                    status,
+                    attempts,
+                    detail,
+                ),
+                tags=(status.lower(),))
+            self.source_job_by_tree_id[tree_id] = {
+                "job_id": job_id,
+                "status": status,
+                "record": job,
+            }
+        self.source_action_status.set(
+            f"{len(jobs):,} saved source jobs loaded.")
+
+    def _selected_source_jobs(self):
+        return tuple(
+            self.source_job_by_tree_id[item_id]
+            for item_id in self.source_jobs_tree.selection()
+            if item_id in self.source_job_by_tree_id)
+
+    def _inspect_selected_source_job(self):
+        selected = self._selected_source_jobs()
+        if len(selected) != 1:
+            messagebox.showinfo(
+                "Select one job",
+                "Select exactly one request to inspect.",
+                parent=self.root)
+            return
+        record = selected[0]
+        if self.source_inspect_callback is None:
+            self._show_source_job_inspection(record["record"])
+            return
+        try:
+            value = self.source_inspect_callback({
+                "job_id": record["job_id"]})
+        except Exception as error:
+            messagebox.showerror(
+                "Could not inspect source job",
+                str(error),
+                parent=self.root)
+            return
+        self._show_source_job_inspection(value)
+        self.source_action_status.set(
+            "Loaded the saved request and response.")
+
+    def _show_source_job_inspection(self, value):
+        if hasattr(value, "to_dict"):
+            value = value.to_dict()
+        if isinstance(value, (dict, list, tuple)):
+            text = json.dumps(
+                value,
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+                default=str)
+        else:
+            text = str(value)
+        self.source_job_inspection.configure(state=tk.NORMAL)
+        self.source_job_inspection.delete("1.0", tk.END)
+        self.source_job_inspection.insert("1.0", text)
+        self.source_job_inspection.configure(state=tk.DISABLED)
+
+    @staticmethod
+    def _source_job_is_retryable(record):
+        status = record["status"].lower()
+        return (
+            status in {
+                "cancelled",
+                "connection_failed",
+                "failed",
+                "invalid",
+                "invalid_response",
+            }
+            or (
+                status == "pending"
+                and not record["job_id"].endswith("::finalize")))
+
+    def _retry_selected_source_jobs(self):
+        selected = self._selected_source_jobs()
+        failed = tuple(
+            record
+            for record in selected
+            if self._source_job_is_retryable(record))
+        if not failed:
+            messagebox.showinfo(
+                "No failed jobs selected",
+                "Select one or more pending, failed, or invalid-response "
+                "requests.",
+                parent=self.root)
+            return
+        self._confirm_and_retry_source_jobs(failed)
+
+    def _retry_all_source_jobs(self):
+        failed = tuple(
+            record
+            for record in self.source_job_by_tree_id.values()
+            if self._source_job_is_retryable(record))
+        if not failed:
+            messagebox.showinfo(
+                "No failed jobs",
+                "There are no saved incomplete requests to resume or retry.",
+                parent=self.root)
+            return
+        self._confirm_and_retry_source_jobs(failed)
+
+    def _confirm_and_retry_source_jobs(self, records):
+        if not messagebox.askyesno(
+                "Authorize paid retries?",
+                (
+                    f"Resume or retry {len(records):,} request(s)? These "
+                    "requests may incur additional OpenAI charges. Completed "
+                    "requests will not be repeated."
+                ),
+                parent=self.root):
+            return
+        self._dispatch_source_action(
+            "retry",
+            self.source_retry_callback,
+            {
+                "job_ids": tuple(
+                    record["job_id"]
+                    for record in records),
+                "paid_confirmed": True,
+            })
+
+    def _generate_mode_changed(self, _event=None):
+        if (
+                hasattr(self, "generate_notebook")
+                and self.generate_notebook.select()
+                == str(self.from_source_tab)):
+            self._schedule_source_estimate()
+
+    def _source_page_changed(self, _event=None):
+        selected = self.source_notebook.select()
+        if selected == str(self.source_generate_page):
+            self._schedule_source_estimate()
+        elif selected == str(self.source_preview_page):
+            try:
+                option = self._selected_source_option()
+            except ValueError:
+                self.source_preview_status.set(
+                    "Select a prepared source to inspect.")
+            else:
+                loaded_key = (
+                    self.source_preview_page_data.source_key
+                    if self.source_preview_page_data is not None
+                    else None)
+                if (
+                        loaded_key != option.key
+                        and not self.source_preview_pending):
+                    self._request_source_preview(offset=0)
+        elif selected == str(self.source_jobs_page):
+            self._refresh_source_jobs(show_errors=False)
 
     def _build_pipeline_tab(self):
         tab = self.pipeline_tab
@@ -3214,6 +7076,11 @@ class AutoAnkiApp:
         self.prompt_text.edit_modified(False)
         self._update_prompt_editor_state(
             f"Saved {self.current_prompt_key}")
+        if hasattr(self, "source_estimate_price"):
+            # Source prompts are part of both the cost and immutable paid
+            # request contract. A saved edit therefore needs a new estimate
+            # and a fresh authorization.
+            self._schedule_source_estimate()
         if show_confirmation:
             messagebox.showinfo(
                 "Prompt saved",
@@ -3233,6 +7100,8 @@ class AutoAnkiApp:
             self.pipeline_editor_container,
             config)]
         self.pipeline_scroll_frame.bind_mousewheel_tree()
+        for row in self.pipeline_rows:
+            row.bind_target_deck_mousewheel()
         self._update_pipeline_status()
 
     def _update_pipeline_status(self, message=None):
@@ -3294,6 +7163,8 @@ class AutoAnkiApp:
         self.pipeline_save_after_id = self.root.after(
             400,
             self._autosave_pipeline_rows)
+        if hasattr(self, "source_estimate_price"):
+            self._schedule_source_estimate()
 
     def _autosave_pipeline_rows(self):
         self.pipeline_save_after_id = None
@@ -3339,6 +7210,13 @@ class AutoAnkiApp:
             self.root.after_idle(
                 self._refresh_prompt_selector_display)
             return
+        if selected_tab == str(self.generate_tab):
+            if (
+                    hasattr(self, "generate_notebook")
+                    and self.generate_notebook.select()
+                    == str(self.from_source_tab)):
+                self._schedule_source_estimate()
+            return
         if selected_tab != str(self.pipeline_tab):
             return
         self.deck_status.set(
@@ -3354,6 +7232,7 @@ class AutoAnkiApp:
 
     def _generation_language_changed(self, _event=None):
         language = self.get_generation_language()
+        self._sync_learned_filter_controls()
         self.schedule_pipeline_save()
         self._update_pipeline_status()
         self._set_status(
@@ -3422,6 +7301,14 @@ class AutoAnkiApp:
                 self.deck_options = value
                 for row in self.pipeline_rows:
                     row.update_deck_options(value)
+                for learned_row in getattr(
+                        self,
+                        "learned_filter_rows",
+                        ()):
+                    try:
+                        learned_row["deck_box"].configure(values=value)
+                    except tk.TclError:
+                        pass
                 self._update_pipeline_status()
             if hasattr(self, "deck_status"):
                 self.deck_status.set(
@@ -3487,6 +7374,16 @@ class AutoAnkiApp:
                     "imported."),
                 parent=self.root)
             return
+        if getattr(self, "source_action_in_progress", False):
+            messagebox.showinfo(
+                "Source work is still running",
+                (
+                    "Keep AutoAnki open while the active source coordinator "
+                    "finishes. Per-chunk results already saved by the backend "
+                    "remain recoverable from Jobs & Failures."
+                ),
+                parent=self.root)
+            return
         if getattr(self, "prompt_dirty", False):
             decision = self._confirm_unsaved_prompt("closing AutoAnki")
             if decision == "cancel":
@@ -3503,6 +7400,9 @@ class AutoAnkiApp:
         if self.pipeline_notice_after_id is not None:
             self.root.after_cancel(self.pipeline_notice_after_id)
             self.pipeline_notice_after_id = None
+        if self.source_estimate_after_id is not None:
+            self.root.after_cancel(self.source_estimate_after_id)
+            self.source_estimate_after_id = None
         if self.save_pipeline_rows(show_errors=True) is None:
             return
         self.root.destroy()
@@ -3525,14 +7425,55 @@ class AutoAnkiApp:
                 "Add at least one pipeline before generating cards.")
             return
 
-        if not self._ensure_api_key():
+        if self._language_filter(
+                self.get_generation_language().key).enabled:
+            if self.manual_input_filter_callback is None:
+                messagebox.showerror(
+                    "Learned-word filter unavailable",
+                    (
+                        "This build has not connected the manual-input "
+                        "learned-word filter. Disable it or reconnect the "
+                        "filter backend."
+                    ),
+                    parent=self.root)
+                return
+            try:
+                filter_request = self._manual_input_filter_request(words)
+            except ValueError as error:
+                messagebox.showerror(
+                    "Learned-word filter is incomplete",
+                    str(error),
+                    parent=self.root)
+                return
+            self._set_generation_busy(True)
+            self._set_status(
+                "Checking exact input lines against Anki before generation…",
+                self.WARNING)
+            worker = threading.Thread(
+                target=self._filter_manual_input_in_background,
+                args=(filter_request, pipelines),
+                daemon=True)
+            worker.start()
+            self.root.after(
+                self.POLL_INTERVAL_MS,
+                self._poll_result)
             return
+        self._start_pipeline_generation(words, pipelines)
 
+    def _start_pipeline_generation(
+            self,
+            words,
+            pipelines,
+            *,
+            status_message=None):
+        if not self._ensure_api_key():
+            self._set_generation_busy(False)
+            return
         self._set_generation_busy(True)
         self._set_status(
-            f"Starting {len(pipelines)} generation pipelines…",
+            status_message
+            or f"Starting {len(pipelines)} generation pipelines…",
             self.WARNING)
-
         worker = threading.Thread(
             target=self._generate_in_background,
             args=(words, pipelines),
@@ -3541,6 +7482,19 @@ class AutoAnkiApp:
         self.root.after(
             self.POLL_INTERVAL_MS,
             self._poll_result)
+
+    def _filter_manual_input_in_background(self, request, pipelines):
+        try:
+            value = self.manual_input_filter_callback(request)
+            result = normalise_manual_input_filter_response(
+                value,
+                len(request["candidates"]))
+        except Exception as error:
+            self.result_queue.put(
+                ("manual_filter_error", error))
+            return
+        self.result_queue.put(
+            ("manual_filter_complete", (result, pipelines)))
 
     def _ensure_api_key(self):
         try:
@@ -3654,6 +7608,47 @@ class AutoAnkiApp:
                 self._poll_result)
             return
 
+        if outcome == "manual_filter_error":
+            self._set_generation_busy(False)
+            self._set_status(
+                "Learned-word check failed before generation.",
+                self.ERROR)
+            messagebox.showerror(
+                "Could not check learned words",
+                (
+                    f"{value}\n\n"
+                    "No OpenAI request was made and no pipeline was started."
+                ),
+                parent=self.root)
+            return
+
+        if outcome == "manual_filter_complete":
+            result, pipelines = value
+            if result.remaining_count == 0:
+                self._set_generation_busy(False)
+                self._set_status(
+                    "Every input line is already present in the selected "
+                    "Anki field.",
+                    self.ACCENT)
+                messagebox.showinfo(
+                    "Nothing new to generate",
+                    (
+                        f"All {result.excluded_count:,} nonblank input lines "
+                        "are already present. No OpenAI request was made and "
+                        "no deck was created."
+                    ),
+                    parent=self.root)
+                return
+            self._start_pipeline_generation(
+                result.filtered_text,
+                pipelines,
+                status_message=(
+                    f"Omitted {result.excluded_count:,} learned lines; "
+                    f"starting {len(pipelines)} generation pipelines for "
+                    f"{result.remaining_count:,} remaining lines…"
+                ))
+            return
+
         if outcome == "pipeline_progress":
             action = (
                 "requesting an OpenAI response"
@@ -3747,8 +7742,15 @@ class AutoAnkiApp:
 
 
 def main():
+    import source_workflow
+
     root = tk.Tk()
-    AutoAnkiApp(root)
+    workflow = source_workflow.SourceWorkflowController()
+    app = AutoAnkiApp(
+        root,
+        **workflow.gui_hooks())
+    # Keep the coordinator explicitly reachable for the lifetime of Tk.
+    app.source_workflow_controller = workflow
     root.mainloop()
 
 
