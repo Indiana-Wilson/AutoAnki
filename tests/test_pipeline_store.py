@@ -13,14 +13,77 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import pipeline_store
+import prompt_builder
 import templates
 
 
+def language_pipeline(
+        language_key,
+        *,
+        enabled=("context",),
+        shared_fields=None,
+        per_card_fields=None,
+        share=True,
+        separate=False):
+    pipeline = pipeline_store.default_pipeline()
+    settings = pipeline_store.get_language_settings(
+        pipeline,
+        language_key)
+    shared_fields = (
+        tuple(shared_fields)
+        if shared_fields is not None
+        else settings.shared_fields)
+    per_card_fields = per_card_fields or {}
+    cards = tuple(
+        replace(
+            card,
+            enabled=card.direction_key in enabled,
+            fields=tuple(per_card_fields.get(
+                card.direction_key,
+                card.fields)),
+            target_deck=f"Deck::{card.direction_key}")
+        for card in settings.cards)
+    settings = replace(
+        settings,
+        cards=cards,
+        target_deck=f"Deck::{language_key}",
+        separate_target_decks=separate,
+        share_field_settings=share,
+        shared_fields=shared_fields)
+    return pipeline_store.replace_active_language_settings(
+        pipeline,
+        settings,
+        (settings,),
+        active_language_key=language_key)
+
+
 class PipelineStoreTests(unittest.TestCase):
+    def test_classical_chinese_eras_share_one_settings_category(self):
+        self.assertEqual(
+            tuple(
+                language.name
+                for language
+                in pipeline_store.list_settings_languages()),
+            (
+                "English",
+                "Classical Chinese",
+                "French",
+                "Japanese",
+                "Latin",
+            ))
+        for language_key in (
+                "classical_chinese",
+                "classical_chinese_ming",
+                "classical_chinese_warring_states"):
+            self.assertEqual(
+                pipeline_store.get_language(
+                    language_key).model_language_key,
+                "classical_chinese")
+
     def test_missing_settings_return_stable_default_pipeline(self):
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            path = Path(temporary_directory) / "missing.json"
-            pipelines = pipeline_store.load_pipelines(path)
+        with tempfile.TemporaryDirectory() as directory:
+            pipelines = pipeline_store.load_pipelines(
+                Path(directory) / "missing.json")
 
         self.assertEqual(
             pipelines,
@@ -29,500 +92,691 @@ class PipelineStoreTests(unittest.TestCase):
             pipelines[0].generated_deck_id,
             templates.DECK_ID)
 
-    def test_pipeline_settings_round_trip(self):
-        first = replace(
-            pipeline_store.default_pipeline(),
-            target_deck="Retained::English",
-            language_settings=(
-                pipeline_store.LanguageSettings(
-                    language_key="english",
-                    card_type_keys=("english_vocabulary",),
-                    target_deck="Retained::English"),
-                pipeline_store.LanguageSettings(
-                    language_key="french",
-                    card_type_keys=(
-                        "french_word_to_meaning",
-                        "french_meaning_to_word"),
-                    target_deck="Retained::French",
-                    separate_target_decks=True,
-                    card_type_target_decks=(
-                        (
-                            "french_word_to_meaning",
-                            "French::Recognition"),
-                        (
-                            "french_meaning_to_word",
-                            "French::Production"),
-                    )),
-            ))
-        second = pipeline_store.create_pipeline((first,))
+    def test_current_settings_round_trip(self):
+        french = language_pipeline(
+            "french",
+            enabled=("context", "meaning_to_word"),
+            share=False,
+            separate=True,
+            per_card_fields={
+                "context": (
+                    pipeline_store.FieldSetting(
+                        "translation",
+                        "english"),
+                    pipeline_store.FieldSetting(
+                        "nuance",
+                        "french"),
+                ),
+                "meaning_to_word": (
+                    pipeline_store.FieldSetting(
+                        "dictionary_meaning",
+                        "japanese"),
+                ),
+            })
+        second = pipeline_store.create_pipeline((french,))
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            path = Path(temporary_directory) / "pipelines.json"
-            pipeline_store.save_pipelines(
-                (first, second),
-                path)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pipelines.json"
+            pipeline_store.save_pipelines((french, second), path)
             loaded = pipeline_store.load_pipelines(path)
             raw = json.loads(path.read_text(encoding="utf-8"))
 
-        self.assertEqual(loaded, (first, second))
+        self.assertEqual(loaded, (french, second))
         self.assertEqual(
             raw["version"],
             pipeline_store.PIPELINE_CONFIG_VERSION)
-        self.assertEqual(
-            loaded[0].language_settings[1].target_deck,
-            "Retained::French")
+        self.assertIn("shared_fields", raw["pipelines"][0])
+        self.assertIn("cards", raw["pipelines"][0])
 
-    def test_each_language_retains_its_own_deck_preferences(self):
-        pipeline = replace(
-            pipeline_store.default_pipeline(),
-            language_settings=(
-                pipeline_store.LanguageSettings(
-                    language_key="french",
-                    card_type_keys=(
-                        "french_word_to_meaning",
-                        "french_meaning_to_word"),
-                    target_deck="Retained::French",
-                    separate_target_decks=True,
-                    card_type_target_decks=(
-                        (
-                            "french_word_to_meaning",
-                            "French::Recognition"),
-                        (
-                            "french_meaning_to_word",
-                            "French::Production"),
-                    )),
-                pipeline_store.LanguageSettings(
-                    language_key="japanese",
-                    card_type_keys=("japanese_vocabulary",),
-                    target_deck="Retained::Japanese"),
+    def test_unselected_field_language_is_saved_without_selecting_field(self):
+        pipeline = pipeline_store.default_pipeline()
+        settings = pipeline_store.get_language_settings(
+            pipeline,
+            "english")
+        remembered = tuple(
+            replace(
+                field,
+                target_language_key="latin")
+            if field.field_key == "register"
+            else field
+            for field in settings.shared_field_languages)
+        settings = replace(
+            settings,
+            shared_field_languages=remembered)
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,))
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pipelines.json"
+            pipeline_store.save_pipelines((pipeline,), path)
+            loaded = pipeline_store.load_pipelines(path)[0]
+
+        loaded_settings = pipeline_store.get_language_settings(
+            loaded,
+            "english")
+        self.assertIn(
+            pipeline_store.FieldSetting("register", "latin"),
+            loaded_settings.shared_field_languages)
+        self.assertNotIn(
+            "register",
+            {
+                field.field_key
+                for field in loaded_settings.shared_fields
+            })
+        self.assertNotIn(
+            pipeline_store.FieldSetting("register", "latin"),
+            pipeline_store.get_requested_field_settings(loaded))
+
+    def test_version_six_settings_gain_remembered_language_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pipelines.json"
+            pipeline_store.save_pipelines(
+                (pipeline_store.default_pipeline(),),
+                path)
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw["version"] = 6
+            for item in raw["pipelines"]:
+                item.pop("shared_field_languages", None)
+                for card in item["cards"]:
+                    card.pop("field_languages", None)
+                for settings in item.get("language_settings", ()):
+                    settings.pop("shared_field_languages", None)
+                    for card in settings["cards"]:
+                        card.pop("field_languages", None)
+            path.write_text(json.dumps(raw), encoding="utf-8")
+
+            loaded = pipeline_store.load_pipelines(path)[0]
+
+        settings = pipeline_store.get_language_settings(
+            loaded,
+            loaded.language_key)
+        self.assertEqual(
+            len(settings.shared_field_languages),
+            len(pipeline_store.list_field_options()))
+        self.assertTrue(all(
+            len(card.field_languages)
+            == len(pipeline_store.list_field_options())
+            for card in settings.cards))
+
+    def test_legacy_card_types_migrate_to_directions_and_fields(self):
+        legacy = {
+            "version": 5,
+            "pipelines": [{
+                "pipeline_id": "legacy",
+                "language_key": "french",
+                "card_type_keys": [
+                    "french_word_to_meaning",
+                    "french_word_to_native_meaning",
+                    "french_meaning_to_word",
+                ],
+                "target_deck": "French",
+                "generated_deck_id": 1 << 30,
+                "generated_deck_name": "Temporary French",
+                "separate_target_decks": False,
+                "language_settings": [],
+            }],
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pipelines.json"
+            path.write_text(json.dumps(legacy), encoding="utf-8")
+            pipeline = pipeline_store.load_pipelines(path)[0]
+
+        self.assertEqual(pipeline.language_key, "french")
+        self.assertEqual(
+            tuple(
+                card.direction_key
+                for card in pipeline_store.get_enabled_cards(pipeline)),
+            ("word_to_meaning", "meaning_to_word"))
+        word_fields = pipeline.cards[1].fields
+        self.assertIn(
+            pipeline_store.FieldSetting("translation", "english"),
+            word_fields)
+        self.assertIn(
+            pipeline_store.FieldSetting(
+                "dictionary_meaning",
+                "french"),
+            word_fields)
+
+    def test_version_one_singular_card_type_key_is_migrated(self):
+        legacy = {
+            "version": 1,
+            "pipelines": [{
+                "pipeline_id": "legacy",
+                "language_key": "english",
+                "card_type_key": "english_vocabulary",
+                "target_deck": "English",
+                "generated_deck_id": 1 << 30,
+                "generated_deck_name": "Temporary English",
+            }],
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pipelines.json"
+            path.write_text(json.dumps(legacy), encoding="utf-8")
+            pipeline = pipeline_store.load_pipelines(path)[0]
+
+        self.assertEqual(
+            pipeline_store.get_card_type_keys(pipeline),
+            ("english_context",))
+
+    def test_translation_cannot_target_source_language(self):
+        pipeline = language_pipeline(
+            "french",
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "french"),
             ))
 
+        with self.assertRaisesRegex(
+                ValueError,
+                "Translation cannot target French"):
+            pipeline_store.validate_pipelines((pipeline,))
+
+    def test_non_translation_field_may_target_source_language(self):
+        pipeline = language_pipeline(
+            "french",
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "french"),
+                pipeline_store.FieldSetting(
+                    "register",
+                    "french"),
+            ))
+
+        self.assertEqual(
+            pipeline_store.validate_pipelines((pipeline,)),
+            (pipeline,))
+
+    def test_enabled_card_requires_at_least_one_effective_field(self):
+        pipeline = language_pipeline(
+            "english",
+            shared_fields=())
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "at least one definition field"):
+            pipeline_store.validate_pipelines((pipeline,))
+
+    def test_three_directions_are_required_exactly_once(self):
+        pipeline = replace(
+            pipeline_store.default_pipeline(),
+            cards=pipeline_store.default_pipeline().cards[:2])
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "each card direction exactly once"):
+            pipeline_store.validate_pipelines((pipeline,))
+
+    def test_shared_settings_apply_to_every_enabled_card(self):
+        fields = (
+            pipeline_store.FieldSetting(
+                "dictionary_meaning",
+                "latin"),
+        )
+        pipeline = language_pipeline(
+            "english",
+            enabled=("context", "word_to_meaning"),
+            shared_fields=fields,
+            share=True)
+        settings = pipeline_store.get_language_settings(
+            pipeline,
+            "english")
+
+        for card in pipeline_store.get_enabled_cards(pipeline):
+            self.assertEqual(
+                pipeline_store.get_effective_fields(settings, card),
+                fields)
+        self.assertEqual(
+            pipeline_store.get_requested_field_settings(pipeline),
+            fields)
+
+    def test_per_card_settings_dedupe_only_identical_response_fields(self):
+        english = pipeline_store.FieldSetting(
+            "translation",
+            "english")
+        japanese = pipeline_store.FieldSetting(
+            "translation",
+            "japanese")
+        nuance = pipeline_store.FieldSetting("nuance", "french")
+        pipeline = language_pipeline(
+            "french",
+            enabled=(
+                "context",
+                "word_to_meaning",
+                "meaning_to_word"),
+            share=False,
+            per_card_fields={
+                "context": (english, nuance),
+                "word_to_meaning": (english,),
+                "meaning_to_word": (japanese,),
+            })
+
+        self.assertEqual(
+            pipeline_store.get_requested_field_settings(pipeline),
+            (english, nuance, japanese))
+        self.assertEqual(
+            tuple(
+                pipeline_store.response_field_name(field)
+                for field
+                in pipeline_store.get_requested_field_settings(pipeline)),
+            (
+                "Translation (English)",
+                "Nuance (French)",
+                "Translation (Japanese)",
+            ))
+
+    def test_context_is_the_only_direction_that_requests_sentences(self):
+        simple = language_pipeline(
+            "english",
+            enabled=("word_to_meaning",))
+        detailed = language_pipeline(
+            "english",
+            enabled=("context", "word_to_meaning"))
+
+        self.assertFalse(pipeline_store.requires_sentences(simple))
+        self.assertTrue(pipeline_store.requires_sentences(detailed))
+
+    def test_separate_decks_route_each_model(self):
+        pipeline = language_pipeline(
+            "latin",
+            enabled=("word_to_meaning", "meaning_to_word"),
+            separate=True)
+
+        self.assertEqual(
+            pipeline_store.get_model_target_decks(pipeline),
+            (
+                (
+                    templates.get_direction_card_type(
+                        "latin",
+                        "word_to_meaning").model.name,
+                    "Deck::word_to_meaning",
+                ),
+                (
+                    templates.get_direction_card_type(
+                        "latin",
+                        "meaning_to_word").model.name,
+                    "Deck::meaning_to_word",
+                ),
+            ))
+
+    def test_separate_deck_requires_destination_for_enabled_card(self):
+        pipeline = language_pipeline(
+            "latin",
+            enabled=("meaning_to_word",),
+            separate=True)
+        cards = tuple(
+            replace(card, target_deck="")
+            if card.direction_key == "meaning_to_word"
+            else card
+            for card in pipeline.cards)
+        pipeline = replace(pipeline, cards=cards)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "target Anki deck"):
+            pipeline_store.validate_pipelines((pipeline,))
+
+    def test_each_language_retains_its_preferences(self):
+        pipeline = pipeline_store.default_pipeline()
         french = pipeline_store.get_language_settings(
             pipeline,
             "french")
         japanese = pipeline_store.get_language_settings(
             pipeline,
             "japanese")
+        french = replace(
+            french,
+            target_deck="French",
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "french"),
+            ))
+        japanese = replace(
+            japanese,
+            target_deck="Japanese")
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            french,
+            (french, japanese))
 
-        self.assertEqual(french.target_deck, "Retained::French")
-        self.assertTrue(french.separate_target_decks)
-        self.assertEqual(
-            dict(french.card_type_target_decks),
-            {
-                "french_word_to_meaning": "French::Recognition",
-                "french_meaning_to_word": "French::Production",
-            })
-        self.assertEqual(japanese.target_deck, "Retained::Japanese")
-
-    def test_version_three_settings_gain_shared_deck_defaults(self):
-        pipeline = pipeline_store.default_pipeline()
-        legacy_data = {
-            "version": 3,
-            "pipelines": [{
-                key: value
-                for key, value in pipeline.__dict__.items()
-                if key not in {
-                    "separate_target_decks",
-                    "card_type_target_decks",
-                }
-            }],
-        }
-
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            path = Path(temporary_directory) / "pipelines.json"
-            path.write_text(json.dumps(legacy_data), encoding="utf-8")
-            loaded = pipeline_store.load_pipelines(path)
-
-        self.assertFalse(loaded[0].separate_target_decks)
-        self.assertEqual(loaded[0].card_type_target_decks, ())
-        self.assertEqual(loaded[0].language_settings, ())
         self.assertEqual(
             pipeline_store.get_language_settings(
-                loaded[0],
-                loaded[0].language_key).target_deck,
-            loaded[0].target_deck)
-
-    def test_separate_decks_map_selected_card_types_to_model_names(self):
-        pipeline = replace(
-            pipeline_store.default_pipeline(),
-            card_type_keys=(
-                templates.ENGLISH_VOCABULARY_CARD_TYPE.key,
-                templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.key,
-            ),
-            separate_target_decks=True,
-            card_type_target_decks=(
-                (
-                    templates.ENGLISH_VOCABULARY_CARD_TYPE.key,
-                    "English::Context"),
-                (
-                    templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.key,
-                    "English::Recognition"),
-            ),
-            target_deck="")
-
-        pipeline_store.validate_pipelines((pipeline,))
-
+                pipeline,
+                "french").target_deck,
+            "French")
         self.assertEqual(
-            pipeline_store.get_model_target_decks(pipeline),
-            (
-                (
-                    templates.ENGLISH_VOCABULARY_CARD_TYPE.model.name,
-                    "English::Context"),
-                (
-                    templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.model.name,
-                    "English::Recognition"),
-            ))
+            pipeline_store.get_language_settings(
+                pipeline,
+                "japanese").target_deck,
+            "Japanese")
 
-    def test_separate_decks_require_a_target_for_every_selected_card_type(self):
-        pipeline = replace(
-            pipeline_store.default_pipeline(),
-            card_type_keys=(
-                templates.ENGLISH_VOCABULARY_CARD_TYPE.key,
-                templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.key,
-            ),
-            separate_target_decks=True,
-            card_type_target_decks=((
-                templates.ENGLISH_VOCABULARY_CARD_TYPE.key,
-                "English::Context"),))
-
-        with self.assertRaisesRegex(
-                ValueError,
-                "every selected card output"):
-            pipeline_store.validate_pipelines((pipeline,))
-
-    def test_anki_deck_cache_round_trip_is_isolated_to_supplied_path(self):
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            path = Path(temporary_directory) / "anki_decks.json"
+    def test_deck_cache_isolated_to_supplied_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "anki_decks.json"
             saved = pipeline_store.save_anki_deck_cache(
-                ("Vocabulary", "Vocabulary::English", "Vocabulary"),
+                ("Vocabulary", "Vocabulary::French", "Vocabulary"),
                 path)
             loaded = pipeline_store.load_anki_deck_cache(path)
 
         self.assertEqual(
             saved,
-            ("Vocabulary", "Vocabulary::English"))
+            ("Vocabulary", "Vocabulary::French"))
         self.assertEqual(loaded, saved)
 
-    def test_new_pipeline_gets_persistent_unique_deck_identity(self):
+    def test_new_pipeline_has_unique_persistent_deck_identity(self):
         first = pipeline_store.default_pipeline()
         second = pipeline_store.create_pipeline((first,))
 
-        self.assertNotEqual(
-            first.pipeline_id,
-            second.pipeline_id)
+        self.assertNotEqual(first.pipeline_id, second.pipeline_id)
         self.assertNotEqual(
             first.generated_deck_id,
             second.generated_deck_id)
         self.assertGreaterEqual(
             second.generated_deck_id,
             1 << 30)
-        self.assertLess(
-            second.generated_deck_id,
-            1 << 31)
+        self.assertLess(second.generated_deck_id, 1 << 31)
 
-    def test_duplicate_deck_ids_are_rejected(self):
+    def test_duplicate_pipeline_and_deck_identities_are_rejected(self):
         first = pipeline_store.default_pipeline()
-        duplicate = pipeline_store.PipelineConfig(
-            pipeline_id="another-pipeline",
-            language_key=first.language_key,
-            card_type_keys=first.card_type_keys,
-            target_deck=first.target_deck,
-            generated_deck_id=first.generated_deck_id,
-            generated_deck_name="Another generated deck")
+        duplicate = replace(
+            pipeline_store.create_pipeline((first,)),
+            pipeline_id=first.pipeline_id)
+        with self.assertRaisesRegex(ValueError, "Pipeline IDs"):
+            pipeline_store.validate_pipelines((first, duplicate))
 
+        duplicate = replace(
+            pipeline_store.create_pipeline((first,)),
+            generated_deck_id=first.generated_deck_id)
         with self.assertRaisesRegex(ValueError, "deck IDs"):
-            pipeline_store.validate_pipelines(
-                (first, duplicate))
+            pipeline_store.validate_pipelines((first, duplicate))
 
-    def test_prompt_discovery_uses_only_the_prompts_directory(self):
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = Path(temporary_directory)
-            input_directory = project_root / "input"
-            prompt_directory = input_directory / "prompts"
-            prompt_directory.mkdir(parents=True)
-            (prompt_directory / "english_vocab").write_text(
-                "English vocabulary",
-                encoding="utf-8")
-            (prompt_directory / "historical_events.txt").write_text(
-                "history",
-                encoding="utf-8")
 
-            prompts = pipeline_store.discover_prompts(project_root)
+class PromptComponentTests(unittest.TestCase):
+    def _copy_components(self, root):
+        target = Path(root) / "input" / "prompt_components"
+        for source in (
+                PROJECT_ROOT / "input" / "prompt_components").rglob("*"):
+            if source.is_file():
+                destination = target / source.relative_to(
+                    PROJECT_ROOT / "input" / "prompt_components")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    source.read_text(encoding="utf-8"),
+                    encoding="utf-8")
+
+    def test_components_are_discovered_recursively(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self._copy_components(directory)
+            keys = {
+                component.key
+                for component
+                in pipeline_store.discover_prompt_components(directory)
+            }
 
         self.assertEqual(
-            [prompt.key for prompt in prompts],
-            ["english_vocab", "historical_events.txt"])
+            keys,
+            {
+                "core",
+                "ending",
+                "directions/context",
+                *{
+                    f"fields/{field.key}"
+                    for field in pipeline_store.list_field_options()
+                },
+                *{
+                    f"languages/{language.key}"
+                    for language in pipeline_store.list_languages()
+                },
+            })
 
-    def test_prompt_text_is_saved_atomically_inside_prompt_directory(self):
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = Path(temporary_directory)
-            prompt_directory = project_root / "input" / "prompts"
-            prompt_directory.mkdir(parents=True)
-            prompt_path = prompt_directory / "english_vocab"
-            prompt_path.write_text(
-                "Original prompt",
-                encoding="utf-8")
+    def test_prompt_contains_only_selected_linear_components(self):
+        pipeline = language_pipeline(
+            "french",
+            enabled=("word_to_meaning", "meaning_to_word"),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "english"),
+                pipeline_store.FieldSetting(
+                    "nuance",
+                    "japanese"),
+            ))
+        text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
 
-            result = pipeline_store.save_prompt_text(
-                prompt_path,
-                "Updated prompt",
-                project_root)
+        self.assertIn('For "Translation (English)"', text)
+        self.assertIn('For "Nuance (Japanese)"', text)
+        self.assertNotIn("four short", text)
+        self.assertNotIn("Dictionary Meaning", text)
+        self.assertNotIn("Pronunciation", text)
 
-            self.assertEqual(result, prompt_path.resolve())
+    def test_nuance_component_explicitly_allows_no_extra_nuance(self):
+        pipeline = language_pipeline(
+            "french",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+                pipeline_store.FieldSetting(
+                    "nuance",
+                    "english"),
+            ))
+        text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
+        normalized_text = " ".join(text.split())
+
+        self.assertIn(
+            "no meaningful nuance beyond the literal or dictionary meaning",
+            normalized_text)
+        self.assertIn(
+            "return an empty string for this field",
+            normalized_text)
+
+    def test_context_adds_sentence_component_once(self):
+        pipeline = language_pipeline(
+            "latin",
+            enabled=("context", "word_to_meaning"))
+        text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
+
+        self.assertEqual(text.count("exactly four short"), 1)
+
+    def test_classical_chinese_era_prompts_add_historical_guidance(self):
+        ming = language_pipeline(
+            "classical_chinese_ming",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+                pipeline_store.FieldSetting(
+                    "register",
+                    "english"),
+            ))
+        warring_states = language_pipeline(
+            "classical_chinese_warring_states",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+                pipeline_store.FieldSetting(
+                    "register",
+                    "english"),
+            ))
+
+        ming_prompt = " ".join(
+            prompt_builder.build_prompt(
+                ming,
+                PROJECT_ROOT).split())
+        warring_prompt = " ".join(
+            prompt_builder.build_prompt(
+                warring_states,
+                PROJECT_ROOT).split())
+
+        self.assertIn(
+            "Infer each sense from Ming usage",
+            ming_prompt)
+        self.assertIn(
+            "particularly associated with the Ming period",
+            ming_prompt)
+        self.assertIn(
+            "Infer each sense from pre-Qin and Warring States usage",
+            warring_prompt)
+        self.assertIn(
+            "particular to the Warring States period",
+            warring_prompt)
+        for prompt in (ming_prompt, warring_prompt):
+            self.assertIn(
+                'do not use "archaic" when a narrower historical label '
+                "is known",
+                prompt)
+
+    def test_component_editor_saves_atomically_and_rejects_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self._copy_components(directory)
+            root = Path(directory)
+            component = (
+                root / "input" / "prompt_components" / "core")
+            pipeline_store.save_prompt_component_text(
+                component,
+                "Replacement component",
+                root)
             self.assertEqual(
-                prompt_path.read_text(encoding="utf-8"),
-                "Updated prompt")
+                component.read_text(encoding="utf-8"),
+                "Replacement component")
             self.assertEqual(
-                list(prompt_directory.iterdir()),
-                [prompt_path])
-
-    def test_prompt_editor_rejects_empty_or_outside_files(self):
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = Path(temporary_directory)
-            prompt_directory = project_root / "input" / "prompts"
-            prompt_directory.mkdir(parents=True)
-            prompt_path = prompt_directory / "english_vocab"
-            prompt_path.write_text(
-                "Original prompt",
-                encoding="utf-8")
-            outside_path = project_root / "outside"
-            outside_path.write_text(
-                "Outside",
-                encoding="utf-8")
+                list(component.parent.glob(".core.*")),
+                [])
 
             with self.assertRaisesRegex(ValueError, "cannot be empty"):
-                pipeline_store.save_prompt_text(
-                    prompt_path,
-                    "   ",
-                    project_root)
-            with self.assertRaisesRegex(ValueError, "inside input/prompts"):
-                pipeline_store.save_prompt_text(
-                    outside_path,
-                    "Changed",
-                    project_root)
+                pipeline_store.save_prompt_component_text(
+                    component,
+                    " ",
+                    root)
+            outside = root / "outside"
+            outside.write_text("outside", encoding="utf-8")
+            with self.assertRaisesRegex(
+                    ValueError,
+                    "must remain inside"):
+                pipeline_store.save_prompt_component_text(
+                    outside,
+                    "replacement",
+                    root)
 
-            self.assertEqual(
-                prompt_path.read_text(encoding="utf-8"),
-                "Original prompt")
-            self.assertEqual(
-                outside_path.read_text(encoding="utf-8"),
-                "Outside")
 
-    def test_version_one_pipeline_keys_are_migrated(self):
-        legacy_data = {
-            "version": 1,
-            "pipelines": [{
-                "pipeline_id": "default-english-vocabulary",
-                "prompt_key": "default",
-                "card_type_key": "english_vocabulary",
-                "target_deck": "English",
-                "generated_deck_id": templates.DECK_ID,
-                "generated_deck_name": templates.DECK_NAME,
-            }],
+class TemplateTests(unittest.TestCase):
+    def test_registered_model_ids_are_unique_and_stable(self):
+        card_types = templates.list_card_types()
+        ids = [card_type.model.model_id for card_type in card_types]
+
+        self.assertEqual(len(card_types), 15)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(
+            templates.ENGLISH_CONTEXT_MODEL_ID,
+            2092222676)
+        self.assertEqual(
+            templates.LATIN_MEANING_TO_WORD_MODEL_ID,
+            2021716093)
+
+    def test_every_language_has_exactly_three_directions(self):
+        model_language_keys = {
+            language.model_language_key
+            for language in pipeline_store.list_languages()
         }
-
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            path = Path(temporary_directory) / "pipelines.json"
-            path.write_text(json.dumps(legacy_data), encoding="utf-8")
-            loaded = pipeline_store.load_pipelines(path)
-
-        self.assertEqual(
-            loaded[0].language_key,
-            "english")
-        self.assertEqual(
-            loaded[0].card_type_keys,
-            ("english_vocabulary",))
-
-    def test_card_type_from_another_language_is_rejected(self):
-        pipeline = pipeline_store.default_pipeline()
-        mismatched = pipeline_store.PipelineConfig(
-            **{
-                **pipeline.__dict__,
-                "card_type_keys": (
-                    "classical_chinese_word_to_meaning",),
-            })
-
-        with self.assertRaisesRegex(ValueError, "not available for English"):
-            pipeline_store.validate_pipelines((mismatched,))
-
-    def test_prompt_selection_uses_minimum_required_schema(self):
-        simple = pipeline_store.PipelineConfig(
-            **{
-                **pipeline_store.default_pipeline().__dict__,
-                "card_type_keys": (
-                    "english_word_to_meaning",
-                    "english_meaning_to_word"),
-            })
-        detailed = pipeline_store.PipelineConfig(
-            **{
-                **simple.__dict__,
-                "card_type_keys": (
-                    *simple.card_type_keys,
-                    "english_vocabulary"),
-            })
-
-        self.assertEqual(
-            pipeline_store.get_prompt_key(simple),
-            "english_vocab_simple")
-        self.assertEqual(
-            pipeline_store.get_prompt_key(detailed),
-            "english_vocab")
-
-    def test_native_detailed_card_selects_rich_language_prompt(self):
-        pipeline = pipeline_store.PipelineConfig(
-            **{
-                **pipeline_store.default_pipeline().__dict__,
-                "language_key": "japanese",
-                "card_type_keys": (
-                    "japanese_native_vocabulary",
-                    "japanese_word_to_meaning"),
-            })
-
-        self.assertEqual(
-            pipeline_store.get_prompt_key(pipeline),
-            "japanese_vocab")
-
-    def test_mixed_simple_definitions_use_minimal_language_prompt(self):
-        pipeline = pipeline_store.PipelineConfig(
-            **{
-                **pipeline_store.default_pipeline().__dict__,
-                "language_key": "french",
-                "card_type_keys": (
-                    "french_word_to_meaning",
-                    "french_word_to_native_meaning"),
-            })
-
-        self.assertEqual(
-            pipeline_store.get_prompt_key(pipeline),
-            "french_vocab_simple")
-
-    def test_languages_expose_expected_compatible_card_outputs(self):
-        self.assertEqual(
-            {
-                language.key: len(language.card_types)
-                for language in pipeline_store.list_languages()
-            },
-            {
-                "english": 3,
-                "classical_chinese": 6,
-                "french": 6,
-                "japanese": 6,
-                "latin": 6,
-            })
-
-    def test_registered_card_type_model_ids_are_unique_and_stable(self):
-        model_ids = [
-            card_type.model.model_id
-            for card_type in templates.list_card_types()
-        ]
-
-        self.assertEqual(len(model_ids), len(set(model_ids)))
-        self.assertEqual(
-            set(model_ids),
-            {
-                templates.MODEL_ID,
-                templates.CLASSICAL_CHINESE_MODEL_ID,
-                templates.ENGLISH_WORD_TO_MEANING_MODEL_ID,
-                templates.ENGLISH_MEANING_TO_WORD_MODEL_ID,
-                templates.CLASSICAL_CHINESE_WORD_TO_MEANING_MODEL_ID,
-                templates.CLASSICAL_CHINESE_MEANING_TO_WORD_MODEL_ID,
-                templates.CLASSICAL_CHINESE_NATIVE_VOCABULARY_MODEL_ID,
-                templates
-                .CLASSICAL_CHINESE_WORD_TO_NATIVE_MEANING_MODEL_ID,
-                templates
-                .CLASSICAL_CHINESE_NATIVE_MEANING_TO_WORD_MODEL_ID,
-                templates.FRENCH_VOCABULARY_MODEL_ID,
-                templates.FRENCH_WORD_TO_MEANING_MODEL_ID,
-                templates.FRENCH_MEANING_TO_WORD_MODEL_ID,
-                templates.FRENCH_NATIVE_VOCABULARY_MODEL_ID,
-                templates.FRENCH_WORD_TO_NATIVE_MEANING_MODEL_ID,
-                templates.FRENCH_NATIVE_MEANING_TO_WORD_MODEL_ID,
-                templates.JAPANESE_VOCABULARY_MODEL_ID,
-                templates.JAPANESE_WORD_TO_MEANING_MODEL_ID,
-                templates.JAPANESE_MEANING_TO_WORD_MODEL_ID,
-                templates.JAPANESE_NATIVE_VOCABULARY_MODEL_ID,
-                templates.JAPANESE_WORD_TO_NATIVE_MEANING_MODEL_ID,
-                templates.JAPANESE_NATIVE_MEANING_TO_WORD_MODEL_ID,
-                templates.LATIN_VOCABULARY_MODEL_ID,
-                templates.LATIN_WORD_TO_MEANING_MODEL_ID,
-                templates.LATIN_MEANING_TO_WORD_MODEL_ID,
-                templates.LATIN_NATIVE_VOCABULARY_MODEL_ID,
-                templates.LATIN_WORD_TO_NATIVE_MEANING_MODEL_ID,
-                templates.LATIN_NATIVE_MEANING_TO_WORD_MODEL_ID,
-            })
-        self.assertEqual(
-            {
-                card_type.key
+        for language_key in model_language_keys:
+            card_types = [
+                card_type
                 for card_type in templates.list_card_types()
-            },
-            {
-                "english_vocabulary",
-                "english_word_to_meaning",
-                "english_meaning_to_word",
-                "classical_chinese_vocabulary",
-                "classical_chinese_word_to_meaning",
-                "classical_chinese_meaning_to_word",
-                "classical_chinese_native_vocabulary",
-                "classical_chinese_word_to_native_meaning",
-                "classical_chinese_native_meaning_to_word",
-                "french_vocabulary",
-                "french_word_to_meaning",
-                "french_meaning_to_word",
-                "french_native_vocabulary",
-                "french_word_to_native_meaning",
-                "french_native_meaning_to_word",
-                "japanese_vocabulary",
-                "japanese_word_to_meaning",
-                "japanese_meaning_to_word",
-                "japanese_native_vocabulary",
-                "japanese_word_to_native_meaning",
-                "japanese_native_meaning_to_word",
-                "latin_vocabulary",
-                "latin_word_to_meaning",
-                "latin_meaning_to_word",
-                "latin_native_vocabulary",
-                "latin_word_to_native_meaning",
-                "latin_native_meaning_to_word",
-            })
+                if card_type.language_key == language_key
+            ]
+            self.assertEqual(
+                {card_type.direction_key for card_type in card_types},
+                {
+                    "context",
+                    "word_to_meaning",
+                    "meaning_to_word",
+                })
 
-    def test_every_registered_model_uses_shared_readable_card_css(self):
-        models = {
-            card_type.model.model_id: card_type.model
-            for card_type in templates.list_card_types()
-        }
+    def test_classical_chinese_eras_share_the_same_three_models(self):
+        for language_key in (
+                "classical_chinese_ming",
+                "classical_chinese_warring_states"):
+            pipeline = language_pipeline(
+                language_key,
+                enabled=(
+                    "context",
+                    "word_to_meaning",
+                    "meaning_to_word"))
+            self.assertEqual(
+                pipeline_store.get_card_type_keys(pipeline),
+                (
+                    "classical_chinese_context",
+                    "classical_chinese_word_to_meaning",
+                    "classical_chinese_meaning_to_word",
+                ))
 
-        self.assertEqual(len(models), 27)
-        self.assertEqual(
-            {
-                model.css
-                for model in models.values()
-            },
-            {templates.CARD_CSS})
+    def test_models_use_stable_superset_fields_and_readable_css(self):
+        for card_type in templates.list_card_types():
+            self.assertEqual(
+                [field["name"] for field in card_type.model.fields],
+                [
+                    card_type.term_field,
+                    "Sentences",
+                    "Translation",
+                    "Dictionary Meaning",
+                    "Pronunciation",
+                    "Part of Speech",
+                    "Register",
+                    "Nuance",
+                ])
+            self.assertIn("font-size: 20px", card_type.model.css)
+            self.assertIn("display: flex", card_type.model.css)
+            self.assertIn("align-items: center", card_type.model.css)
+            self.assertIn("justify-content: center", card_type.model.css)
+            self.assertIn("min-height: 100vh", card_type.model.css)
+            self.assertIn("font-weight: 700", card_type.model.css)
+
+    def test_every_model_can_be_packaged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for index, card_type in enumerate(
+                    templates.list_card_types()):
+                deck = genanki.Deck(
+                    (1 << 30) + index,
+                    f"Test {index}")
+                deck.add_note(genanki.Note(
+                    model=card_type.model,
+                    fields=[
+                        "term",
+                        "one|two|three|four",
+                        "translation",
+                        "definition",
+                        "pronunciation",
+                        "part of speech",
+                        "register",
+                        "nuance",
+                    ]))
+                output = Path(directory) / f"{index}.apkg"
+                genanki.Package(deck).write_to_file(output)
+                with zipfile.ZipFile(output) as archive:
+                    self.assertIn("collection.anki2", archive.namelist())
+
+    def test_meaning_fields_are_vertical_and_conditionally_rendered(self):
+        card_type = templates.get_direction_card_type(
+            "french",
+            "word_to_meaning")
+        answer = card_type.model.templates[0]["afmt"]
+
+        self.assertIn('class="definition-stack"', answer)
+        self.assertIn("{{#Translation}}", answer)
         self.assertIn(
-            "font-size: 22px",
-            templates.CARD_CSS)
-
-    def test_every_registered_model_can_be_packaged_with_declared_fields(self):
-        deck = templates.create_deck(
-            2059400999,
-            "All registered models")
-        for index, card_type in enumerate(
-                templates.list_card_types()):
-            deck.add_note(genanki.Note(
-                model=card_type.model,
-                fields=[
-                    f"{field_name} {index}"
-                    for field_name in card_type.field_names
-                ]))
-
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            output_path = Path(temporary_directory) / "models.apkg"
-            genanki.Package(deck).write_to_file(output_path)
-
-            with zipfile.ZipFile(output_path) as package:
-                self.assertIn(
-                    "collection.anki2",
-                    package.namelist())
+            '<strong class="definition-label">Translation</strong>',
+            answer)
+        self.assertIn("{{#Nuance}}", answer)
 
 
 if __name__ == "__main__":

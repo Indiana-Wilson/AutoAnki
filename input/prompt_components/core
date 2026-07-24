@@ -1,0 +1,9 @@
+Create vocabulary data for the supplied {source_language} words or expressions.
+
+Treat bracketed input as context for selecting the intended sense. If an entry
+has multiple relevant senses, create a separate JSON card entry for each sense.
+All requested fields in one card entry must describe the same sense. Skip an
+entry that does not exist and silently correct an obvious typo.
+
+Return only the fields required by the supplied response schema. Never invent
+extra fields and never return null in place of requested text.

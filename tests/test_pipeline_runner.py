@@ -15,331 +15,329 @@ import pipeline_store
 import templates
 
 
-class PipelineRunnerTests(unittest.TestCase):
-    def _project_with_prompts(self, directory):
-        project_root = Path(directory)
-        input_directory = project_root / "input"
-        prompt_directory = input_directory / "prompts"
-        prompt_directory.mkdir(parents=True)
-        (prompt_directory / "english_vocab").write_text(
-            "default prompt",
-            encoding="utf-8")
-        (prompt_directory / "english_vocab_simple").write_text(
-            "simple English prompt",
-            encoding="utf-8")
-        (prompt_directory / "classical_chinese").write_text(
-            "Classical Chinese prompt",
-            encoding="utf-8")
-        (prompt_directory / "classical_chinese_simple").write_text(
-            "simple Classical Chinese prompt",
-            encoding="utf-8")
-        (prompt_directory / "french_vocab").write_text(
-            "French prompt",
-            encoding="utf-8")
-        (prompt_directory / "french_vocab_simple").write_text(
-            "simple French prompt",
-            encoding="utf-8")
-        (prompt_directory / "japanese_vocab").write_text(
-            "Japanese prompt",
-            encoding="utf-8")
-        (prompt_directory / "japanese_vocab_simple").write_text(
-            "simple Japanese prompt",
-            encoding="utf-8")
-        (prompt_directory / "latin_vocab").write_text(
-            "Latin prompt",
-            encoding="utf-8")
-        (prompt_directory / "latin_vocab_simple").write_text(
-            "simple Latin prompt",
-            encoding="utf-8")
-        return project_root
+def configure_pipeline(
+        pipeline,
+        language_key,
+        *,
+        enabled=("context",),
+        fields=None,
+        separate=False):
+    settings = pipeline_store.get_language_settings(
+        pipeline,
+        language_key)
+    fields = tuple(fields or settings.shared_fields)
+    settings = replace(
+        settings,
+        cards=tuple(
+            replace(
+                card,
+                enabled=card.direction_key in enabled,
+                fields=fields,
+                target_deck=f"Target::{direction_index}")
+            for direction_index, card in enumerate(settings.cards)),
+        target_deck=f"Target::{language_key}",
+        separate_target_decks=separate,
+        share_field_settings=True,
+        shared_fields=fields)
+    return pipeline_store.replace_active_language_settings(
+        pipeline,
+        settings,
+        (settings,),
+        active_language_key=language_key)
 
-    def test_two_pipelines_generate_and_import_independently(self):
-        first = pipeline_store.default_pipeline()
-        second = replace(
-            pipeline_store.create_pipeline((first,)),
-            language_key="classical_chinese",
-            card_type_keys=(templates.CLASSICAL_CHINESE_CARD_TYPE.key,),
-            target_deck="Another::Deck")
-        generator = MagicMock(
+
+class PipelineRunnerTests(unittest.TestCase):
+    def setUp(self):
+        self.generator = MagicMock(
             side_effect=lambda _words, **kwargs: kwargs["output_path"])
-        importer = MagicMock(
+        self.importer = MagicMock(
             side_effect=lambda _path, **kwargs: (
                 anki_integration.AnkiImportResult(
                     cards_moved=2,
                     target_deck=kwargs["target_deck"])))
+
+    def test_pipeline_composes_prompt_generates_and_imports(self):
+        pipeline = configure_pipeline(
+            pipeline_store.default_pipeline(),
+            "french",
+            fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "english"),
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "french"),
+            ))
         progress = []
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = self._project_with_prompts(
-                temporary_directory)
+        with tempfile.TemporaryDirectory() as directory:
             summary = pipeline_runner.run_pipelines(
-                "astrolabe",
-                (first, second),
-                project_root=project_root,
-                output_root=project_root / "output",
+                "épanouir",
+                (pipeline,),
+                project_root=PROJECT_ROOT,
+                output_root=directory,
                 progress_callback=progress.append,
                 openai_client="openai-client",
                 anki_client="anki-client",
-                generator=generator,
-                importer=importer)
+                generator=self.generator,
+                importer=self.importer)
 
-        self.assertEqual(len(summary.successes), 2)
-        self.assertEqual(summary.cards_moved, 4)
+        self.assertEqual(len(summary.successes), 1)
+        self.assertEqual(summary.cards_moved, 2)
         self.assertEqual(
             [item.stage for item in progress],
-            ["generating", "importing", "generating", "importing"])
-        self.assertEqual(generator.call_count, 2)
-        self.assertEqual(importer.call_count, 2)
+            ["generating", "importing"])
+        generation = self.generator.call_args.kwargs
+        self.assertIs(generation["pipeline"], pipeline)
+        self.assertEqual(
+            generation["guid_seed"],
+            pipeline.pipeline_id)
+        self.assertIn(
+            'For "Translation (English)"',
+            generation["prompt_text"])
+        self.assertIn(
+            'For "Dictionary Meaning (French)"',
+            generation["prompt_text"])
+        self.assertIs(
+            generation["client"],
+            "openai-client")
+        self.importer.assert_called_once_with(
+            generation["output_path"],
+            target_deck="Target::french",
+            source_deck=pipeline.generated_deck_name,
+            client="anki-client")
 
-        first_generation = generator.call_args_list[0].kwargs
-        second_generation = generator.call_args_list[1].kwargs
-        self.assertEqual(
-            first_generation["guid_seed"],
-            first.pipeline_id)
-        self.assertEqual(
-            first_generation["legacy_guid_card_type_key"],
-            templates.DEFAULT_CARD_TYPE_KEY)
-        self.assertEqual(
-            second_generation["guid_seed"],
-            second.pipeline_id)
+    def test_two_configurations_each_make_one_generation_call(self):
+        first = configure_pipeline(
+            pipeline_store.default_pipeline(),
+            "english",
+            enabled=("word_to_meaning",),
+            fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+            ))
+        second = configure_pipeline(
+            pipeline_store.create_pipeline((first,)),
+            "classical_chinese",
+            enabled=("meaning_to_word",),
+            fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "english"),
+            ))
+
+        with tempfile.TemporaryDirectory() as directory:
+            summary = pipeline_runner.run_pipelines(
+                "word",
+                (first, second),
+                project_root=PROJECT_ROOT,
+                output_root=directory,
+                generator=self.generator,
+                importer=self.importer)
+
+        self.assertEqual(len(summary.successes), 2)
+        self.assertEqual(self.generator.call_count, 2)
+        self.assertEqual(self.importer.call_count, 2)
         self.assertNotEqual(
-            first_generation["deck_id"],
-            second_generation["deck_id"])
-        self.assertEqual(
-            importer.call_args_list[1].kwargs["target_deck"],
-            "Another::Deck")
+            self.generator.call_args_list[0].kwargs["deck_id"],
+            self.generator.call_args_list[1].kwargs["deck_id"])
 
-    def test_failure_in_one_pipeline_does_not_stop_the_next(self):
+    def test_multiple_card_directions_share_one_paid_request(self):
+        pipeline = configure_pipeline(
+            pipeline_store.default_pipeline(),
+            "japanese",
+            enabled=(
+                "context",
+                "word_to_meaning",
+                "meaning_to_word"),
+            fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "english"),
+                pipeline_store.FieldSetting(
+                    "nuance",
+                    "japanese"),
+            ))
+
+        with tempfile.TemporaryDirectory() as directory:
+            pipeline_runner.run_pipelines(
+                "開く",
+                (pipeline,),
+                project_root=PROJECT_ROOT,
+                output_root=directory,
+                generator=self.generator,
+                importer=self.importer)
+
+        self.generator.assert_called_once()
+        prompt = self.generator.call_args.kwargs["prompt_text"]
+        self.assertEqual(
+            prompt.count('For "Translation (English)"'),
+            1)
+        self.assertEqual(
+            prompt.count('For "Nuance (Japanese)"'),
+            1)
+
+    def test_per_card_fields_are_unioned_into_one_minimal_request(self):
+        pipeline = pipeline_store.default_pipeline()
+        settings = pipeline_store.get_language_settings(
+            pipeline,
+            "latin")
+        cards = tuple(
+            replace(
+                card,
+                enabled=True,
+                fields=(
+                    (
+                        pipeline_store.FieldSetting(
+                            "translation",
+                            "english"),
+                    )
+                    if card.direction_key != "meaning_to_word"
+                    else (
+                        pipeline_store.FieldSetting(
+                            "dictionary_meaning",
+                            "latin"),
+                    )),
+                target_deck="Latin")
+            for card in settings.cards)
+        settings = replace(
+            settings,
+            cards=cards,
+            target_deck="Latin",
+            share_field_settings=False)
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,))
+
+        with tempfile.TemporaryDirectory() as directory:
+            pipeline_runner.run_pipelines(
+                "floreo",
+                (pipeline,),
+                project_root=PROJECT_ROOT,
+                output_root=directory,
+                generator=self.generator,
+                importer=self.importer)
+
+        self.generator.assert_called_once()
+        prompt = self.generator.call_args.kwargs["prompt_text"]
+        self.assertEqual(
+            prompt.count('For "Translation (English)"'),
+            1)
+        self.assertEqual(
+            prompt.count('For "Dictionary Meaning (Latin)"'),
+            1)
+        self.assertNotIn("Pronunciation", prompt)
+
+    def test_separate_decks_are_passed_as_model_routes(self):
+        pipeline = configure_pipeline(
+            pipeline_store.default_pipeline(),
+            "english",
+            enabled=("word_to_meaning", "meaning_to_word"),
+            separate=True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            pipeline_runner.run_pipelines(
+                "astrolabe",
+                (pipeline,),
+                project_root=PROJECT_ROOT,
+                output_root=directory,
+                generator=self.generator,
+                importer=self.importer)
+
+        routes = self.importer.call_args.kwargs["target_decks"]
+        self.assertEqual(
+            routes,
+            (
+                (
+                    templates.get_direction_card_type(
+                        "english",
+                        "word_to_meaning").model.name,
+                    "Target::1",
+                ),
+                (
+                    templates.get_direction_card_type(
+                        "english",
+                        "meaning_to_word").model.name,
+                    "Target::2",
+                ),
+            ))
+
+    def test_generation_failure_does_not_stop_next_pipeline(self):
         first = pipeline_store.default_pipeline()
         second = pipeline_store.create_pipeline((first,))
-        generator = MagicMock(
-            side_effect=[
-                RuntimeError("first failed"),
-                Path("/tmp/second.apkg"),
-            ])
-        importer = MagicMock(return_value=(
-            anki_integration.AnkiImportResult(
-                cards_moved=1,
-                target_deck=second.target_deck)))
+        self.generator.side_effect = [
+            RuntimeError("first failed"),
+            Path("/tmp/second.apkg"),
+        ]
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = self._project_with_prompts(
-                temporary_directory)
+        summary = pipeline_runner.run_pipelines(
+            "words",
+            (first, second),
+            project_root=PROJECT_ROOT,
+            generator=self.generator,
+            importer=self.importer)
+
+        self.assertEqual(len(summary.failures), 1)
+        self.assertEqual(summary.failures[0].stage, "generation")
+        self.assertEqual(len(summary.successes), 1)
+        self.importer.assert_called_once()
+
+    def test_missing_component_is_configuration_failure_without_api_call(self):
+        pipeline = pipeline_store.default_pipeline()
+
+        with tempfile.TemporaryDirectory() as directory:
             summary = pipeline_runner.run_pipelines(
                 "words",
-                (first, second),
-                project_root=project_root,
-                generator=generator,
-                importer=importer)
+                (pipeline,),
+                project_root=directory,
+                generator=self.generator,
+                importer=self.importer)
 
         self.assertEqual(len(summary.failures), 1)
         self.assertEqual(
             summary.failures[0].stage,
-            "generation")
-        self.assertEqual(len(summary.successes), 1)
-        importer.assert_called_once()
+            "configuration")
+        self.generator.assert_not_called()
+        self.importer.assert_not_called()
 
-    def test_classical_chinese_pipeline_combines_prompt_model_and_target(self):
-        pipeline = replace(
-            pipeline_store.create_pipeline(),
-            language_key="classical_chinese",
-            card_type_keys=(
-                templates.CLASSICAL_CHINESE_CARD_TYPE.key,),
-            target_deck="Retained Information::Chinese::Classical Chinese")
-        generator = MagicMock(
-            side_effect=lambda _words, **kwargs: kwargs["output_path"])
-        importer = MagicMock(return_value=(
-            anki_integration.AnkiImportResult(
-                cards_moved=1,
-                target_deck=pipeline.target_deck)))
+    def test_import_failure_keeps_generated_output_in_summary(self):
+        pipeline = pipeline_store.default_pipeline()
+        self.importer.side_effect = RuntimeError("Anki unavailable")
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = self._project_with_prompts(temporary_directory)
+        with tempfile.TemporaryDirectory() as directory:
             summary = pipeline_runner.run_pipelines(
-                "學",
+                "words",
                 (pipeline,),
-                project_root=project_root,
-                generator=generator,
-                importer=importer)
+                project_root=PROJECT_ROOT,
+                output_root=directory,
+                generator=self.generator,
+                importer=self.importer)
 
-        self.assertEqual(len(summary.successes), 1)
-        generation = generator.call_args.kwargs
-        self.assertEqual(
-            generation["prompt_path"].name,
-            "classical_chinese")
-        self.assertEqual(
-            generation["card_type_keys"],
-            ("classical_chinese_vocabulary",))
-        importer.assert_called_once_with(
-            generation["output_path"],
-            target_deck=pipeline.target_deck,
-            source_deck=pipeline.generated_deck_name,
-            client=None)
+        self.assertEqual(len(summary.failures), 1)
+        failure = summary.failures[0]
+        self.assertEqual(failure.stage, "import")
+        self.assertIsNotNone(failure.output_path)
 
-    def test_two_simple_outputs_share_the_minimal_prompt_and_request(self):
-        pipeline = replace(
-            pipeline_store.create_pipeline(),
-            card_type_keys=(
-                templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.key,
-                templates.ENGLISH_MEANING_TO_WORD_CARD_TYPE.key))
-        generator = MagicMock(
-            side_effect=lambda _words, **kwargs: kwargs["output_path"])
-        importer = MagicMock(return_value=(
-            anki_integration.AnkiImportResult(
-                cards_moved=2,
-                target_deck=pipeline.target_deck)))
+    def test_default_and_named_pipeline_output_paths_are_isolated(self):
+        first = pipeline_store.default_pipeline()
+        second = pipeline_store.create_pipeline((first,))
+        root = Path("/temporary/output")
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = self._project_with_prompts(temporary_directory)
-            summary = pipeline_runner.run_pipelines(
-                "astrolabe",
-                (pipeline,),
-                project_root=project_root,
-                generator=generator,
-                importer=importer)
-
-        self.assertEqual(len(summary.successes), 1)
-        generator.assert_called_once()
-        generation = generator.call_args.kwargs
-        self.assertEqual(
-            generation["prompt_path"].name,
-            "english_vocab_simple")
-        self.assertEqual(
-            generation["card_type_keys"],
-            (
-                "english_word_to_meaning",
-                "english_meaning_to_word"))
-
-    def test_selected_outputs_can_be_imported_into_separate_decks(self):
-        pipeline = replace(
-            pipeline_store.create_pipeline(),
-            card_type_keys=(
-                templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.key,
-                templates.ENGLISH_MEANING_TO_WORD_CARD_TYPE.key),
-            separate_target_decks=True,
-            card_type_target_decks=(
-                (
-                    templates.ENGLISH_WORD_TO_MEANING_CARD_TYPE.key,
-                    "English::Recognition"),
-                (
-                    templates.ENGLISH_MEANING_TO_WORD_CARD_TYPE.key,
-                    "English::Production"),
-            ))
-        generator = MagicMock(
-            side_effect=lambda _words, **kwargs: kwargs["output_path"])
-        importer = MagicMock(return_value=(
-            anki_integration.AnkiImportResult(
-                cards_moved=2,
-                target_deck="Multiple decks")))
-
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = self._project_with_prompts(temporary_directory)
-            pipeline_runner.run_pipelines(
-                "astrolabe",
-                (pipeline,),
-                project_root=project_root,
-                generator=generator,
-                importer=importer)
-
-        generator.assert_called_once()
-        importer.assert_called_once_with(
-            generator.call_args.kwargs["output_path"],
-            target_deck=pipeline.target_deck,
-            target_decks=(
-                (
-                    templates
-                    .ENGLISH_WORD_TO_MEANING_CARD_TYPE.model.name,
-                    "English::Recognition"),
-                (
-                    templates
-                    .ENGLISH_MEANING_TO_WORD_CARD_TYPE.model.name,
-                    "English::Production"),
-            ),
-            source_deck=pipeline.generated_deck_name,
-            client=None)
-
-    def test_mixed_japanese_definitions_share_one_detailed_request(self):
-        pipeline = replace(
-            pipeline_store.create_pipeline(),
-            language_key="japanese",
-            card_type_keys=(
-                templates.JAPANESE_VOCABULARY_CARD_TYPE.key,
-                templates.JAPANESE_WORD_TO_NATIVE_MEANING_CARD_TYPE.key),
-            target_deck="Retained Information::Japanese")
-        generator = MagicMock(
-            side_effect=lambda _words, **kwargs: kwargs["output_path"])
-        importer = MagicMock(return_value=(
-            anki_integration.AnkiImportResult(
-                cards_moved=2,
-                target_deck=pipeline.target_deck)))
-
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = self._project_with_prompts(temporary_directory)
-            summary = pipeline_runner.run_pipelines(
-                "勉強",
-                (pipeline,),
-                project_root=project_root,
-                generator=generator,
-                importer=importer)
-
-        self.assertEqual(len(summary.successes), 1)
-        generator.assert_called_once()
-        generation = generator.call_args.kwargs
-        self.assertEqual(
-            generation["prompt_path"].name,
-            "japanese_vocab")
-        self.assertEqual(
-            generation["card_type_keys"],
-            (
-                "japanese_vocabulary",
-                "japanese_word_to_native_meaning"))
-
-    def test_latin_native_outputs_use_one_minimal_request(self):
-        pipeline = replace(
-            pipeline_store.create_pipeline(),
-            language_key="latin",
-            card_type_keys=(
-                templates.LATIN_WORD_TO_NATIVE_MEANING_CARD_TYPE.key,
-                templates.LATIN_NATIVE_MEANING_TO_WORD_CARD_TYPE.key),
-            target_deck="Retained Information::Latin")
-        generator = MagicMock(
-            side_effect=lambda _words, **kwargs: kwargs["output_path"])
-        importer = MagicMock(return_value=(
-            anki_integration.AnkiImportResult(
-                cards_moved=2,
-                target_deck=pipeline.target_deck)))
-
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            project_root = self._project_with_prompts(temporary_directory)
-            summary = pipeline_runner.run_pipelines(
-                "sapientia",
-                (pipeline,),
-                project_root=project_root,
-                generator=generator,
-                importer=importer)
-
-        self.assertEqual(len(summary.successes), 1)
-        generator.assert_called_once()
-        self.assertEqual(
-            generator.call_args.kwargs["prompt_path"].name,
-            "latin_vocab_simple")
-        self.assertEqual(
-            generator.call_args.kwargs["card_type_keys"],
-            (
-                "latin_word_to_native_meaning",
-                "latin_native_meaning_to_word"))
-
-    def test_default_pipeline_keeps_legacy_output_paths(self):
-        paths = pipeline_runner.get_pipeline_output_paths(
-            pipeline_store.default_pipeline(),
-            Path("/project/output"))
+        first_paths = pipeline_runner.get_pipeline_output_paths(
+            first,
+            root)
+        second_paths = pipeline_runner.get_pipeline_output_paths(
+            second,
+            root)
 
         self.assertEqual(
-            paths["response"],
-            Path("/project/output/response.json"))
+            first_paths["package"],
+            root / "output.apkg")
         self.assertEqual(
-            paths["package"],
-            Path("/project/output/output.apkg"))
+            second_paths["package"],
+            root / "pipelines" / second.pipeline_id / "output.apkg")
 
 
 if __name__ == "__main__":

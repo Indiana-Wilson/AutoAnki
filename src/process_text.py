@@ -2,17 +2,22 @@ import genanki
 import json
 import templates
 import credential_store
+import pipeline_store
+import prompt_builder
+import runtime_paths
 from openai import OpenAI
 import os
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PROMPT_PATH = PROJECT_ROOT / "input" / "prompts" / "english_vocab"
-WORDS_PATH = PROJECT_ROOT / "input" / "words"
-RESPONSE_PATH = PROJECT_ROOT / "output" / "response.json"
-RESPONSE_LOG_PATH = PROJECT_ROOT / "output" / "response_log"
-DECK_PATH = PROJECT_ROOT / "output" / "output.apkg"
+PROJECT_ROOT = runtime_paths.get_resource_root()
+PROMPT_DIRECTORY = runtime_paths.get_prompt_directory()
+OUTPUT_DIRECTORY = runtime_paths.get_output_directory()
+PROMPT_PATH = PROMPT_DIRECTORY / "english_vocab"
+WORDS_PATH = runtime_paths.get_words_path()
+RESPONSE_PATH = OUTPUT_DIRECTORY / "response.json"
+RESPONSE_LOG_PATH = OUTPUT_DIRECTORY / "response_log"
+DECK_PATH = OUTPUT_DIRECTORY / "output.apkg"
 
 
 class MissingAPIKeyError(RuntimeError):
@@ -42,31 +47,27 @@ def get_api_key():
     return credential_store.load_api_key()
 
 
-def build_response_format(card_types):
-    """Build the strict Structured Outputs schema for selected card types."""
-    card_types = tuple(card_types)
-    if not card_types:
-        raise ValueError("Select at least one card type.")
+def get_response_field_names(pipeline):
+    pipeline_store.validate_pipelines((pipeline,))
+    language = pipeline_store.get_language(
+        pipeline.language_key)
+    field_names = [language.term_field]
+    if pipeline_store.requires_sentences(pipeline):
+        field_names.append("Sentences")
+    field_names.extend(
+        pipeline_store.response_field_name(field_setting)
+        for field_setting
+        in pipeline_store.get_requested_field_settings(pipeline))
+    return tuple(field_names)
 
-    field_names = tuple(dict.fromkeys(
-        field_name
-        for card_type in card_types
-        for field_name in card_type.field_names))
-    language_fields = (
-        ("Classical Chinese", "classical_chinese"),
-        ("French", "french"),
-        ("Japanese", "japanese"),
-        ("Latin", "latin"),
-        ("Word", "english"),
-    )
-    language_name = next(
-        (
-            language_name
-            for field_name, language_name in language_fields
-            if field_name in field_names
-        ),
-        "vocabulary")
-    detail_name = "detailed" if "Sentences" in field_names else "simple"
+
+def build_response_format(pipeline):
+    """Build a strict schema containing only fields selected in the UI."""
+    field_names = get_response_field_names(pipeline)
+    detail_name = (
+        "context"
+        if pipeline_store.requires_sentences(pipeline)
+        else "simple")
 
     card_schema = {
         "type": "object",
@@ -79,7 +80,8 @@ def build_response_format(card_types):
     }
     return {
         "type": "json_schema",
-        "name": f"autoanki_{language_name}_{detail_name}_cards",
+        "name": (
+            f"autoanki_{pipeline.language_key}_{detail_name}_cards"),
         "strict": True,
         "schema": {
             "type": "object",
@@ -121,8 +123,8 @@ def fetch_response(
         prompt_path=None,
         response_path=None,
         response_log_path=None,
-        response_format=None):
-    prompt_path = Path(prompt_path or PROMPT_PATH)
+        response_format=None,
+        prompt_text=None):
     response_path = Path(response_path or RESPONSE_PATH)
     response_log_path = Path(response_log_path or RESPONSE_LOG_PATH)
 
@@ -136,14 +138,16 @@ def fetch_response(
         # Retry/Cancel decision, never automatically by the SDK.
         client = OpenAI(api_key=key, max_retries=0)
 
-    prompt = prompt_path.read_text(encoding="utf-8")
+    if prompt_text is None:
+        prompt_path = Path(prompt_path or PROMPT_PATH)
+        prompt_text = prompt_path.read_text(encoding="utf-8")
     if response_format is None:
         response_format = build_response_format(
-            (templates.ENGLISH_VOCABULARY_CARD_TYPE,))
+            pipeline_store.default_pipeline())
 
     response = client.responses.create(
         model="gpt-5.4-mini",
-        input=prompt + words,
+        input=prompt_text + words,
         text={"format": response_format},
     )
 
@@ -190,22 +194,21 @@ def process_json_text(
         *,
         deck=None,
         output_path=None,
-        card_type=None,
-        card_types=None,
+        pipeline=None,
         guid_seed=None,
-        legacy_guid_card_type_key=None):
+        **_legacy_arguments):
     if deck is None:
         deck = templates.my_deck
     output_path = Path(output_path or DECK_PATH)
-    if card_type is not None and card_types is not None:
-        raise ValueError("Pass either card_type or card_types, not both.")
-    if card_types is None:
-        card_types = (
-            card_type or templates.ENGLISH_VOCABULARY_CARD_TYPE,)
-    else:
-        card_types = tuple(card_types)
-    if not card_types:
-        raise ValueError("Select at least one card type.")
+    pipeline = pipeline or pipeline_store.default_pipeline()
+    pipeline_store.validate_pipelines((pipeline,))
+    language = pipeline_store.get_language(
+        pipeline.language_key)
+    model_language_key = language.model_language_key
+    language_settings = pipeline_store.get_language_settings(
+        pipeline,
+        pipeline.language_key)
+    enabled_cards = pipeline_store.get_enabled_cards(pipeline)
     parsed = json.loads(text)
     if isinstance(parsed, dict):
         if set(parsed) != {"cards"}:
@@ -220,11 +223,14 @@ def process_json_text(
         raise GeneratedCardValidationError(
             "Generated card data must be an array.")
 
-    expected_fields = tuple(dict.fromkeys(
-        field_name
-        for selected_card_type in card_types
-        for field_name in selected_card_type.field_names))
+    expected_fields = get_response_field_names(pipeline)
     expected_field_set = set(expected_fields)
+    empty_allowed_fields = {
+        pipeline_store.response_field_name(field_setting)
+        for field_setting
+        in pipeline_store.get_requested_field_settings(pipeline)
+        if field_setting.field_key == "nuance"
+    }
     validated_notes = []
     for note_data in parser:
         if not isinstance(note_data, dict):
@@ -249,6 +255,9 @@ def process_json_text(
                 raise TypeError(
                     "All generated card fields must be strings.")
             if not field.strip():
+                if field_name in empty_allowed_fields:
+                    note_data[field_name] = ""
+                    continue
                 raise GeneratedCardValidationError(
                     f'Generated field "{field_name}" cannot be empty.')
         if "Sentences" in expected_field_set:
@@ -261,26 +270,57 @@ def process_json_text(
                 raise GeneratedCardValidationError(
                     "Each detailed card must contain exactly four "
                     "pipe-separated example sentences.")
+        for card in enabled_cards:
+            effective_fields = pipeline_store.get_effective_fields(
+                language_settings,
+                card)
+            if not any(
+                    note_data[
+                        pipeline_store.response_field_name(
+                            field_setting)].strip()
+                    for field_setting in effective_fields):
+                direction_name = pipeline_store.get_direction(
+                    card.direction_key).name
+                raise GeneratedCardValidationError(
+                    f'"{direction_name}" has no non-empty meaning fields.')
         validated_notes.append(note_data)
 
     notes_created = 0
     for note_data in validated_notes:
-        for selected_card_type in card_types:
+        for card in enabled_cards:
+            selected_card_type = templates.get_direction_card_type(
+                model_language_key,
+                card.direction_key)
+            effective_fields = pipeline_store.get_effective_fields(
+                language_settings,
+                card)
+            response_fields_by_key = {
+                field_setting.field_key: (
+                    pipeline_store.response_field_name(field_setting))
+                for field_setting in effective_fields
+            }
             fields = [
-                note_data[field_name]
-                for field_name in selected_card_type.field_names
+                note_data[language.term_field],
+                note_data.get("Sentences", ""),
+                *(
+                    note_data.get(
+                        response_fields_by_key.get(field_key, ""),
+                        "")
+                    for field_key, _field_name
+                    in templates.CONTENT_FIELDS
+                ),
             ]
             note_arguments = {
                 "model": selected_card_type.model,
                 "fields": fields,
             }
-            if (
-                    guid_seed is not None
-                    and selected_card_type.key
-                    != legacy_guid_card_type_key):
+            if guid_seed is not None:
                 identity_values = [
-                    note_data[field_name]
-                    for field_name in selected_card_type.identity_fields
+                    note_data[language.term_field],
+                    *(
+                        note_data[
+                            pipeline_store.response_field_name(field_setting)]
+                        for field_setting in effective_fields),
                 ]
                 note_arguments["guid"] = genanki.guid_for(
                     "autoanki",
@@ -313,34 +353,33 @@ def generate_deck(
         output_path=None,
         deck_id=templates.DECK_ID,
         deck_name=templates.DECK_NAME,
-        card_type_key=templates.DEFAULT_CARD_TYPE_KEY,
-        card_type_keys=None,
+        pipeline=None,
+        prompt_text=None,
         guid_seed=None,
-        legacy_guid_card_type_key=None):
+        **_legacy_arguments):
     """Generate one fresh Anki deck from the supplied words."""
     response_path = Path(response_path or RESPONSE_PATH)
     response_log_path = Path(
         response_log_path or RESPONSE_LOG_PATH)
     output_path = Path(output_path or DECK_PATH)
-    if card_type_keys is None:
-        card_type_keys = (card_type_key,)
-    card_types = tuple(
-        templates.get_card_type(key)
-        for key in card_type_keys)
+    pipeline = pipeline or pipeline_store.default_pipeline()
+    if prompt_text is None:
+        prompt_text = prompt_builder.build_prompt(pipeline)
     response_text = fetch_response(
         words,
         client=client,
         prompt_path=prompt_path,
+        prompt_text=prompt_text,
         response_path=response_path,
         response_log_path=response_log_path,
-        response_format=build_response_format(card_types))
+        response_format=build_response_format(pipeline))
     process_json_text(
         response_text,
         deck=templates.create_deck(deck_id, deck_name),
         output_path=output_path,
-        card_types=card_types,
+        pipeline=pipeline,
         guid_seed=guid_seed,
-        legacy_guid_card_type_key=legacy_guid_card_type_key)
+    )
     return output_path
 
 

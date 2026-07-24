@@ -1,0 +1,62 @@
+AUTOANKI WINDOWS INSTALLATION
+=============================
+
+Building and sharing AutoAnki
+-----------------------------
+
+1. On a Windows build computer, open the complete AutoAnki repository.
+
+2. Run build_windows.bat.
+
+3. Wait for the build to finish. It will create:
+
+   dist\AutoAnki.exe
+
+4. Send AutoAnki.exe to your friend. They do not need the source repository,
+   build_windows.bat, Git, or Python.
+
+5. Your friend can launch AutoAnki by double-clicking AutoAnki.exe in File
+   Explorer.
+
+Windows may display a SmartScreen warning because AutoAnki.exe is not
+digitally signed.
+
+
+Requirements on your friend's computer
+--------------------------------------
+
+1. Install Anki:
+
+   https://apps.ankiweb.net/
+
+2. Install AnkiConnect in Anki:
+
+   a. Open Anki.
+   b. Select Tools > Add-ons.
+   c. Click Get Add-ons.
+   d. Enter this add-on code:
+
+      2055492159
+
+   e. Restart Anki.
+
+3. Launch AutoAnki.exe.
+
+4. Enter an OpenAI API key when AutoAnki asks for one. Ideally, your friend
+   should use their own API key because generation requests cost money.
+
+5. Create the intended destination decks in Anki before selecting them in
+   AutoAnki.
+
+
+Normal same-computer configuration
+----------------------------------
+
+If AutoAnki and Anki run on the same computer, leave the AnkiConnect address
+set to:
+
+http://127.0.0.1:8765
+
+There is no need to change webBindAddress or find the computer's IP address.
+
+Anki should be open, or AutoAnki will attempt to open it automatically.

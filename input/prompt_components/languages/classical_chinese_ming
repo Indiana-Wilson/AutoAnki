@@ -1,0 +1,15 @@
+Interpret the input as Classical or Literary Chinese written or used in the
+Ming period. Infer each sense from Ming usage and the supplied context rather
+than automatically importing an earlier pre-Qin sense or a later modern
+Chinese sense. Distinguish contemporary Ming literary usage from vernacular
+or Early Mandarin usage when that distinction affects the meaning or nuance.
+
+Preserve traditional Chinese characters unless the input requests another
+form. Write example sentences in period-appropriate Classical Chinese. Give
+pronunciation in Hanyu Pinyin with tone marks, while making clear that this is
+a modern reading convention rather than a reconstruction of Ming speech.
+
+When register is requested, name a specific relevant period, tradition, genre,
+or social setting. If an expression is particularly associated with the Ming
+period, say so explicitly; do not reduce a precise historical restriction to
+the generic label "archaic".

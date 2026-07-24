@@ -1,0 +1,5 @@
+For "{response_field}", give a concise account in {target_language} of a
+connotation or semantic distinction that is important for using the selected
+sense correctly. Do not repeat its dictionary explanation. If there is no
+meaningful nuance beyond the literal or dictionary meaning, return an empty
+string for this field.

@@ -1,0 +1,16 @@
+Interpret the input as Classical Chinese of the Warring States period. Infer
+each sense from pre-Qin and Warring States usage and the supplied context,
+rather than automatically importing later imperial or modern Chinese
+meanings. Explain historically appropriate semantic distinctions when they
+affect the translation, dictionary meaning, or nuance.
+
+Preserve traditional Chinese characters unless the input requests another
+form. Write example sentences in period-appropriate Classical Chinese. Give
+pronunciation in Hanyu Pinyin with tone marks, while making clear that this is
+a modern reading convention rather than a reconstruction of Warring States
+speech.
+
+When register is requested, name a specific relevant period, textual
+tradition, genre, or social setting. If an expression is particular to the
+Warring States period or more broadly pre-Qin usage, say so explicitly; do not
+reduce a precise historical restriction to the generic label "archaic".

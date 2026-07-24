@@ -11,7 +11,18 @@ import anki_integration
 import credential_store
 import pipeline_runner
 import pipeline_store
+import prompt_builder
 import process_text
+
+
+def language_selector_width():
+    """Size language menus for their longest label with comfortable padding."""
+    return max(
+        24,
+        max(
+            len(language.name)
+            for language in pipeline_store.list_languages())
+        + 4)
 
 
 def wheel_scroll_amount(event):
@@ -310,20 +321,17 @@ class ScrollableFrame(ttk.Frame):
             widget = stack.pop()
             widget.bind(
                 "<MouseWheel>",
-                self._wheel_scroll,
-                add="+")
+                self._wheel_scroll)
             widget.bind(
                 "<Button-4>",
-                self._wheel_scroll,
-                add="+")
+                self._wheel_scroll)
             widget.bind(
                 "<Button-5>",
-                self._wheel_scroll,
-                add="+")
+                self._wheel_scroll)
             stack.extend(widget.winfo_children())
 
 
-class PipelineEditor:
+class _LegacyPipelineEditor:
     CARD_DESCRIPTIONS = {
         "Context sentence → meaning": (
             "A varied example sentence on the front; pronunciation and "
@@ -401,13 +409,16 @@ class PipelineEditor:
             column=0,
             sticky="nsew")
 
-        for language in pipeline_store.list_languages():
+        for language in pipeline_store.list_settings_languages():
             self._add_language_tab(language, config)
 
-        active_tab = self.language_tabs.get(config.language_key)
+        active_settings_language_key = pipeline_store.get_language(
+            config.language_key).model_language_key
+        active_tab = self.language_tabs.get(
+            active_settings_language_key)
         if active_tab is not None:
             self.language_notebook.select(active_tab)
-        self.last_active_language_key = config.language_key
+        self.last_active_language_key = active_settings_language_key
         self.language_notebook.bind(
             "<<NotebookTabChanged>>",
             self._language_changed)
@@ -758,9 +769,9 @@ class PipelineEditor:
         return language
 
     def to_config(self):
-        active_language = self.get_active_language()
+        active_language = self.app.get_generation_language()
         language_settings = []
-        for language in pipeline_store.list_languages():
+        for language in pipeline_store.list_settings_languages():
             variables = self.card_output_variables[language.key]
             card_type_keys = tuple(
                 card_type_key
@@ -815,6 +826,653 @@ class PipelineEditor:
         self.frame.destroy()
 
 
+class PipelineEditor:
+    """Editor for three card directions and configurable meaning fields."""
+
+    def __init__(self, app, parent, config):
+        self.app = app
+        self.config = config
+        self.variable_traces = []
+        self.language_tabs = {}
+        self.language_by_tab = {}
+        self.target_deck_variables = {}
+        self.target_deck_boxes = {}
+        self.separate_target_deck_variables = {}
+        self.share_field_settings_variables = {}
+        self.direction_enabled_variables = {}
+        self.card_output_variables = self.direction_enabled_variables
+        self.direction_target_deck_variables = {}
+        self.direction_target_deck_boxes = {}
+        self.direction_surfaces = {}
+        self.shared_field_enabled_variables = {}
+        self.shared_field_language_variables = {}
+        self.shared_field_language_boxes = {}
+        self.shared_field_containers = {}
+        self.per_card_field_enabled_variables = {}
+        self.per_card_field_language_variables = {}
+        self.per_card_field_language_boxes = {}
+        self.per_card_field_containers = {}
+
+        self.frame = RoundedPanel(
+            parent,
+            fill=app.PANEL_BACKGROUND,
+            outline=app.LINE,
+            background=app.WINDOW_BACKGROUND,
+            radius=26,
+            inset=18)
+        self.frame.grid(row=0, column=0, sticky="ew")
+        panel = self.frame.interior
+        panel.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            panel,
+            text="CHOOSE A LANGUAGE",
+            style="Section.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                pady=(0, 10))
+        self.language_notebook = ttk.Notebook(
+            panel,
+            padding=(0, 0))
+        self.language_notebook.grid(
+            row=1,
+            column=0,
+            sticky="nsew")
+
+        for language in pipeline_store.list_settings_languages():
+            self._add_language_tab(language, config)
+        active_settings_language_key = pipeline_store.get_language(
+            config.language_key).model_language_key
+        active_tab = self.language_tabs.get(
+            active_settings_language_key)
+        if active_tab is not None:
+            self.language_notebook.select(active_tab)
+        self.last_active_language_key = active_settings_language_key
+        self.language_notebook.bind(
+            "<<NotebookTabChanged>>",
+            self._language_changed)
+        self._update_all_visibility()
+
+    def _trace(self, variable, callback=None):
+        trace_id = variable.trace_add(
+            "write",
+            callback or self.app.schedule_pipeline_save)
+        self.variable_traces.append((variable, trace_id))
+
+    def _language_values(self, source_language_key, field_key):
+        return tuple(
+            language.name
+            for language in pipeline_store.list_response_languages()
+            if not (
+                field_key == "translation"
+                and language.key == source_language_key))
+
+    def _language_key_from_name(self, language_name):
+        for language in pipeline_store.list_response_languages():
+            if language.name == language_name:
+                return language.key
+        raise ValueError(
+            f"Unknown target language: {language_name}")
+
+    def _create_field_grid(
+            self,
+            parent,
+            language,
+            selected_fields,
+            remembered_fields=()):
+        remembered_by_key = {
+            field.field_key: field.target_language_key
+            for field in remembered_fields}
+        selected_by_key = {
+            field.field_key: field.target_language_key
+            for field in selected_fields}
+        enabled_variables = {}
+        language_variables = {}
+        language_boxes = {}
+        grid = ttk.Frame(parent, style="Pale.TFrame")
+        grid.columnconfigure(1, weight=1)
+
+        for row, field in enumerate(
+                pipeline_store.list_field_options()):
+            target_values = self._language_values(
+                language.key,
+                field.key)
+            selected_target_key = selected_by_key.get(
+                field.key,
+                remembered_by_key.get(field.key))
+            if selected_target_key == language.key and (
+                    field.key == "translation"):
+                selected_target_key = None
+            if selected_target_key is None:
+                selected_target_key = (
+                    "english"
+                    if language.key != "english" or field.key != "translation"
+                    else "french")
+            selected_target_name = pipeline_store.get_language(
+                selected_target_key).name
+            enabled = tk.BooleanVar(
+                value=field.key in selected_by_key)
+            target = tk.StringVar(value=selected_target_name)
+            enabled_variables[field.key] = enabled
+            language_variables[field.key] = target
+
+            ttk.Checkbutton(
+                grid,
+                text=field.name,
+                variable=enabled,
+                command=lambda key=language.key: (
+                    self._field_controls_changed(key)),
+                style="CardOption.TCheckbutton").grid(
+                    row=row,
+                    column=0,
+                    sticky="w",
+                    padx=(0, 12),
+                    pady=3)
+            box = ttk.Combobox(
+                grid,
+                textvariable=target,
+                values=target_values,
+                width=language_selector_width(),
+                state="readonly",
+                style="App.TCombobox")
+            box.grid(
+                row=row,
+                column=1,
+                sticky="ew",
+                pady=3)
+            box.bind(
+                "<<ComboboxSelected>>",
+                lambda _event, key=language.key: (
+                    self._field_controls_changed(key)),
+                add="+")
+            box.bind(
+                "<FocusOut>",
+                self.app._clear_entry_selection,
+                add="+")
+            language_boxes[field.key] = box
+            self._trace(enabled)
+            self._trace(target)
+        return (
+            grid,
+            enabled_variables,
+            language_variables,
+            language_boxes)
+
+    def _add_language_tab(self, language, config):
+        tab = ttk.Frame(
+            self.language_notebook,
+            style="Panel.TFrame")
+        tab.columnconfigure(0, weight=1)
+        self.language_notebook.add(tab, text=language.name)
+        self.language_tabs[language.key] = tab
+        self.language_by_tab[str(tab)] = language
+
+        content = ttk.Frame(
+            tab,
+            padding=(20, 18, 20, 32),
+            style="Panel.TFrame")
+        content.grid(row=0, column=0, sticky="ew")
+        content.columnconfigure(0, weight=1)
+        settings = pipeline_store.get_language_settings(
+            config,
+            language.key)
+
+        ttk.Label(
+            content,
+            text="Cards to create",
+            style="Section.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w")
+        ttk.Label(
+            content,
+            text=(
+                "Choose card directions and exactly which information "
+                "OpenAI should return. Unselected fields are omitted."),
+            style="Muted.TLabel",
+            wraplength=1000).grid(
+                row=1,
+                column=0,
+                sticky="w",
+                pady=(3, 12))
+
+        controls = ttk.Frame(content, style="Panel.TFrame")
+        controls.grid(
+            row=2,
+            column=0,
+            sticky="ew",
+            pady=(0, 10))
+        controls.columnconfigure(1, weight=1)
+
+        separate_decks = tk.BooleanVar(
+            value=settings.separate_target_decks)
+        self.separate_target_deck_variables[language.key] = separate_decks
+        ttk.Checkbutton(
+            controls,
+            text="Send each card type to a separate Anki deck",
+            variable=separate_decks,
+            command=lambda key=language.key: (
+                self._layout_mode_changed(key)),
+            style="Panel.TCheckbutton").grid(
+                row=0,
+                column=0,
+                columnspan=2,
+                sticky="w")
+
+        share_fields = tk.BooleanVar(
+            value=settings.share_field_settings)
+        self.share_field_settings_variables[language.key] = share_fields
+        ttk.Checkbutton(
+            controls,
+            text=(
+                "Use the same selected fields and response languages "
+                "for all card types"),
+            variable=share_fields,
+            command=lambda key=language.key: (
+                self._layout_mode_changed(key)),
+            style="Panel.TCheckbutton").grid(
+                row=1,
+                column=0,
+                columnspan=2,
+                sticky="w",
+                pady=(4, 10))
+
+        ttk.Label(
+            controls,
+            text="TARGET ANKI DECK",
+            style="FieldLabel.TLabel").grid(
+                row=2,
+                column=0,
+                sticky="w",
+                padx=(0, 10))
+        target_deck = tk.StringVar(value=settings.target_deck)
+        self.target_deck_variables[language.key] = target_deck
+        target_box = ttk.Combobox(
+            controls,
+            textvariable=target_deck,
+            values=self.app.deck_options,
+            width=42,
+            state="normal",
+            style="App.TCombobox")
+        target_box.grid(row=2, column=1, sticky="ew")
+        target_box.bind(
+            "<FocusOut>",
+            self.app._clear_entry_selection,
+            add="+")
+        target_box.bind(
+            "<Button-1>",
+            self.app._deck_selector_opened,
+            add="+")
+        self.target_deck_boxes[language.key] = target_box
+        ttk.Label(
+            controls,
+            textvariable=self.app.deck_status,
+            style="Muted.TLabel").grid(
+                row=3,
+                column=0,
+                columnspan=2,
+                sticky="w",
+                pady=(5, 0))
+        self._trace(separate_decks)
+        self._trace(share_fields)
+        self._trace(target_deck)
+
+        shared_surface = RoundedPanel(
+            content,
+            fill=self.app.PALE,
+            outline="#C8DDD8",
+            background=self.app.PANEL_BACKGROUND,
+            radius=18,
+            inset=10)
+        shared_surface.grid(
+            row=3,
+            column=0,
+            sticky="ew",
+            pady=(0, 10))
+        shared_content = shared_surface.interior
+        shared_content.columnconfigure(0, weight=1)
+        ttk.Label(
+            shared_content,
+            text="SHARED DEFINITION CONTENT",
+            style="PaleField.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                pady=(0, 6))
+        (
+            shared_grid,
+            shared_enabled,
+            shared_languages,
+            shared_boxes,
+        ) = self._create_field_grid(
+            shared_content,
+            language,
+            settings.shared_fields,
+            settings.shared_field_languages)
+        shared_grid.grid(row=1, column=0, sticky="ew")
+        self.shared_field_containers[language.key] = shared_surface
+        self.shared_field_enabled_variables[
+            language.key] = shared_enabled
+        self.shared_field_language_variables[
+            language.key] = shared_languages
+        self.shared_field_language_boxes[
+            language.key] = shared_boxes
+
+        cards_by_direction = {
+            card.direction_key: card
+            for card in settings.cards}
+        enabled_variables = {}
+        deck_variables = {}
+        deck_boxes = {}
+        field_enabled_by_direction = {}
+        field_languages_by_direction = {}
+        field_boxes_by_direction = {}
+        field_containers = {}
+        direction_surfaces = {}
+
+        for row, direction in enumerate(
+                pipeline_store.list_directions(),
+                start=4):
+            card = cards_by_direction[direction.key]
+            surface = RoundedPanel(
+                content,
+                fill=self.app.PALE,
+                outline="#C8DDD8",
+                background=self.app.PANEL_BACKGROUND,
+                radius=18,
+                inset=10)
+            surface.grid(
+                row=row,
+                column=0,
+                sticky="ew",
+                pady=(0, 9))
+            direction_surfaces[direction.key] = surface
+            card_panel = surface.interior
+            card_panel.columnconfigure(0, weight=1)
+            card_panel.columnconfigure(2, weight=1)
+
+            enabled = tk.BooleanVar(value=card.enabled)
+            enabled_variables[direction.key] = enabled
+            ttk.Checkbutton(
+                card_panel,
+                text=direction.name,
+                variable=enabled,
+                command=lambda key=language.key: (
+                    self._card_controls_changed(key)),
+                style="CardOption.TCheckbutton").grid(
+                    row=0,
+                    column=0,
+                    sticky="w")
+            ttk.Label(
+                card_panel,
+                text="DECK",
+                style="PaleField.TLabel").grid(
+                    row=0,
+                    column=1,
+                    sticky="e",
+                    padx=(14, 7))
+            deck_variable = tk.StringVar(
+                value=card.target_deck)
+            deck_variables[direction.key] = deck_variable
+            deck_box = ttk.Combobox(
+                card_panel,
+                textvariable=deck_variable,
+                values=self.app.deck_options,
+                width=25,
+                state="normal",
+                style="App.TCombobox")
+            deck_box.grid(
+                row=0,
+                column=2,
+                sticky="ew")
+            deck_box.bind(
+                "<FocusOut>",
+                self.app._clear_entry_selection,
+                add="+")
+            deck_box.bind(
+                "<Button-1>",
+                self.app._deck_selector_opened,
+                add="+")
+            deck_boxes[direction.key] = deck_box
+
+            ttk.Label(
+                card_panel,
+                text=direction.description,
+                style="CardDescription.TLabel",
+                wraplength=850).grid(
+                    row=1,
+                    column=0,
+                    columnspan=3,
+                    sticky="w",
+                    pady=(5, 6))
+            (
+                field_grid,
+                field_enabled,
+                field_languages,
+                field_boxes,
+            ) = self._create_field_grid(
+                card_panel,
+                language,
+                card.fields,
+                card.field_languages)
+            field_grid.grid(
+                row=2,
+                column=0,
+                columnspan=3,
+                sticky="ew")
+            field_containers[direction.key] = field_grid
+            field_enabled_by_direction[
+                direction.key] = field_enabled
+            field_languages_by_direction[
+                direction.key] = field_languages
+            field_boxes_by_direction[
+                direction.key] = field_boxes
+            self._trace(enabled)
+            self._trace(deck_variable)
+
+        self.direction_enabled_variables[
+            language.key] = enabled_variables
+        self.direction_target_deck_variables[
+            language.key] = deck_variables
+        self.direction_target_deck_boxes[
+            language.key] = deck_boxes
+        self.direction_surfaces[
+            language.key] = direction_surfaces
+        self.per_card_field_enabled_variables[
+            language.key] = field_enabled_by_direction
+        self.per_card_field_language_variables[
+            language.key] = field_languages_by_direction
+        self.per_card_field_language_boxes[
+            language.key] = field_boxes_by_direction
+        self.per_card_field_containers[
+            language.key] = field_containers
+
+    def _fields_from_controls(
+            self,
+            enabled_variables,
+            language_variables):
+        return tuple(
+            pipeline_store.FieldSetting(
+                field_key=field.key,
+                target_language_key=self._language_key_from_name(
+                    language_variables[field.key].get()))
+            for field in pipeline_store.list_field_options()
+            if enabled_variables[field.key].get())
+
+    def _all_field_languages_from_controls(
+            self,
+            language_variables):
+        return tuple(
+            pipeline_store.FieldSetting(
+                field_key=field.key,
+                target_language_key=self._language_key_from_name(
+                    language_variables[field.key].get()))
+            for field in pipeline_store.list_field_options())
+
+    def _layout_mode_changed(self, language_key):
+        self._update_visibility(language_key)
+        self.app.schedule_pipeline_save()
+        self.app._update_pipeline_status()
+
+    def _field_controls_changed(self, language_key):
+        self._update_field_box_states(language_key)
+        self.app.schedule_pipeline_save()
+        self.app._update_pipeline_status()
+
+    def _card_controls_changed(self, language_key):
+        self._update_visibility(language_key)
+        self.app.schedule_pipeline_save()
+        self.app._update_pipeline_status()
+
+    def _update_field_box_states(self, language_key):
+        for _field_key, box in (
+                self.shared_field_language_boxes[
+                    language_key].items()):
+            box.configure(state="readonly")
+        for _direction_key, boxes in (
+                self.per_card_field_language_boxes[
+                    language_key].items()):
+            for box in boxes.values():
+                box.configure(state="readonly")
+
+    def _update_visibility(self, language_key):
+        separate = self.separate_target_deck_variables[
+            language_key].get()
+        sharing = self.share_field_settings_variables[
+            language_key].get()
+        if separate:
+            self.target_deck_boxes[language_key].configure(
+                state="disabled")
+        else:
+            self.target_deck_boxes[language_key].configure(
+                state="normal")
+        if sharing:
+            self.shared_field_containers[language_key].grid()
+        else:
+            self.shared_field_containers[language_key].grid_remove()
+        for direction in pipeline_store.list_directions():
+            enabled = self.direction_enabled_variables[
+                language_key][direction.key].get()
+            self.direction_target_deck_boxes[
+                language_key][direction.key].configure(
+                    state=(
+                        "normal"
+                        if separate and enabled
+                        else "disabled"))
+            container = self.per_card_field_containers[
+                language_key][direction.key]
+            if sharing:
+                container.grid_remove()
+            else:
+                container.grid()
+        self._update_field_box_states(language_key)
+        self._refresh_layout_geometry(language_key)
+
+    def _refresh_layout_geometry(self, language_key):
+        """Resize rounded surfaces after their optional controls change."""
+        if not self.frame.winfo_exists():
+            return
+        self.frame.update_idletasks()
+        for surface in self.direction_surfaces[
+                language_key].values():
+            surface._fit_to_contents()
+        self.shared_field_containers[
+            language_key]._fit_to_contents()
+        self.frame.update_idletasks()
+        self.frame._fit_to_contents()
+        self.frame.update_idletasks()
+        scroll_frame = getattr(
+            self.app,
+            "pipeline_scroll_frame",
+            None)
+        if scroll_frame is not None:
+            scroll_frame._content_changed()
+
+    def _update_all_visibility(self):
+        for language in pipeline_store.list_settings_languages():
+            self._update_visibility(language.key)
+
+    def _language_changed(self, _event=None):
+        language = self.get_active_language()
+        if language.key == self.last_active_language_key:
+            return
+        self.last_active_language_key = language.key
+        self._update_visibility(language.key)
+
+    def get_active_language(self):
+        selected_tab = self.language_notebook.select()
+        language = self.language_by_tab.get(selected_tab)
+        if language is None:
+            raise ValueError("Select a language.")
+        return language
+
+    def to_config(self):
+        active_language = self.app.get_generation_language()
+        all_settings = []
+        for language in pipeline_store.list_settings_languages():
+            shared_fields = self._fields_from_controls(
+                self.shared_field_enabled_variables[language.key],
+                self.shared_field_language_variables[language.key])
+            shared_field_languages = (
+                self._all_field_languages_from_controls(
+                    self.shared_field_language_variables[
+                        language.key]))
+            cards = []
+            for direction in pipeline_store.list_directions():
+                fields = self._fields_from_controls(
+                    self.per_card_field_enabled_variables[
+                        language.key][direction.key],
+                    self.per_card_field_language_variables[
+                        language.key][direction.key])
+                cards.append(pipeline_store.CardSettings(
+                    direction_key=direction.key,
+                    enabled=self.direction_enabled_variables[
+                        language.key][direction.key].get(),
+                    fields=fields,
+                    target_deck=self.direction_target_deck_variables[
+                        language.key][direction.key].get().strip(),
+                    field_languages=(
+                        self._all_field_languages_from_controls(
+                            self.per_card_field_language_variables[
+                                language.key][direction.key]))))
+            all_settings.append(pipeline_store.LanguageSettings(
+                language_key=language.key,
+                cards=tuple(cards),
+                target_deck=self.target_deck_variables[
+                    language.key].get().strip(),
+                separate_target_decks=(
+                    self.separate_target_deck_variables[
+                        language.key].get()),
+                share_field_settings=(
+                    self.share_field_settings_variables[
+                        language.key].get()),
+                shared_fields=shared_fields,
+                shared_field_languages=shared_field_languages))
+        active_settings = next(
+            settings
+            for settings in all_settings
+            if settings.language_key
+            == active_language.model_language_key)
+        return pipeline_store.replace_active_language_settings(
+            self.config,
+            active_settings,
+            all_settings,
+            active_language_key=active_language.key)
+
+    def update_deck_options(self, deck_options):
+        for box in self.target_deck_boxes.values():
+            box.configure(values=deck_options)
+        for boxes in self.direction_target_deck_boxes.values():
+            for box in boxes.values():
+                box.configure(values=deck_options)
+
+    def destroy(self):
+        for variable, trace_id in self.variable_traces:
+            variable.trace_remove("write", trace_id)
+        self.frame.destroy()
+
+
 class AutoAnkiApp:
     POLL_INTERVAL_MS = 100
     DECK_REFRESH_INTERVAL_MS = 5000
@@ -853,6 +1511,7 @@ class AutoAnkiApp:
             pipeline_saver or pipeline_store.save_pipelines)
         self.result_queue = queue.Queue()
         self.deck_result_queue = queue.Queue()
+        self.connection_result_queue = queue.Queue()
         self.pipeline_rows = []
         self.pipeline_save_after_id = None
         self.pipeline_notice_after_id = None
@@ -871,6 +1530,19 @@ class AutoAnkiApp:
         self.pipeline_status = tk.StringVar()
         self.deck_status = tk.StringVar(
             value="Checking Anki deck list…")
+        try:
+            anki_settings = (
+                anki_integration.load_anki_connection_settings())
+            connection_status = (
+                "Saved locally · test the connection after changing it")
+        except (OSError, ValueError) as error:
+            anki_settings = anki_integration.AnkiConnectionSettings()
+            connection_status = f"Could not read saved settings · {error}"
+        self.anki_url = tk.StringVar(value=anki_settings.url)
+        self.anki_api_key = tk.StringVar(
+            value=anki_settings.api_key or "")
+        self.anki_connection_status = tk.StringVar(
+            value=connection_status)
 
         try:
             loaded_pipelines = tuple(self.pipeline_loader())
@@ -882,30 +1554,26 @@ class AutoAnkiApp:
             self.pipeline_configs = (
                 pipeline_store.default_pipeline(),)
             self.pipeline_load_error = error
+        initial_language = pipeline_store.get_language(
+            self.pipeline_configs[0].language_key)
+        self.generation_language = tk.StringVar(
+            value=initial_language.name)
 
-        configured_decks = {
-            pipeline.target_deck
-            for pipeline in self.pipeline_configs
-            if pipeline.target_deck
-        }
-        configured_decks.update(
-            target_deck
-            for pipeline in self.pipeline_configs
-            for _card_type_key, target_deck
-            in pipeline.card_type_target_decks
-            if target_deck)
-        configured_decks.update(
-            settings.target_deck
-            for pipeline in self.pipeline_configs
-            for settings in pipeline.language_settings
-            if settings.target_deck)
-        configured_decks.update(
-            target_deck
-            for pipeline in self.pipeline_configs
-            for settings in pipeline.language_settings
-            for _card_type_key, target_deck
-            in settings.card_type_target_decks
-            if target_deck)
+        configured_decks = set()
+        for pipeline in self.pipeline_configs:
+            settings_items = (
+                pipeline_store.get_language_settings(
+                    pipeline,
+                    pipeline.language_key),
+                *pipeline.language_settings,
+            )
+            for settings in settings_items:
+                if settings.target_deck:
+                    configured_decks.add(settings.target_deck)
+                configured_decks.update(
+                    card.target_deck
+                    for card in settings.cards
+                    if card.target_deck)
         try:
             cached_decks = pipeline_store.load_anki_deck_cache()
         except (OSError, ValueError) as error:
@@ -1035,7 +1703,8 @@ class AutoAnkiApp:
                 fill,
                 outline,
                 selected=False,
-                check="#FFFFFF"):
+                check="#FFFFFF",
+                backdrop=None):
             width = 29
             height = 22
             box_size = 22
@@ -1089,7 +1758,7 @@ class AutoAnkiApp:
             fill_rgb = colour_rgb(fill)
             outline_rgb = colour_rgb(outline)
             check_rgb = colour_rgb(check)
-            backdrop_rgb = colour_rgb(self.PALE)
+            backdrop_rgb = colour_rgb(backdrop or self.PALE)
             check_segments = (
                 ((5.4, 11.2), (9.2, 14.8)),
                 ((9.2, 14.8), (16.8, 7.2)))
@@ -1209,6 +1878,11 @@ class AutoAnkiApp:
             foreground=self.TEXT_PRIMARY,
             font=("DejaVu Sans", 11, "bold"))
         style.configure(
+            "HelpSection.TLabel",
+            background=self.WINDOW_BACKGROUND,
+            foreground=self.TEXT_PRIMARY,
+            font=("DejaVu Sans", 11, "bold"))
+        style.configure(
             "Muted.TLabel",
             background=self.PANEL_BACKGROUND,
             foreground=self.TEXT_SECONDARY,
@@ -1283,6 +1957,59 @@ class AutoAnkiApp:
                     "children": [
                         (
                             "AutoAnkiModernCheck.indicator",
+                            {"side": "left", "sticky": ""}),
+                        (
+                            "Checkbutton.label",
+                            {"side": "left", "sticky": "w"}),
+                    ],
+                })])
+        panel_check_off = checkbox_image(
+            fill=self.PANEL_BACKGROUND,
+            outline="#AAB7B3",
+            backdrop=self.PANEL_BACKGROUND)
+        panel_check_off_active = checkbox_image(
+            fill="#EEF6F3",
+            outline=self.ACCENT,
+            backdrop=self.PANEL_BACKGROUND)
+        panel_check_off_disabled = checkbox_image(
+            fill="#F5F6F5",
+            outline="#D5DBD8",
+            backdrop=self.PANEL_BACKGROUND)
+        panel_check_on = checkbox_image(
+            fill=self.ACCENT,
+            outline=self.ACCENT,
+            selected=True,
+            backdrop=self.PANEL_BACKGROUND)
+        panel_check_on_active = checkbox_image(
+            fill=self.ACCENT_HOVER,
+            outline=self.ACCENT_HOVER,
+            selected=True,
+            backdrop=self.PANEL_BACKGROUND)
+        panel_check_on_disabled = checkbox_image(
+            fill="#AFCAC5",
+            outline="#AFCAC5",
+            selected=True,
+            backdrop=self.PANEL_BACKGROUND)
+        style.element_create(
+            "AutoAnkiPanelModernCheck.indicator",
+            "image",
+            panel_check_off,
+            ("disabled selected", panel_check_on_disabled),
+            ("disabled", panel_check_off_disabled),
+            ("active selected", panel_check_on_active),
+            ("pressed selected", panel_check_on_active),
+            ("selected", panel_check_on),
+            ("active", panel_check_off_active),
+            sticky="")
+        style.layout(
+            "Panel.TCheckbutton",
+            [(
+                "Checkbutton.padding",
+                {
+                    "sticky": "nswe",
+                    "children": [
+                        (
+                            "AutoAnkiPanelModernCheck.indicator",
                             {"side": "left", "sticky": ""}),
                         (
                             "Checkbutton.label",
@@ -1504,6 +2231,10 @@ class AutoAnkiApp:
             self.notebook,
             padding=(4, 16, 4, 4),
             style="App.TFrame")
+        self.help_tab = ttk.Frame(
+            self.notebook,
+            padding=(4, 16, 4, 4),
+            style="App.TFrame")
         self.notebook.add(
             self.generate_tab,
             text="Generate")
@@ -1513,10 +2244,14 @@ class AutoAnkiApp:
         self.notebook.add(
             self.advanced_tab,
             text="Advanced")
+        self.notebook.add(
+            self.help_tab,
+            text="Help")
 
         self._build_generate_tab()
         self._build_pipeline_tab()
         self._build_advanced_tab()
+        self._build_help_tab()
 
     def _build_generate_tab(self):
         tab = self.generate_tab
@@ -1550,17 +2285,48 @@ class AutoAnkiApp:
                 sticky="w")
         ttk.Label(
             input_header,
+            text="INPUT LANGUAGE",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=1,
+                sticky="e",
+                padx=(18, 8))
+        self.generation_language_box = ttk.Combobox(
+            input_header,
+            textvariable=self.generation_language,
+            values=tuple(
+                language.name
+                for language in pipeline_store.list_languages()),
+            width=language_selector_width(),
+            state="readonly",
+            style="App.TCombobox")
+        self.generation_language_box.grid(
+            row=0,
+            column=2,
+            sticky="e",
+            padx=(0, 18))
+        self.generation_language_box.bind(
+            "<<ComboboxSelected>>",
+            self._generation_language_changed,
+            add="+")
+        self.generation_language_box.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+
+        ttk.Label(
+            input_header,
             textvariable=self.input_count,
             style="Muted.TLabel").grid(
                 row=0,
-                column=1,
+                column=3,
                 sticky="e")
 
         ttk.Label(
             editor,
             text=(
-                "The same input is sent through every configured pipeline. "
-                "Each pipeline makes one OpenAI API request."),
+                "The input uses the selected language's saved card settings. "
+                "Each run makes one OpenAI API request."),
             style="Muted.TLabel",
             wraplength=880).grid(
                 row=1,
@@ -1728,10 +2494,21 @@ class AutoAnkiApp:
     def _build_pipeline_tab(self):
         tab = self.pipeline_tab
         tab.columnconfigure(0, weight=1)
-        tab.rowconfigure(1, weight=1)
+        tab.rowconfigure(0, weight=1)
+
+        self.pipeline_scroll_frame = ScrollableFrame(
+            tab,
+            background=self.WINDOW_BACKGROUND,
+            frame_style="App.TFrame")
+        self.pipeline_scroll_frame.grid(
+            row=0,
+            column=0,
+            sticky="nsew")
+        page = self.pipeline_scroll_frame.content
+        page.columnconfigure(0, weight=1)
 
         header_surface = RoundedPanel(
-            tab,
+            page,
             fill=self.PALE,
             outline="#C8DDD8",
             background=self.WINDOW_BACKGROUND,
@@ -1766,18 +2543,17 @@ class AutoAnkiApp:
                 pady=(4, 0))
 
         self.pipeline_editor_container = ttk.Frame(
-            tab,
+            page,
             style="App.TFrame")
         self.pipeline_editor_container.grid(
             row=1,
             column=0,
-            sticky="nsew",
+            sticky="ew",
             pady=(10, 0))
         self.pipeline_editor_container.columnconfigure(0, weight=1)
-        self.pipeline_editor_container.rowconfigure(0, weight=1)
 
         ttk.Label(
-            tab,
+            page,
             textvariable=self.pipeline_status,
             style="Status.TLabel").grid(
                 row=2,
@@ -1805,7 +2581,7 @@ class AutoAnkiApp:
         header.columnconfigure(0, weight=1)
         tk.Label(
             header,
-            text="PROMPT EDITOR",
+            text="PROMPT COMPONENT EDITOR",
             background=self.PALE,
             foreground=self.TEXT_PRIMARY,
             font=("DejaVu Sans", 11, "bold")).grid(
@@ -1815,8 +2591,9 @@ class AutoAnkiApp:
         tk.Label(
             header,
             text=(
-                "Inspect the instructions sent to OpenAI. Changes affect "
-                "future paid requests, so editing is locked by default."),
+                "Inspect the reusable instructions assembled for each "
+                "request. Changes affect future paid requests, so editing "
+                "is locked by default."),
             background=self.PALE,
             foreground=self.TEXT_SECONDARY,
             font=("DejaVu Sans", 9),
@@ -1843,8 +2620,7 @@ class AutoAnkiApp:
         editor.columnconfigure(0, weight=1)
         editor.rowconfigure(2, weight=1)
 
-        self.prompt_options = pipeline_store.discover_prompts(
-            process_text.PROJECT_ROOT)
+        self.prompt_options = pipeline_store.discover_prompts()
         self.prompt_options_by_key = {
             prompt.key: prompt
             for prompt in self.prompt_options
@@ -1873,7 +2649,7 @@ class AutoAnkiApp:
         toolbar.columnconfigure(1, weight=1)
         ttk.Label(
             toolbar,
-            text="PROMPT",
+            text="COMPONENT",
             style="FieldLabel.TLabel").grid(
                 row=0,
                 column=0,
@@ -1985,7 +2761,7 @@ class AutoAnkiApp:
         actions.columnconfigure(0, weight=1)
         self.save_prompt_button = ttk.Button(
             actions,
-            text="Save prompt",
+            text="Save component",
             command=self.save_current_prompt,
             state=tk.DISABLED,
             style="Accent.TButton",
@@ -1999,9 +2775,260 @@ class AutoAnkiApp:
             self._load_prompt(first_prompt_key)
         else:
             self.prompt_status.set(
-                "No prompt files were found in input/prompts.")
+                "No files were found in input/prompt_components.")
             self.prompt_selector.configure(state=tk.DISABLED)
             self.prompt_editing_checkbox.configure(state=tk.DISABLED)
+
+    def _build_help_tab(self):
+        tab = self.help_tab
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+
+        viewport = ScrollableFrame(
+            tab,
+            background=self.WINDOW_BACKGROUND,
+            frame_style="App.TFrame")
+        viewport.grid(row=0, column=0, sticky="nsew")
+        content = viewport.content
+        content.columnconfigure(0, weight=1)
+
+        def section(row, title, body):
+            ttk.Label(
+                content,
+                text=title,
+                style="HelpSection.TLabel").grid(
+                    row=row,
+                    column=0,
+                    sticky="w",
+                    pady=(0 if row == 0 else 22, 5))
+            ttk.Label(
+                content,
+                text=body,
+                style="Status.TLabel",
+                justify="left",
+                wraplength=1160).grid(
+                    row=row + 1,
+                    column=0,
+                    sticky="ew")
+
+        section(
+            0,
+            "QUICK START",
+            (
+                "1. Install AnkiConnect in Anki: Tools → Add-ons → "
+                "Get Add-ons, enter 2055492159, then restart Anki.\n"
+                "2. In Card setup, configure each language's card "
+                "directions, response fields and languages, and existing "
+                "destination decks.\n"
+                "3. In Generate, explicitly choose the input language, "
+                "enter words or notes, and choose Generate and import. "
+                "AutoAnki waits while Anki opens or syncs."))
+
+        code_row = ttk.Frame(content, style="App.TFrame")
+        code_row.grid(row=2, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            code_row,
+            text="Copy add-on code 2055492159",
+            command=self._copy_anki_addon_code,
+            style="Secondary.TButton",
+            cursor="hand2").grid(row=0, column=0, sticky="w")
+
+        section(
+            3,
+            "USING ANKI ON ANOTHER COMPUTER",
+            (
+                "On the Anki computer, open Tools → Add-ons → AnkiConnect "
+                "→ Config. Set webBindAddress to that computer's private LAN "
+                "address (or 0.0.0.0), set a strong apiKey, restart Anki, and "
+                "allow TCP port 8765 through the firewall only on a trusted "
+                "LAN or VPN. Do not expose AnkiConnect directly to the "
+                "internet.\n\n"
+                "Below, enter http://ANKI-COMPUTER-IP:8765 and the same API "
+                "key. AutoAnki uploads the generated package through "
+                "AnkiConnect before importing it; the two computers do not "
+                "need a shared filesystem. AutoAnki cannot start Anki on a "
+                "remote computer, so Anki and its profile must already be "
+                "open there."))
+
+        connection_surface = RoundedPanel(
+            content,
+            fill=self.PANEL_BACKGROUND,
+            outline=self.LINE,
+            background=self.WINDOW_BACKGROUND,
+            radius=24,
+            inset=18)
+        connection_surface.grid(
+            row=5,
+            column=0,
+            sticky="ew",
+            pady=(12, 0))
+        connection = connection_surface.interior
+        connection.columnconfigure(1, weight=1)
+
+        ttk.Label(
+            connection,
+            text="ANKICONNECT ADDRESS",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        self.anki_url_entry = ttk.Entry(
+            connection,
+            textvariable=self.anki_url)
+        self.anki_url_entry.grid(
+            row=0,
+            column=1,
+            sticky="ew")
+        self.anki_url_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+
+        ttk.Label(
+            connection,
+            text="API KEY",
+            style="FieldLabel.TLabel").grid(
+                row=1,
+                column=0,
+                sticky="w",
+                padx=(0, 12),
+                pady=(12, 0))
+        self.anki_api_key_entry = ttk.Entry(
+            connection,
+            textvariable=self.anki_api_key,
+            show="•")
+        self.anki_api_key_entry.grid(
+            row=1,
+            column=1,
+            sticky="ew",
+            pady=(12, 0))
+        self.anki_api_key_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+
+        action_row = ttk.Frame(connection, style="Panel.TFrame")
+        action_row.grid(
+            row=2,
+            column=0,
+            columnspan=2,
+            sticky="ew",
+            pady=(14, 0))
+        action_row.columnconfigure(0, weight=1)
+        ttk.Label(
+            action_row,
+            textvariable=self.anki_connection_status,
+            style="Muted.TLabel",
+            wraplength=760).grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        self.test_anki_connection_button = ttk.Button(
+            action_row,
+            text="Save and test",
+            command=self.save_and_test_anki_connection,
+            style="Accent.TButton",
+            cursor="hand2")
+        self.test_anki_connection_button.grid(
+            row=0,
+            column=1,
+            sticky="e")
+
+        section(
+            6,
+            "PORTABLE WINDOWS BUILD",
+            (
+                "A packaged AutoAnki.exe includes Python and its libraries, "
+                "so the receiving computer does not need Python or Git. The "
+                "Windows executable must be built on Windows. Settings, API "
+                "keys, edited prompts, and generated packages are retained "
+                "in the current Windows user's AppData\\Roaming\\AutoAnki "
+                "folder rather than inside the executable."))
+        viewport.bind_mousewheel_tree()
+
+    def _copy_anki_addon_code(self):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(
+            anki_integration.ANKI_CONNECT_ADDON_CODE)
+        self.anki_connection_status.set(
+            "Copied AnkiConnect add-on code 2055492159")
+
+    def save_and_test_anki_connection(self):
+        try:
+            settings = anki_integration.save_anki_connection_settings(
+                self.anki_url.get(),
+                self.anki_api_key.get())
+        except (OSError, ValueError) as error:
+            messagebox.showerror(
+                "Could not save Anki connection",
+                str(error),
+                parent=self.root)
+            return
+
+        self.anki_url.set(settings.url)
+        self.anki_connection_status.set(
+            "Saved · testing AnkiConnect…")
+        self.test_anki_connection_button.configure(
+            state=tk.DISABLED,
+            text="Testing…")
+        worker = threading.Thread(
+            target=self._test_anki_connection_in_background,
+            args=(settings,),
+            daemon=True)
+        worker.start()
+        self.root.after(
+            self.POLL_INTERVAL_MS,
+            self._poll_anki_connection_result)
+
+    def _test_anki_connection_in_background(self, settings):
+        try:
+            client = anki_integration.AnkiConnectClient(
+                url=settings.url,
+                api_key=settings.api_key,
+                timeout=5)
+            deck_names = client.invoke("deckNames")
+        except Exception as error:
+            self.connection_result_queue.put(("error", error))
+        else:
+            self.connection_result_queue.put(
+                ("success", tuple(sorted(deck_names))))
+
+    def _poll_anki_connection_result(self):
+        try:
+            outcome, value = (
+                self.connection_result_queue.get_nowait())
+        except queue.Empty:
+            self.root.after(
+                self.POLL_INTERVAL_MS,
+                self._poll_anki_connection_result)
+            return
+
+        self.test_anki_connection_button.configure(
+            state=tk.NORMAL,
+            text="Save and test")
+        if outcome == "error":
+            self.anki_connection_status.set(
+                f"Saved, but connection failed · {value}")
+            messagebox.showerror(
+                "Anki connection failed",
+                (
+                    f"{value}\n\n"
+                    "The settings were saved. Check the Help instructions, "
+                    "then correct them and test again."),
+                parent=self.root)
+            return
+
+        self.anki_connection_status.set(
+            f"Connected · {len(value)} Anki decks available")
+        self.deck_options = value
+        for row in self.pipeline_rows:
+            row.update_deck_options(value)
+        try:
+            pipeline_store.save_anki_deck_cache(value)
+        except OSError:
+            pass
 
     def _load_prompt(self, prompt_key):
         prompt = self.prompt_options_by_key[prompt_key]
@@ -2175,8 +3202,7 @@ class AutoAnkiApp:
         try:
             pipeline_store.save_prompt_text(
                 prompt.path,
-                text,
-                process_text.PROJECT_ROOT)
+                text)
         except (OSError, ValueError) as error:
             messagebox.showerror(
                 "Could not save prompt",
@@ -2206,6 +3232,7 @@ class AutoAnkiApp:
             self,
             self.pipeline_editor_container,
             config)]
+        self.pipeline_scroll_frame.bind_mousewheel_tree()
         self._update_pipeline_status()
 
     def _update_pipeline_status(self, message=None):
@@ -2214,7 +3241,8 @@ class AutoAnkiApp:
                 config = self.pipeline_rows[0].to_config()
                 language = pipeline_store.get_language(
                     config.language_key)
-                output_count = len(config.card_type_keys)
+                output_count = len(
+                    pipeline_store.get_enabled_cards(config))
                 if output_count:
                     output_word = (
                         "output" if output_count == 1 else "outputs")
@@ -2223,12 +3251,16 @@ class AutoAnkiApp:
                         if config.separate_target_decks
                         else "one target deck")
                     message = (
-                        f"{language.name} · {output_count} card "
+                        f"Generation language: {language.name} · "
+                        f"{output_count} card "
                         f"{output_word} selected · {deck_mode} · "
+                        f"{len(pipeline_store.get_requested_field_settings(config))} "
+                        "unique response fields · "
                         "1 paid API request per run")
                 else:
                     message = (
-                        f"{language.name} · Select at least one card output.")
+                        f"Generation language: {language.name} · "
+                        "Select at least one card output.")
             except (IndexError, ValueError):
                 message = (
                     "Select a language and at least one card output.")
@@ -2252,16 +3284,8 @@ class AutoAnkiApp:
             for row in self.pipeline_rows)
         pipelines = pipeline_store.validate_pipelines(pipelines)
 
-        available_prompt_keys = {
-            prompt.key
-            for prompt in pipeline_store.discover_prompts(
-                process_text.PROJECT_ROOT)
-        }
         for pipeline in pipelines:
-            prompt_key = pipeline_store.get_prompt_key(pipeline)
-            if prompt_key not in available_prompt_keys:
-                raise ValueError(
-                    f'Prompt "{prompt_key}" was not found.')
+            prompt_builder.build_prompt(pipeline)
         return pipelines
 
     def schedule_pipeline_save(self, *_args):
@@ -2320,6 +3344,21 @@ class AutoAnkiApp:
         self.deck_status.set(
             "Connecting to Anki and refreshing decks…")
         self.refresh_anki_decks(launch_if_needed=True)
+
+    def get_generation_language(self):
+        selected_name = self.generation_language.get()
+        for language in pipeline_store.list_languages():
+            if language.name == selected_name:
+                return language
+        raise ValueError("Select an input language on the Generate tab.")
+
+    def _generation_language_changed(self, _event=None):
+        language = self.get_generation_language()
+        self.schedule_pipeline_save()
+        self._update_pipeline_status()
+        self._set_status(
+            f"{language.name} selected for the next generation.",
+            self.TEXT_SECONDARY)
 
     def _deck_selector_opened(self, _event=None):
         self.deck_status.set(
@@ -2657,7 +3696,7 @@ class AutoAnkiApp:
             else:
                 self.output.set(
                     f"{success_count} packages generated under "
-                    f"{process_text.PROJECT_ROOT / 'output'}")
+                    f"{process_text.OUTPUT_DIRECTORY}")
 
         if summary.failures:
             self._set_status(

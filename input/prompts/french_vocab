@@ -3,10 +3,14 @@ exactly four natural French example sentences separated by the pipe character,
 |, and its IPA pronunciation.
 
 The response schema determines which definitions are needed. If it contains
-"Meaning", give a concise English definition. If it contains "Native Meaning",
-give a concise definition written in French. If both are present, they must
-describe the same sense. If an entry has multiple relevant meanings, create a
-separate card entry for each meaning and make its examples unambiguous.
+"Meaning", give concise English translation equivalent(s). If it contains "Native Meaning",
+give a concise definition written in French. If it contains
+"Dictionary Meaning", give a concise English dictionary-style explanation of what the
+entry means, including important semantic nuance, register, implications, or
+typical usage where relevant; do not merely list possible English
+translations. If multiple definition fields are present, they must describe
+the same sense. If an entry has multiple relevant meanings, create a separate
+card entry for each meaning and make its examples unambiguous.
 
 Wrap the requested word or expression in <strong>expression</strong> in every
 sentence. Preserve French accents and spelling. Anything in brackets is context

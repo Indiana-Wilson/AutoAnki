@@ -1,0 +1,4 @@
+Provide exactly four short, natural {source_language} example sentences for
+each sense, separated with the pipe character, |. Wrap the requested word or
+an inflected form of it in <strong>...</strong> in every sentence. Make each
+sentence unambiguously illustrate the selected sense.

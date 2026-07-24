@@ -3,8 +3,8 @@ from pathlib import Path
 
 import anki_integration
 import pipeline_store
+import prompt_builder
 import process_text
-import templates
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,7 @@ def run_pipelines(
         words,
         pipelines,
         *,
-        project_root=process_text.PROJECT_ROOT,
+        project_root=None,
         output_root=None,
         progress_callback=None,
         openai_client=None,
@@ -75,23 +75,26 @@ def run_pipelines(
     if not pipelines:
         raise ValueError("Add at least one pipeline before generating.")
 
-    project_root = Path(project_root)
     output_root = Path(
-        output_root or project_root / "output")
-    prompts = pipeline_store.prompt_map(project_root)
+        output_root
+        or (
+            Path(project_root) / "output"
+            if project_root is not None
+            else process_text.OUTPUT_DIRECTORY))
     successes = []
     failures = []
     total = len(pipelines)
 
     for index, pipeline in enumerate(pipelines, start=1):
-        prompt_key = pipeline_store.get_prompt_key(pipeline)
-        prompt = prompts.get(prompt_key)
-        if prompt is None:
+        try:
+            prompt_text = prompt_builder.build_prompt(
+                pipeline,
+                project_root)
+        except Exception as error:
             failures.append(PipelineFailure(
                 pipeline=pipeline,
                 stage="configuration",
-                error=ValueError(
-                    f'Prompt "{prompt_key}" was not found.')))
+                error=error))
             continue
 
         output_paths = get_pipeline_output_paths(
@@ -108,19 +111,15 @@ def run_pipelines(
             package_path = generator(
                 words,
                 client=openai_client,
-                prompt_path=prompt.path,
+                prompt_text=prompt_text,
                 response_path=output_paths["response"],
                 response_log_path=output_paths["response_log"],
                 output_path=output_paths["package"],
                 deck_id=pipeline.generated_deck_id,
                 deck_name=pipeline.generated_deck_name,
-                card_type_keys=pipeline.card_type_keys,
+                pipeline=pipeline,
                 guid_seed=pipeline.pipeline_id,
-                legacy_guid_card_type_key=(
-                    templates.DEFAULT_CARD_TYPE_KEY
-                    if pipeline.pipeline_id
-                    == pipeline_store.DEFAULT_PIPELINE_ID
-                    else None))
+            )
         except Exception as error:
             failures.append(PipelineFailure(
                 pipeline=pipeline,

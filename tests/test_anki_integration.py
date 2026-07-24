@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import stat
 import sys
 import tempfile
 import unittest
@@ -55,6 +56,52 @@ class AnkiConnectClientTests(unittest.TestCase):
                     anki_integration.AnkiConnectResponseError,
                     "sync: auth not configured")):
             client.invoke("sync")
+
+    def test_connection_settings_are_stored_with_owner_only_permissions(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "anki_connection.json"
+            saved = anki_integration.save_anki_connection_settings(
+                "http://192.168.1.25:8765/",
+                "  shared-secret  ",
+                path=path)
+            loaded = anki_integration.load_anki_connection_settings(path)
+
+            self.assertEqual(
+                saved,
+                anki_integration.AnkiConnectionSettings(
+                    url="http://192.168.1.25:8765",
+                    api_key="shared-secret"))
+            self.assertEqual(loaded, saved)
+            if os.name == "posix":
+                self.assertEqual(
+                    stat.S_IMODE(path.stat().st_mode),
+                    0o600)
+
+    def test_saved_connection_is_used_by_default(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            config_directory = Path(temporary_directory) / "config"
+            with patch.dict(
+                    os.environ,
+                    {
+                        "AUTOANKI_CONFIG_DIR": str(config_directory),
+                        "ANKICONNECT_API_KEY": "",
+                        "AUTOANKI_ANKI_CONNECT_URL": "",
+                    }):
+                anki_integration.save_anki_connection_settings(
+                    "http://anki-study.local:8765",
+                    "saved-key")
+                client = anki_integration.AnkiConnectClient()
+
+            self.assertEqual(
+                client.url,
+                "http://anki-study.local:8765")
+            self.assertEqual(client.api_key, "saved-key")
+            self.assertFalse(client.is_local)
+
+    def test_invalid_connection_url_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "http"):
+            anki_integration.save_anki_connection_settings(
+                "file:///tmp/anki")
 
 
 class AnkiStartupTests(unittest.TestCase):
@@ -129,6 +176,22 @@ class AnkiStartupTests(unittest.TestCase):
         minimize_new_windows.assert_called_once_with(
             {"0x-existing"})
         sleep.assert_called_once_with(0)
+
+    def test_remote_anki_is_never_launched_locally(self):
+        client = anki_integration.AnkiConnectClient(
+            url="http://192.168.1.25:8765",
+            api_key="test-key")
+        launch = MagicMock()
+        with (
+                patch.object(client, "is_available", return_value=False),
+                self.assertRaisesRegex(
+                    anki_integration.AnkiConnectUnavailableError,
+                    "remote AnkiConnect")):
+            anki_integration.ensure_anki_running(
+                client,
+                launch=launch)
+
+        launch.assert_not_called()
 
     def test_collection_readiness_retries_while_syncing(self):
         client = MagicMock()
@@ -225,6 +288,80 @@ class ImportWorkflowTests(unittest.TestCase):
                     wait_until_ready=wait_until_ready)
 
         client.invoke.assert_not_called()
+
+    def test_remote_package_is_uploaded_imported_and_removed(self):
+        client = MagicMock()
+        client.is_local = False
+        client.invoke.side_effect = [
+            "_autoanki_import_test.apkg",
+            r"C:\Users\Study\AppData\Roaming\Anki2\User 1\collection.media",
+            True,
+            None,
+        ]
+
+        with (
+                tempfile.TemporaryDirectory() as temporary_directory,
+                patch.object(
+                    anki_integration.uuid,
+                    "uuid4",
+                    return_value=MagicMock(hex="test"))):
+            package_path = self._create_package(temporary_directory)
+            imported = anki_integration.import_package(
+                client,
+                package_path)
+
+        self.assertTrue(imported)
+        calls = client.invoke.call_args_list
+        self.assertEqual(calls[0].args, ("storeMediaFile",))
+        self.assertEqual(
+            calls[0].kwargs["filename"],
+            "_autoanki_import_test.apkg")
+        self.assertEqual(
+            calls[0].kwargs["data"],
+            "dGVzdCBwYWNrYWdl")
+        self.assertEqual(calls[1], call("getMediaDirPath"))
+        self.assertEqual(
+            calls[2],
+            call(
+                "importPackage",
+                path=(
+                    "C:\\Users\\Study\\AppData\\Roaming\\Anki2\\User 1"
+                    "\\collection.media/_autoanki_import_test.apkg")))
+        self.assertEqual(
+            calls[3],
+            call(
+                "deleteMediaFile",
+                filename="_autoanki_import_test.apkg"))
+
+    def test_remote_staging_file_is_removed_when_import_fails(self):
+        client = MagicMock()
+        client.is_local = False
+        client.invoke.side_effect = [
+            "_autoanki_import_test.apkg",
+            "/anki/collection.media",
+            anki_integration.AnkiConnectResponseError("import failed"),
+            None,
+        ]
+
+        with (
+                tempfile.TemporaryDirectory() as temporary_directory,
+                patch.object(
+                    anki_integration.uuid,
+                    "uuid4",
+                    return_value=MagicMock(hex="test"))):
+            package_path = self._create_package(temporary_directory)
+            with self.assertRaisesRegex(
+                    anki_integration.AnkiConnectResponseError,
+                    "import failed"):
+                anki_integration.import_package(
+                    client,
+                    package_path)
+
+        self.assertEqual(
+            client.invoke.call_args_list[-1],
+            call(
+                "deleteMediaFile",
+                filename="_autoanki_import_test.apkg"))
 
     def test_move_retries_until_temporary_deck_is_empty(self):
         client = MagicMock()

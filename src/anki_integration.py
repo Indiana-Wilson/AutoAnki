@@ -1,20 +1,28 @@
+import base64
 import ctypes
+import ipaddress
 import json
 import os
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+import credential_store
 import templates
 
 
 ANKI_CONNECT_URL = "http://127.0.0.1:8765"
+ANKI_CONNECTION_FILE_NAME = "anki_connection.json"
+ANKI_CONNECT_URL_ENVIRONMENT_VARIABLE = "AUTOANKI_ANKI_CONNECT_URL"
 ANKI_CONNECT_VERSION = 6
 ANKI_CONNECT_ADDON_CODE = "2055492159"
 TARGET_DECK_NAME = "Retained Information::English::Modern English"
@@ -38,17 +46,140 @@ class AnkiConnectResponseError(AnkiIntegrationError):
 
 
 @dataclass(frozen=True)
+class AnkiConnectionSettings:
+    url: str = ANKI_CONNECT_URL
+    api_key: str | None = None
+
+
+@dataclass(frozen=True)
 class AnkiImportResult:
     cards_moved: int
     target_deck: str
     target_decks: tuple[str, ...] = ()
 
 
+def normalize_anki_connect_url(url):
+    url = str(url).strip()
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError(
+            "The AnkiConnect address must be an http:// or https:// URL.")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError(
+            "The AnkiConnect address cannot contain credentials, a query, "
+            "or a fragment.")
+    try:
+        parsed.port
+    except ValueError as error:
+        raise ValueError(
+            "The AnkiConnect address has an invalid port.") from error
+    path = parsed.path.rstrip("/")
+    return urllib.parse.urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        path,
+        "",
+        "",
+        "",
+    ))
+
+
+def is_local_anki_connect_url(url):
+    hostname = urllib.parse.urlparse(url).hostname
+    if not hostname:
+        return False
+    if hostname.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def get_anki_connection_path():
+    return (
+        credential_store.get_config_directory()
+        / ANKI_CONNECTION_FILE_NAME)
+
+
+def load_anki_connection_settings(path=None):
+    path = Path(path or get_anki_connection_path())
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return AnkiConnectionSettings()
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"Anki connection settings are not valid JSON: {path}"
+        ) from error
+    if not isinstance(data, dict) or set(data) - {"url", "api_key"}:
+        raise ValueError(
+            "Anki connection settings have an invalid structure.")
+    url = normalize_anki_connect_url(data.get("url", ANKI_CONNECT_URL))
+    api_key = data.get("api_key")
+    if api_key is not None and not isinstance(api_key, str):
+        raise ValueError("The AnkiConnect API key must be text.")
+    api_key = api_key.strip() if api_key else None
+    return AnkiConnectionSettings(url=url, api_key=api_key)
+
+
+def save_anki_connection_settings(url, api_key=None, path=None):
+    settings = AnkiConnectionSettings(
+        url=normalize_anki_connect_url(url),
+        api_key=(
+            (str(api_key).strip() or None)
+            if api_key is not None
+            else None))
+    path = Path(path or get_anki_connection_path())
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if os.name == "posix":
+        path.parent.chmod(0o700)
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{ANKI_CONNECTION_FILE_NAME}.",
+        dir=path.parent)
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as file:
+            file_descriptor = None
+            json.dump(
+                {"url": settings.url, "api_key": settings.api_key},
+                file,
+                indent=2)
+            file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
+        if os.name == "posix":
+            temporary_path.chmod(0o600)
+        temporary_path.replace(path)
+        if os.name == "posix":
+            path.chmod(0o600)
+    except Exception:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        temporary_path.unlink(missing_ok=True)
+        raise
+    return settings
+
+
 class AnkiConnectClient:
-    def __init__(self, url=ANKI_CONNECT_URL, api_key=None, timeout=300):
-        self.url = url
-        self.api_key = api_key or os.environ.get("ANKICONNECT_API_KEY")
+    def __init__(self, url=None, api_key=None, timeout=300):
+        saved_settings = load_anki_connection_settings()
+        configured_url = (
+            url
+            or os.environ.get(ANKI_CONNECT_URL_ENVIRONMENT_VARIABLE)
+            or saved_settings.url)
+        self.url = normalize_anki_connect_url(configured_url)
+        self.api_key = (
+            api_key
+            if api_key is not None
+            else (
+                os.environ.get("ANKICONNECT_API_KEY")
+                or saved_settings.api_key))
         self.timeout = timeout
+
+    @property
+    def is_local(self):
+        return is_local_anki_connect_url(self.url)
 
     def invoke(self, action, **params):
         payload = {
@@ -219,6 +350,12 @@ def ensure_anki_running(
     if client.is_available():
         return False
 
+    if getattr(client, "is_local", True) is False:
+        raise AnkiConnectUnavailableError(
+            f"Could not reach remote AnkiConnect at {client.url}. Start "
+            "Anki on that computer, open its profile, and check the address, "
+            "API key, firewall, and AnkiConnect add-on configuration.")
+
     existing_window_ids = get_window_ids()
     launch()
     window_minimized = False
@@ -277,6 +414,50 @@ def _note_type_search_query(note_type_name):
         .replace("\\", "\\\\")
         .replace('"', '\\"'))
     return f'note:"{escaped_name}"'
+
+
+def import_package(client, package_path):
+    """Import locally, or upload through media storage before remote import."""
+    package_path = Path(package_path).resolve()
+    if getattr(client, "is_local", True) is not False:
+        return client.invoke("importPackage", path=str(package_path))
+
+    remote_filename = f"_autoanki_import_{uuid.uuid4().hex}.apkg"
+    encoded_package = (
+        base64.b64encode(package_path.read_bytes()).decode("ascii"))
+    stored_filename = client.invoke(
+        "storeMediaFile",
+        filename=remote_filename,
+        data=encoded_package)
+    if stored_filename != remote_filename:
+        raise AnkiIntegrationError(
+            "AnkiConnect could not stage the generated package on the "
+            "remote computer.")
+
+    try:
+        media_directory = client.invoke("getMediaDirPath")
+        if not isinstance(media_directory, str) or not media_directory:
+            raise AnkiIntegrationError(
+                "AnkiConnect did not return its remote media directory.")
+        remote_path = (
+            media_directory.rstrip("/\\")
+            + "/"
+            + remote_filename)
+        imported = client.invoke("importPackage", path=remote_path)
+    except Exception:
+        try:
+            client.invoke("deleteMediaFile", filename=remote_filename)
+        except AnkiIntegrationError:
+            pass
+        raise
+
+    try:
+        client.invoke("deleteMediaFile", filename=remote_filename)
+    except AnkiIntegrationError as error:
+        raise AnkiIntegrationError(
+            "The package was imported, but its temporary remote staging "
+            "file could not be removed.") from error
+    return imported
 
 
 def _move_matching_cards(
@@ -402,7 +583,7 @@ def import_generated_deck(
             "The following destination decks do not exist in Anki: "
             + ", ".join(f'"{deck_name}"' for deck_name in missing_decks))
 
-    imported = client.invoke("importPackage", path=str(package_path))
+    imported = import_package(client, package_path)
     if imported is not True:
         raise AnkiIntegrationError(
             "AnkiConnect reported that package import failed.")

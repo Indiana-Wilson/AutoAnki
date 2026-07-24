@@ -7,58 +7,108 @@ Here's what everything does:
 
 input/words: Contains input used by the command-line generation script.
 
-input/prompts/: Contains every prompt discovered automatically and shown in
-the Card setup tab. Built-in detailed and simple prompts are provided for
-English, Classical Chinese, French, Japanese, and Latin.
+input/prompt_components/: Contains the reusable prompt instructions shown in
+the Advanced tab. There is one source-language component, one component for
+each selectable response field, and a context-sentence component. AutoAnki
+assembles only the components needed by the current Card setup selections.
+
+input/prompts/: Retains the older monolithic prompts for compatibility. New
+generation requests use input/prompt_components instead.
+
+In a packaged executable, built-in prompts are copied to the current user's
+AutoAnki configuration directory the first time it runs. Prompt edits and
+generated output therefore survive application upgrades and are never written
+into PyInstaller's temporary extraction directory.
 
 src/process_text.py: Calls the OpenAI API and converts JSON responses into
 genanki packages. API responses use a strict JSON schema and are validated
 again locally before any package is written.
 
-src/templates.py: Contains the registered genanki card types. English supports
-context-sentence, word-to-definition, and definition-to-word cards. Classical
-Chinese, French, and Japanese provide those same three directions with either
-an English definition or a definition written in the language itself. Latin
-provides the same six outputs.
+src/templates.py: Contains fifteen registered genanki card types: three
+directions for each of English, Classical Chinese, French, Japanese, and
+Latin. Each model has stable fields for Translation, Dictionary Meaning,
+Pronunciation, Part of Speech, Register, and Nuance. Empty local model fields
+are hidden by the card template.
+
+Classical Chinese also has Ming and Warring States input variants. These
+variants add period-specific sense, nuance, and register instructions to the
+prompt, but deliberately reuse the same three Classical Chinese Anki models
+and IDs and the same single Classical Chinese Card Setup tab. They do not
+create additional note types or settings tabs. Historical register output is
+instructed to name the narrowest supported era, textual tradition, or genre
+instead of using "archaic" when a more precise label is available.
 
 output/: Stores generated responses and packages at output/response.json and
 output/output.apkg.
 
 Running the user interface:
 
-1. From the repository root, run:
+1. Install Python 3.11 or newer and, from the repository root, create an
+   environment and install the dependencies:
+
+   python -m venv .venv
+   .venv/bin/python -m pip install -r requirements.txt
+
+   On Windows, use .venv\Scripts\python instead.
+
+2. Run on Linux/macOS:
 
    .venv/bin/python src/gui.py
 
-2. Enter words or notes in the scrolling text box and click
+   Or on Windows:
+
+   .venv\Scripts\python src\gui.py
+
+3. Enter words or notes in the scrolling text box and click
    "Generate and import".
 
 The interface uses screen-aware sizing and DPI scaling, rounded card surfaces
 and controls, a non-tiled scrollbar, transient autosave feedback, and explicit
 busy/progress states. Clicking a non-interactive background clears transient
 focus and text highlighting. AutoAnki prevents the window from closing while
-a paid response is still being generated or imported.
+a paid response is still being generated or imported. Card setup scrolls as
+one complete page rather than placing a nested scrollbar inside the language
+selector.
 
 Configuring card generation:
 
 Open the Card setup tab. Select:
 
-1. The language tab matching the input.
-2. One or more card outputs inside that language tab.
-3. That language's target deck from inside its tab, or enable separate target
-   decks and choose one beside each selected card output.
+1. A language tab whose saved card preferences you want to configure.
+2. Any of Context sentence → Meaning, Word → Meaning, and Meaning → Word.
+3. The checkbox and response language beside each desired field: Translation,
+   Dictionary Meaning, Pronunciation, Part of Speech, Register, and Nuance.
+4. That language's target deck, or enable separate target decks and choose one
+   beside each selected card output.
+
+On the Generate tab, explicitly choose the input language from the dropdown
+above the text box. This dropdown—not the Card setup tab most recently
+viewed—controls which language settings the next run uses. The selection is
+saved for the next launch.
+
+Use "Use the same selected fields and response languages for all card types"
+when every selected direction should display the same definition stack. Turn
+it off to configure the six fields independently for each direction. This is
+independent of the shared/separate target-deck setting.
+
+Response-language menus remain available while their field is unticked. This
+lets a preferred language be prepared and saved without requesting that field;
+only ticked fields enter the OpenAI schema or generated cards.
 
 Each language tab retains its own card selections, shared target deck,
-separate-deck mode, and per-card target decks. Switching languages does not
-replace the preferences saved for the other language tabs.
+separate-deck mode, per-card target decks, and field/language choices.
+Switching languages does not replace preferences saved in other tabs.
 
-AutoAnki chooses the cheapest sufficient prompt automatically. If only simple
-word/definition outputs are selected, the response asks only for the word and
-the selected English and/or native-language definitions. If any
-context-sentence output is selected, the richer prompt adds examples and
-pronunciation once. The same response is reused for every selected card output,
-so a generation run makes exactly one API request regardless of how many
-outputs are selected.
+Translation must target a language other than the source language. Every other
+field may target any supported language, including the source language. For
+example, a French Dictionary Meaning can be written in French.
+
+The strict OpenAI JSON schema contains only the union of fields actually
+needed by the enabled cards. Identical field/language requests are requested
+once and reused. Unselected fields are omitted entirely—not returned as null.
+Context sentences are requested only when Context sentence → Meaning is
+enabled. A generation run makes one API request regardless of how many of the
+three directions are selected.
 
 Opening Card setup or a target-deck selector connects to Anki, waits for its
 collection to become available, and refreshes the choices. The most recently
@@ -68,20 +118,29 @@ is saved automatically in the current user's AutoAnki configuration directory.
 
 Editing prompts:
 
-The Advanced tab lists every file discovered in input/prompts. Prompts open
-in read-only mode. Tick "Enable prompt editing" to unlock the text editor,
-then use "Save prompt" to apply an atomic update. Empty prompts and paths
-outside input/prompts are rejected. AutoAnki asks whether to save, discard, or
-cancel if unsaved changes exist while switching prompts, disabling editing,
-or closing the application.
+The Advanced tab lists every reusable file discovered recursively in
+input/prompt_components. Components open in read-only mode. Tick "Enable
+prompt editing" to unlock the text editor, then use "Save component" to apply
+an atomic update. Empty components and paths outside input/prompt_components
+are rejected. AutoAnki asks whether to save, discard, or cancel if unsaved
+changes exist while switching components, disabling editing, or closing the
+application. Placeholders such as {source_language}, {target_language}, and
+{response_field} are filled at generation time; invalid placeholders are
+reported as a configuration failure before any paid request.
+
+The Help tab contains the quick-start instructions, the AnkiConnect add-on
+code, remote-computer setup, and saved Anki connection fields. The API key is
+masked in the interface.
 
 genanki identities:
 
-Every card type has a unique model ID generated once and hard-coded in
-src/templates.py. The generated temporary deck also retains its stable deck
-ID, and generated notes use stable GUIDs. All generated note types share a
-22px `.card` styling rule while retaining their individual front/back HTML
-and JavaScript.
+Every source-language/direction model has a unique ID generated once and
+hard-coded in src/templates.py. The generated temporary deck also retains its
+stable deck ID, and generated notes use stable GUIDs. The model fields form a
+stable superset, while Mustache conditionals hide every unselected/empty field.
+Definition sections appear vertically with bold labels. All generated note
+types share a centered 20px `.card` styling rule while retaining their
+individual front/back HTML and JavaScript.
 
 On the first generation, AutoAnki asks for an OpenAI API key. The key is
 entered through a masked field and stored outside the repository in the
@@ -103,8 +162,8 @@ not prompt for a paid regeneration.
 
 Automatic Anki import:
 
-AutoAnki uses the local AnkiConnect API and does not control the mouse or
-keyboard. Install AnkiConnect once in Anki:
+AutoAnki uses AnkiConnect and does not control the mouse or keyboard. Install
+AnkiConnect once in Anki:
 
 1. Open Tools > Add-ons > Get Add-ons.
 2. Enter the add-on code 2055492159.
@@ -112,7 +171,7 @@ keyboard. Install AnkiConnect once in Anki:
 
 After generating a package, AutoAnki:
 
-1. Starts Anki if AnkiConnect is not already available.
+1. Starts local Anki if AnkiConnect is not already available.
    On Linux/X11, a newly launched Anki window is minimized automatically
    without controlling the mouse or keyboard.
 2. Waits for Anki, the active profile, and any automatic startup sync to
@@ -125,6 +184,46 @@ After generating a package, AutoAnki:
 Every selected target deck must already exist.
 If Anki is installed under a non-standard command, set
 AUTOANKI_ANKI_COMMAND to the command used to start it. An optional AnkiConnect
-API key can be supplied through ANKICONNECT_API_KEY. AutoAnki does not trigger
+API key can be supplied through ANKICONNECT_API_KEY. The address can be
+overridden with AUTOANKI_ANKI_CONNECT_URL. Saved GUI settings are used when
+these environment variables are absent. AutoAnki does not trigger
 synchronization itself; Anki's automatic synchronization settings remain in
 control.
+
+Using Anki on another computer:
+
+1. Install AnkiConnect on the Anki computer.
+2. In Tools > Add-ons > AnkiConnect > Config, change webBindAddress from
+   127.0.0.1 to that computer's private LAN address (or 0.0.0.0), configure a
+   strong apiKey, and restart Anki.
+3. Permit TCP port 8765 through that computer's firewall only for a trusted
+   LAN or VPN.
+4. In AutoAnki's Help tab, enter http://ANKI-COMPUTER-IP:8765 and the same
+   API key, then choose "Save and test".
+
+Do not expose AnkiConnect directly to the public internet. Its ordinary HTTP
+connection is not encrypted. A private VPN is the safer choice across
+untrusted networks.
+
+Anki must already be open with a profile loaded on a remote computer; AutoAnki
+cannot start another computer's application. For remote imports, AutoAnki
+temporarily transfers the generated package through AnkiConnect, imports it
+using the Anki computer's own path, and removes the staging file. No shared
+folder is required.
+
+Building a standalone Windows executable:
+
+PyInstaller can bundle AutoAnki, Python, and all dependencies into one
+AutoAnki.exe. The recipient does not need Python or Git. PyInstaller is not a
+cross-compiler, so perform the Windows build on a Windows computer:
+
+1. Install Python 3.11 or newer on the build computer.
+2. Copy or clone this repository.
+3. Double-click build_windows.bat, or run it from Command Prompt.
+4. Distribute dist\AutoAnki.exe.
+
+The executable is unsigned, so Windows may display a SmartScreen warning until
+it is code-signed or has established reputation. Build and test the executable
+before distributing it. On Windows, settings and secrets live in
+%APPDATA%\AutoAnki and generated packages live in
+%APPDATA%\AutoAnki\output.
