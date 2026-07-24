@@ -1,3 +1,6 @@
-For "{response_field}", give a concise dictionary-style explanation in
-{target_language}. Explain the core sense and any essential usage distinction;
-do not merely list translations.
+For "{response_field}", explain in plain {target_language} what the selected
+sense actually means. Describe the idea, action, state, quality, or relationship
+it expresses, plus any distinction essential to understanding that sense. The
+explanation must be understandable without knowing the source term. Do not give
+only translation equivalents, synonyms, or near-synonyms, and do not repeat the
+translation field in different wording.

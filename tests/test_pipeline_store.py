@@ -583,6 +583,35 @@ class PromptComponentTests(unittest.TestCase):
             "return an empty string for this field",
             normalized_text)
 
+    def test_dictionary_meaning_requires_an_explanation_not_a_translation(self):
+        pipeline = language_pipeline(
+            "french",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "english"),
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+            ))
+        text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
+        normalized_text = " ".join(text.split())
+
+        self.assertIn(
+            "explain in plain English what the selected sense actually means",
+            normalized_text)
+        self.assertIn(
+            "understandable without knowing the source term",
+            normalized_text)
+        self.assertIn(
+            "Do not give only translation equivalents, synonyms, or "
+            "near-synonyms",
+            normalized_text)
+        self.assertIn(
+            "do not repeat the translation field in different wording",
+            normalized_text)
+
     def test_context_adds_sentence_component_once(self):
         pipeline = language_pipeline(
             "latin",
