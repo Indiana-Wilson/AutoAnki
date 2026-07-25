@@ -22,6 +22,7 @@ from corpus_pipeline.models import (
 )
 from corpus_pipeline.processing import build_vocabulary
 from corpus_pipeline.storage import build_id, write_build
+from corpus_pipeline.tokenizers import HistoricalEnglishTokenizer
 from source_generation import (
     ContextMode,
     GenerationJobRunner,
@@ -30,7 +31,6 @@ from source_generation import (
     OutputDetail,
     RetryPolicy,
     SOURCE_REQUEST_MODEL,
-    SOURCE_REQUEST_REASONING,
     SourceGenerationConfig,
     SourceGenerationBackend,
     build_source_request_contract,
@@ -38,11 +38,31 @@ from source_generation import (
     load_processed_source,
     plan_source_generation,
 )
-from source_generation.validation import make_pipeline_response_validator
-from source_generation.requests import load_source_batch_instructions
+from source_generation.validation import (
+    inspect_pipeline_response,
+    make_pipeline_response_validator,
+)
+from source_generation.requests import (
+    load_source_batch_instructions,
+    normalise_source_request_contract,
+    render_chunk_input,
+    source_request_requires_sentence_translations,
+    source_request_uses_obsolete_context_translation_protocol,
+    source_request_uses_grouped_source_results,
+    source_request_uses_occurrence_locators,
+    source_request_uses_sentence_arrays,
+    source_request_uses_split_contextual_cards,
+)
+from source_generation.planning import (
+    BATCH_PRICING,
+    STANDARD_PRICING,
+    estimate_text_tokens,
+    price_source_usage,
+)
 from source_generation.jobs import _RequestStartGate
 import pipeline_store
 import process_text
+import templates
 
 
 class CharacterTokenizer:
@@ -61,7 +81,11 @@ class CharacterTokenizer:
             if "\u3400" <= character <= "\u9fff")
 
 
-def make_source(section_texts=("甲乙。丙丁。戊己。",)):
+def make_source(
+        section_texts=("甲乙。丙丁。戊己。",),
+        *,
+        source_language_key="classical_chinese",
+        tokenizer=None):
     raw = "\n".join(section_texts)
     page = SourcePage(
         page_key="fixture-001",
@@ -86,14 +110,14 @@ def make_source(section_texts=("甲乙。丙丁。戊己。",)):
     snapshot = CorpusSnapshot(
         spec_key="fixture_source",
         edition="Fixture Source",
-        source_language_key="classical_chinese",
+        source_language_key=source_language_key,
         pages=(page,),
         sections=sections,
         canonical_text=canonical,
         cleaner_version="fixture-cleaner")
     build = build_vocabulary(
         snapshot,
-        CharacterTokenizer(),
+        tokenizer or CharacterTokenizer(),
         BuildConfig())
     return LoadedSource(
         key="fixture_source",
@@ -107,7 +131,10 @@ def make_plan(
         *,
         chunk_size=500,
         context_mode=ContextMode.SENTENCE,
-        excluded_words=()):
+        excluded_words=(),
+        request_protocol="v9",
+        reasoning_effort="none",
+        execution_mode="standard"):
     source = make_source()
     return plan_source_generation(
         source,
@@ -118,6 +145,9 @@ def make_plan(
             concurrency=3,
             request_stagger_ms=0,
             max_transient_retries=2,
+            request_protocol=request_protocol,
+            reasoning_effort=reasoning_effort,
+            execution_mode=execution_mode,
             excluded_words=tuple(excluded_words)))
 
 
@@ -127,6 +157,37 @@ class SourcePlanningTests(unittest.TestCase):
 
         self.assertEqual(config.chunk_size, 30)
         self.assertEqual(config.concurrency, 8)
+        self.assertEqual(config.request_protocol, "v9")
+        self.assertEqual(config.reasoning_effort, "none")
+        self.assertEqual(config.execution_mode, "standard")
+
+    def test_request_protocol_reasoning_and_execution_settings_are_validated(
+            self):
+        legacy = SourceGenerationConfig.from_mapping({
+            "source_key": "fixture_source",
+            "protocol_version": 8,
+            "reasoning_effort": "low",
+            "processing_mode": "economy",
+        })
+
+        self.assertEqual(legacy.request_protocol, "v8")
+        self.assertEqual(legacy.reasoning_effort, "low")
+        self.assertEqual(legacy.execution_mode, "economy")
+        for setting, value, message in (
+                ("request_protocol", "v10", "protocol"),
+                ("reasoning_effort", "medium", "reasoning"),
+                ("execution_mode", "fast", "execution")):
+            with self.subTest(setting=setting), self.assertRaisesRegex(
+                    ValueError,
+                    message):
+                SourceGenerationConfig(
+                    source_key="fixture_source",
+                    **{setting: value})
+        with self.assertRaisesRegex(ValueError, "requires reasoning"):
+            SourceGenerationConfig(
+                source_key="fixture_source",
+                request_protocol="v8",
+                reasoning_effort="none")
 
     def test_source_batch_instructions_are_an_editable_prompt_component(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -148,6 +209,7 @@ class SourcePlanningTests(unittest.TestCase):
         config = SourceGenerationConfig.from_mapping({
             "source": "fixture_source",
             "chunk_size": 50,
+            "source_prefix_token_limit": 100,
             "context_mode": "current+/-1",
             "concurrency": 8,
             "exclude_anki": {
@@ -159,6 +221,7 @@ class SourcePlanningTests(unittest.TestCase):
         })
 
         self.assertEqual(config.source_key, "fixture_source")
+        self.assertEqual(config.source_prefix_token_limit, 100)
         self.assertEqual(config.context_mode, ContextMode.SENTENCE_NEIGHBORS)
         self.assertEqual(config.exclude_anki.deck_name, "Known words")
         self.assertEqual(config.exclude_anki.field_name, "Word")
@@ -188,6 +251,103 @@ class SourcePlanningTests(unittest.TestCase):
                 specification.deck_name
                 for specification in config.anki_exclusions),
             ("Recognition", "Production"))
+
+    def test_source_prefix_limit_requires_a_positive_integer(self):
+        for invalid in (True, 0, -1, 1.5, "100"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(
+                        ValueError,
+                        "Source prefix length"):
+                    SourceGenerationConfig(
+                        source_key="fixture_source",
+                        source_prefix_token_limit=invalid)
+
+    def test_source_prefix_counts_running_tokens_before_deduplication(self):
+        source = make_source(("甲甲乙甲丙。",))
+
+        plan = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                source_prefix_token_limit=4,
+                chunk_size=1,
+                context_mode=ContextMode.NONE))
+
+        self.assertEqual(plan.original_word_count, 3)
+        self.assertEqual(plan.source_prefix_token_count, 4)
+        self.assertEqual(plan.prefix_unique_word_count, 2)
+        self.assertEqual(plan.word_count, 2)
+        self.assertEqual(plan.excluded_word_count, 0)
+        self.assertEqual(
+            tuple(
+                word.surface
+                for chunk in plan.chunks
+                for word in chunk.words),
+            ("甲", "乙"))
+        self.assertEqual(
+            tuple(word.rank for chunk in plan.chunks for word in chunk.words),
+            (1, 2))
+
+    def test_source_prefix_clamps_at_end_and_then_applies_exclusions(self):
+        source = make_source(("甲甲乙甲丙。",))
+
+        plan = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                source_prefix_token_limit=100,
+                excluded_words=("乙",),
+                context_mode=ContextMode.NONE))
+
+        self.assertEqual(plan.source_prefix_token_count, 5)
+        self.assertEqual(plan.prefix_unique_word_count, 3)
+        self.assertEqual(plan.excluded_word_count, 1)
+        self.assertEqual(
+            tuple(
+                word.surface
+                for chunk in plan.chunks
+                for word in chunk.words),
+            ("甲", "丙"))
+
+    def test_source_prefix_changes_plan_identity_at_the_token_boundary(self):
+        source = make_source(("甲甲乙甲丙。",))
+        first_two_tokens = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                source_prefix_token_limit=2))
+        first_three_tokens = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                source_prefix_token_limit=3))
+
+        self.assertNotEqual(
+            first_two_tokens.plan_id,
+            first_three_tokens.plan_id)
+        self.assertEqual(first_two_tokens.word_count, 1)
+        self.assertEqual(first_three_tokens.word_count, 2)
+
+    def test_historical_english_exclusion_is_casefolded_like_candidates(self):
+        source = make_source(
+            ("Whan whan that Aprill.",),
+            source_language_key="middle_english",
+            tokenizer=(
+                HistoricalEnglishTokenizer.for_middle_english()))
+        plan = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                excluded_words=("WHAN",)))
+
+        self.assertEqual(plan.original_word_count, 3)
+        self.assertEqual(plan.excluded_word_count, 1)
+        self.assertEqual(
+            tuple(
+                word.surface
+                for chunk in plan.chunks
+                for word in chunk.words),
+            ("that", "Aprill"))
 
     def test_variable_chunk_size_repartitions_existing_unique_words(self):
         source = make_source()
@@ -225,6 +385,42 @@ class SourcePlanningTests(unittest.TestCase):
         self.assertNotIn(
             "text",
             payload["words"][0])
+        self.assertEqual(
+            payload["words"][0]["occurrence_span"],
+            [0, 1])
+        self.assertEqual(
+            payload["words"][0]["occurrence_locator"],
+            {
+                "before": "",
+                "target": "甲",
+                "after": "乙。",
+                "literal_match_ordinal": 1,
+                "marked_excerpt": "⟪TARGET⟫甲⟪/TARGET⟫乙。",
+            })
+        self.assertEqual(
+            payload["words"][1]["occurrence_span"],
+            [1, 2])
+        self.assertEqual(
+            payload["words"][1]["occurrence_locator"],
+            {
+                "before": "甲",
+                "target": "乙",
+                "after": "。",
+                "literal_match_ordinal": 1,
+                "marked_excerpt": "甲⟪TARGET⟫乙⟪/TARGET⟫。",
+            })
+        legacy_word = replace(
+            chunk.words[0],
+            occurrence_locator=None)
+        legacy_chunk = replace(
+            chunk,
+            words=(legacy_word,))
+        self.assertIn(
+            "occurrence_span",
+            legacy_chunk.request_payload()["words"][0])
+        self.assertNotIn(
+            "occurrence_locator",
+            legacy_chunk.request_payload()["words"][0])
 
     def test_overlapping_neighbor_windows_merge_into_one_context(self):
         plan = make_plan(
@@ -399,6 +595,332 @@ class SourcePlanningTests(unittest.TestCase):
         self.assertEqual(
             detailed_estimate.assumptions["token_estimator"],
             "deterministic character-class approximation; no API call")
+        self.assertEqual(
+            detailed_estimate.assumptions["reasoning_effort"],
+            "none")
+        self.assertEqual(
+            detailed_estimate.assumptions[
+                "reasoning_output_reserve_multiplier"],
+            1.0)
+
+    def test_cost_estimate_counts_exact_per_chunk_response_schemas(self):
+        plan = make_plan(
+            chunk_size=2,
+            request_protocol="v8",
+            reasoning_effort="low")
+        formats = {
+            chunk.chunk_id: {
+                "type": "json_schema",
+                "strict": True,
+                "name": f"schema_{chunk.index}",
+                "schema": {
+                    "type": "object",
+                    "description": "rank keyed " * (100 + chunk.index),
+                },
+            }
+            for chunk in plan.chunks
+        }
+
+        baseline = estimate_plan_cost(
+            plan,
+            OutputDetail(("translation",)),
+            prompt_text="Prompt")
+        exact = estimate_plan_cost(
+            plan,
+            OutputDetail(("translation",)),
+            prompt_text="Prompt",
+            response_formats_by_chunk=formats)
+
+        self.assertGreater(exact.schema_tokens, baseline.schema_tokens)
+        self.assertEqual(
+            set(exact.assumptions["schema_tokens_by_chunk"]),
+            {chunk.chunk_id for chunk in plan.chunks})
+        with self.assertRaisesRegex(
+                ValueError,
+                "do not match the generation plan"):
+            estimate_plan_cost(
+                plan,
+                OutputDetail(("translation",)),
+                response_formats_by_chunk={})
+
+    def test_empty_v8_source_plan_accepts_its_empty_schema_map(self):
+        plan = make_plan(
+            excluded_words=("甲", "乙", "丙", "丁", "戊", "己"),
+            request_protocol="v8",
+            reasoning_effort="low")
+
+        estimate = estimate_plan_cost(
+            plan,
+            OutputDetail(
+                ("translation",),
+                include_example_sentences=True),
+            use_source_for_example_sentences=True,
+            response_formats_by_chunk={})
+
+        self.assertEqual(estimate.request_count, 0)
+        self.assertEqual(estimate.estimated_input_tokens, 0)
+        self.assertEqual(estimate.estimated_output_tokens, 0)
+        self.assertEqual(
+            estimate.assumptions["schema_estimation_mode"],
+            "per_chunk_exact")
+
+    def test_cost_estimate_counts_exact_fixed_v9_response_schema(self):
+        plan = make_plan(chunk_size=2)
+        response_format = {
+            "type": "json_schema",
+            "strict": True,
+            "name": "fixed_source_v9",
+            "schema": {
+                "type": "object",
+                "description": "fixed rank arrays " * 300,
+            },
+        }
+
+        baseline = estimate_plan_cost(
+            plan,
+            OutputDetail(("translation",)),
+            prompt_text="Prompt")
+        exact = estimate_plan_cost(
+            plan,
+            OutputDetail(("translation",)),
+            prompt_text="Prompt",
+            response_format=response_format)
+
+        expected_per_request = estimate_text_tokens(json.dumps(
+            response_format,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":")))
+        self.assertEqual(
+            exact.schema_tokens,
+            expected_per_request * exact.request_count)
+        self.assertGreater(exact.schema_tokens, baseline.schema_tokens)
+        self.assertEqual(
+            exact.assumptions["schema_estimation_mode"],
+            "fixed_exact")
+        with self.assertRaisesRegex(ValueError, "either one fixed"):
+            estimate_plan_cost(
+                plan,
+                OutputDetail(("translation",)),
+                response_format=response_format,
+                response_formats_by_chunk={
+                    chunk.chunk_id: response_format
+                    for chunk in plan.chunks
+                })
+
+    def test_cost_estimate_uses_exact_protocol_payload_rendering(self):
+        for protocol, reasoning in (("v8", "low"), ("v9", "none")):
+            with self.subTest(protocol=protocol):
+                plan = make_plan(
+                    chunk_size=2,
+                    request_protocol=protocol,
+                    reasoning_effort=reasoning)
+                estimate = estimate_plan_cost(
+                    plan,
+                    OutputDetail(("translation",)))
+                expected = sum(
+                    estimate_text_tokens(render_chunk_input(
+                        chunk,
+                        protocol_version=int(protocol[1:])))
+                    for chunk in plan.chunks
+                )
+
+                self.assertEqual(estimate.payload_tokens, expected)
+
+    def test_cost_estimate_prices_standard_and_economy_at_published_rates(
+            self):
+        standard_plan = make_plan(
+            chunk_size=2,
+            execution_mode="standard")
+        economy_plan = make_plan(
+            chunk_size=2,
+            execution_mode="economy")
+
+        standard = estimate_plan_cost(
+            standard_plan,
+            OutputDetail(("translation",)),
+            prompt_text="Prompt")
+        economy = estimate_plan_cost(
+            economy_plan,
+            OutputDetail(("translation",)),
+            prompt_text="Prompt")
+
+        self.assertEqual(STANDARD_PRICING.input_usd_per_million, 0.75)
+        self.assertEqual(
+            STANDARD_PRICING.cached_input_usd_per_million,
+            0.075)
+        self.assertEqual(STANDARD_PRICING.output_usd_per_million, 4.50)
+        self.assertEqual(
+            BATCH_PRICING.input_usd_per_million,
+            STANDARD_PRICING.input_usd_per_million / 2)
+        self.assertEqual(
+            BATCH_PRICING.cached_input_usd_per_million,
+            STANDARD_PRICING.cached_input_usd_per_million / 2)
+        self.assertEqual(
+            BATCH_PRICING.output_usd_per_million,
+            STANDARD_PRICING.output_usd_per_million / 2)
+        self.assertEqual(
+            economy.estimated_input_tokens,
+            standard.estimated_input_tokens)
+        self.assertEqual(
+            economy.estimated_output_tokens,
+            standard.estimated_output_tokens)
+        self.assertAlmostEqual(
+            economy.estimated_total_usd,
+            standard.estimated_total_usd / 2)
+        self.assertAlmostEqual(
+            economy.low_total_usd,
+            standard.low_total_usd / 2)
+        self.assertAlmostEqual(
+            economy.high_total_usd,
+            standard.high_total_usd / 2)
+
+    def test_cost_estimate_uses_cache_reads_centrally_and_cold_input_high(
+            self):
+        plan = make_plan(chunk_size=2)
+        estimate = estimate_plan_cost(
+            plan,
+            OutputDetail(("translation",)),
+            prompt_text="identical stable prompt prefix " * 1_000)
+
+        self.assertGreater(estimate.estimated_cached_input_tokens, 0)
+        self.assertEqual(
+            estimate.estimated_input_tokens,
+            (
+                estimate.estimated_cached_input_tokens
+                + estimate.estimated_uncached_input_tokens))
+        self.assertAlmostEqual(
+            estimate.estimated_input_usd,
+            (
+                estimate.estimated_cached_input_usd
+                + estimate.estimated_uncached_input_usd))
+        self.assertGreater(
+            estimate.assumptions["cold_input_usd"],
+            estimate.estimated_input_usd)
+        self.assertEqual(
+            estimate.assumptions["high_input_assumption"],
+            "all input tokens are cold")
+
+    def test_source_response_shape_translates_each_deduplicated_context_once(
+            self):
+        shared_source = make_source(("甲乙。",))
+        separate_source = make_source(("甲。乙。",))
+        config = SourceGenerationConfig(
+            source_key="fixture_source",
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE)
+        shared_plan = plan_source_generation(shared_source, config)
+        separate_plan = plan_source_generation(separate_source, config)
+        detail = OutputDetail(
+            ("translation",),
+            include_example_sentences=True)
+
+        shared = estimate_plan_cost(
+            shared_plan,
+            detail,
+            use_source_for_example_sentences=True)
+        separate = estimate_plan_cost(
+            separate_plan,
+            detail,
+            use_source_for_example_sentences=True)
+        generated_shared = estimate_plan_cost(shared_plan, detail)
+        generated_separate = estimate_plan_cost(separate_plan, detail)
+
+        self.assertEqual(len(shared_plan.chunks[0].contexts), 1)
+        self.assertEqual(len(separate_plan.chunks[0].contexts), 2)
+        self.assertGreater(
+            separate.estimated_output_tokens,
+            shared.estimated_output_tokens)
+        self.assertEqual(
+            generated_separate.estimated_output_tokens,
+            generated_shared.estimated_output_tokens)
+        self.assertEqual(
+            shared.assumptions["response_shape"],
+            "source_contextual_lexical_plus_additional")
+        shape = shared.assumptions["output_shape"]
+        self.assertFalse(
+            shape["contextual_senses_include_generated_examples"])
+        self.assertEqual(
+            shape["additional_senses_per_word"]["central"],
+            1.0)
+        self.assertEqual(
+            shape["source_context_translations"],
+            "one output translation per deduplicated context")
+
+    def test_reasoning_reserve_is_scenario_specific_not_a_blanket_multiplier(
+            self):
+        without_reasoning = estimate_plan_cost(
+            make_plan(
+                chunk_size=2,
+                reasoning_effort="none"),
+            OutputDetail(("translation",)))
+        with_low_reasoning = estimate_plan_cost(
+            make_plan(
+                chunk_size=2,
+                reasoning_effort="low"),
+            OutputDetail(("translation",)))
+
+        self.assertEqual(
+            without_reasoning.assumptions[
+                "reasoning_output_reserve_multiplier"],
+            1.0)
+        self.assertEqual(
+            with_low_reasoning.assumptions[
+                "reasoning_output_reserve_multiplier"],
+            1.20)
+        self.assertNotEqual(
+            with_low_reasoning.assumptions[
+                "reasoning_output_reserve_multiplier"],
+            1.50)
+        self.assertGreater(
+            with_low_reasoning.estimated_output_tokens,
+            without_reasoning.estimated_output_tokens)
+
+    def test_exact_usage_pricing_includes_cached_input_and_aud(self):
+        usage = {
+            "uncached_input_tokens": 1_000_000,
+            "cached_input_tokens": 1_000_000,
+            "output_tokens": 1_000_000,
+        }
+
+        standard = price_source_usage(
+            usage,
+            execution_mode="standard")
+        economy = price_source_usage(
+            usage,
+            execution_mode="economy")
+
+        self.assertEqual(standard["input_tokens"], 2_000_000)
+        self.assertEqual(standard["total_tokens"], 3_000_000)
+        self.assertEqual(standard["uncached_input_usd"], 0.75)
+        self.assertEqual(standard["cached_input_usd"], 0.075)
+        self.assertEqual(standard["output_usd"], 4.50)
+        self.assertEqual(standard["total_usd"], 5.325)
+        self.assertAlmostEqual(
+            standard["total_aud"],
+            standard["total_usd"] * standard["usd_to_aud_rate"])
+        self.assertAlmostEqual(
+            economy["total_usd"],
+            standard["total_usd"] / 2)
+        self.assertIn("published", standard["pricing_label"])
+        self.assertIn("RBA", standard["aud_exchange_rate"])
+        with_search = price_source_usage(
+            {
+                **usage,
+                "web_search_calls": 2,
+            },
+            execution_mode="standard")
+        self.assertEqual(with_search["web_search_usd"], 0.02)
+        self.assertEqual(
+            with_search["total_usd"],
+            standard["total_usd"] + 0.02)
+        with self.assertRaisesRegex(ValueError, "non-negative integer"):
+            price_source_usage({
+                **usage,
+                "cached_input_tokens": True,
+            })
+        with self.assertRaisesRegex(ValueError, "execution mode"):
+            price_source_usage(usage, execution_mode="instant")
 
     def test_web_search_estimate_is_bounded_to_one_search_per_request(self):
         plan = make_plan(chunk_size=2)
@@ -452,6 +974,54 @@ def simple_classical_pipeline():
                 card,
                 enabled=card.direction_key == "word_to_meaning",
                 fields=selected_fields)
+            for card in settings.cards),
+        share_field_settings=True,
+        shared_fields=selected_fields)
+    return pipeline_store.replace_active_language_settings(
+        pipeline,
+        settings,
+        (settings,),
+        active_language_key="classical_chinese")
+
+
+def context_classical_pipeline():
+    pipeline = pipeline_store.default_pipeline()
+    settings = pipeline_store.get_language_settings(
+        pipeline,
+        "classical_chinese")
+    selected_fields = (
+        pipeline_store.FieldSetting("translation", "english"),
+    )
+    settings = replace(
+        settings,
+        cards=tuple(
+            replace(
+                card,
+                enabled=card.direction_key == "context",
+                fields=selected_fields)
+            for card in settings.cards),
+        share_field_settings=True,
+        shared_fields=selected_fields)
+    return pipeline_store.replace_active_language_settings(
+        pipeline,
+        settings,
+        (settings,),
+        active_language_key="classical_chinese")
+
+
+def detailed_context_classical_pipeline():
+    pipeline = context_classical_pipeline()
+    settings = pipeline_store.get_language_settings(
+        pipeline,
+        "classical_chinese")
+    selected_fields = (
+        pipeline_store.FieldSetting("translation", "english"),
+        pipeline_store.FieldSetting("dictionary_meaning", "english"),
+    )
+    settings = replace(
+        settings,
+        cards=tuple(
+            replace(card, fields=selected_fields)
             for card in settings.cards),
         share_field_settings=True,
         shared_fields=selected_fields)
@@ -525,6 +1095,954 @@ class SourceResponseValidationTests(unittest.TestCase):
                 "outside.*丙"):
             self.validator(raw, self.chunk)
 
+    def test_source_context_is_inserted_only_for_each_first_sense(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE_NEIGHBORS).chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True)
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = (
+            process_text.get_response_field_names(pipeline))
+        exact_contexts = {
+            word.surface: next(
+                context.text
+                for context in chunk.contexts
+                if context.context_id == word.context_id)
+            for word in chunk.words
+        }
+        additional_examples = (
+            "<strong>甲</strong>一。|<strong>甲</strong>二。|"
+            "<strong>甲</strong>三。|<strong>甲</strong>四。")
+        additional_translations = (
+            "First 甲 example.|Second 甲 example.|"
+            "Third 甲 example.|Fourth 甲 example.")
+        raw = json.dumps({
+            "cards": [
+                {
+                    term_field: "甲",
+                    sentence_translations_field: "Exact 甲 source context.",
+                    meaning_field: "contextual",
+                },
+                {
+                    term_field: "甲",
+                    sentence_field: additional_examples,
+                    sentence_translations_field: additional_translations,
+                    meaning_field: "other disjoint sense",
+                },
+                {
+                    term_field: "乙",
+                    sentence_translations_field: "Exact 乙 source context.",
+                    meaning_field: "contextual",
+                },
+            ],
+        }, ensure_ascii=False)
+
+        validated = validator(raw, chunk)
+
+        self.assertEqual(
+            validated["cards"][0][sentence_field],
+            process_text.encode_source_context_block(
+                process_text.emphasize_term_in_sentences(
+                    exact_contexts["甲"],
+                    "甲",
+                    pipeline.language_key)))
+        self.assertNotIn(
+            "|",
+            validated["cards"][0][sentence_field])
+        self.assertEqual(
+            validated["cards"][1][sentence_field],
+            additional_examples)
+        self.assertEqual(
+            validated["cards"][1][sentence_translations_field],
+            additional_translations)
+        self.assertEqual(
+            validated["cards"][2][sentence_field],
+            process_text.encode_source_context_block(
+                process_text.emphasize_term_in_sentences(
+                    exact_contexts["乙"],
+                    "乙",
+                    pipeline.language_key)))
+
+    def test_v5_context_map_is_shared_and_arrays_are_canonicalized(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True)
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        context = chunk.contexts[0]
+        raw = json.dumps({
+            "source_context_translations": [{
+                "context_id": context.context_id,
+                "translation": "The complete shared source context.",
+            }],
+            "cards": [
+                {
+                    term_field: "甲",
+                    meaning_field: "contextual",
+                },
+                {
+                    term_field: "甲",
+                    sentence_field: [
+                        "<strong>甲</strong>一。",
+                        "<strong>甲</strong>二。",
+                        "<strong>甲</strong>三。",
+                        "<strong>甲</strong>四。",
+                    ],
+                    sentence_translations_field: [
+                        "First.",
+                        "Second.",
+                        "Third.",
+                        "Fourth.",
+                    ],
+                    meaning_field: "other sense",
+                },
+                {
+                    term_field: "乙",
+                    meaning_field: "contextual",
+                },
+            ],
+        }, ensure_ascii=False)
+
+        validated = validator(raw, chunk)["cards"]
+
+        self.assertEqual(
+            validated[0][sentence_translations_field],
+            "The complete shared source context.")
+        self.assertEqual(
+            validated[2][sentence_translations_field],
+            "The complete shared source context.")
+        self.assertEqual(
+            validated[1][sentence_field],
+            (
+                "<strong>甲</strong>一。|<strong>甲</strong>二。|"
+                "<strong>甲</strong>三。|<strong>甲</strong>四。"))
+        self.assertEqual(
+            validated[1][sentence_translations_field],
+            "First.|Second.|Third.|Fourth.")
+
+    def test_v6_split_cards_merge_contextual_first_in_source_rank_order(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True,
+            use_split_source_context_cards=True)
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        examples = [
+            "<strong>甲</strong>一。",
+            "<strong>甲</strong>二。",
+            "<strong>甲</strong>三。",
+            "<strong>甲</strong>四。",
+        ]
+        raw = json.dumps({
+            "contextual_cards": [
+                {term_field: "乙", meaning_field: "乙 contextual"},
+                {term_field: "甲", meaning_field: "甲 contextual"},
+            ],
+            "additional_sense_cards": [{
+                term_field: "甲",
+                sentence_field: examples,
+                sentence_translations_field: [
+                    "First.", "Second.", "Third.", "Fourth.",
+                ],
+                meaning_field: "甲 additional",
+            }],
+            "source_context_translations": [{
+                "context_id": chunk.contexts[0].context_id,
+                "translation": "The complete shared source context.",
+            }],
+        }, ensure_ascii=False)
+
+        cards = validator(raw, chunk)["cards"]
+
+        self.assertEqual(
+            [card[term_field] for card in cards],
+            ["甲", "甲", "乙"])
+        self.assertEqual(
+            [card[meaning_field] for card in cards],
+            ["甲 contextual", "甲 additional", "乙 contextual"])
+        self.assertTrue(cards[0][sentence_field].startswith(
+            templates.SOURCE_CONTEXT_BLOCK_PREFIX))
+        self.assertEqual(
+            cards[1][sentence_field],
+            "|".join(examples))
+
+    def test_v6_contextual_cards_require_exactly_one_requested_term(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        term_field, _sentences, _translations, meaning_field = (
+            process_text.get_response_field_names(pipeline))
+        context_map = [{
+            "context_id": chunk.contexts[0].context_id,
+            "translation": "The complete shared source context.",
+        }]
+        cases = {
+            "missing_contextual_source_card": [
+                {term_field: "甲", meaning_field: "first"},
+            ],
+            "duplicate_contextual_source_card": [
+                {term_field: "甲", meaning_field: "first"},
+                {term_field: "甲", meaning_field: "duplicate"},
+                {term_field: "乙", meaning_field: "second"},
+            ],
+            "unexpected_contextual_source_term": [
+                {term_field: "甲", meaning_field: "first"},
+                {term_field: "乙", meaning_field: "second"},
+                {term_field: "丙", meaning_field: "extra"},
+            ],
+        }
+
+        for expected_code, contextual_cards in cases.items():
+            with self.subTest(expected_code=expected_code):
+                raw = json.dumps({
+                    "contextual_cards": contextual_cards,
+                    "additional_sense_cards": [],
+                    "source_context_translations": context_map,
+                }, ensure_ascii=False)
+                report = inspect_pipeline_response(
+                    raw,
+                    pipeline,
+                    chunk,
+                    use_source_for_example_sentences=True,
+                    sentence_collections_as_arrays=True,
+                    use_source_context_translation_map=True,
+                    use_split_source_context_cards=True)
+                matching = [
+                    problem
+                    for problem in report["problems"]
+                    if problem["code"] == expected_code
+                ]
+                self.assertTrue(matching)
+                self.assertTrue(all(
+                    not problem["overrideable"]
+                    for problem in matching))
+                self.assertFalse(report["can_manually_accept"])
+
+    def test_v6_additional_sense_requires_both_four_item_arrays(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        term_field, _sentences, _translations, meaning_field = (
+            process_text.get_response_field_names(pipeline))
+        raw = json.dumps({
+            "contextual_cards": [
+                {term_field: "甲", meaning_field: "first"},
+                {term_field: "乙", meaning_field: "second"},
+            ],
+            "additional_sense_cards": [{
+                term_field: "甲",
+                meaning_field: "additional",
+            }],
+            "source_context_translations": [{
+                "context_id": chunk.contexts[0].context_id,
+                "translation": "The complete shared source context.",
+            }],
+        }, ensure_ascii=False)
+
+        report = inspect_pipeline_response(
+            raw,
+            pipeline,
+            chunk,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True,
+            use_split_source_context_cards=True)
+
+        self.assertIn(
+            "invalid_card_fields",
+            {
+                problem["code"]
+                for problem in report["problems"]
+            })
+        self.assertFalse(report["can_manually_accept"])
+
+    def test_v6_rejects_literal_pipe_inside_sentence_array_item(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        raw = json.dumps({
+            "contextual_cards": [
+                {term_field: "甲", meaning_field: "first"},
+                {term_field: "乙", meaning_field: "second"},
+            ],
+            "additional_sense_cards": [{
+                term_field: "甲",
+                sentence_field: [
+                    "<strong>甲</strong>一|續。",
+                    "<strong>甲</strong>二。",
+                    "<strong>甲</strong>三。",
+                    "<strong>甲</strong>四。",
+                ],
+                sentence_translations_field: [
+                    "First.", "Second.", "Third.", "Fourth.",
+                ],
+                meaning_field: "additional",
+            }],
+            "source_context_translations": [{
+                "context_id": chunk.contexts[0].context_id,
+                "translation": "The complete shared source context.",
+            }],
+        }, ensure_ascii=False)
+
+        report = inspect_pipeline_response(
+            raw,
+            pipeline,
+            chunk,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True,
+            use_split_source_context_cards=True)
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if (
+                problem["code"]
+                == "sentence_collection_item_contains_delimiter"))
+        self.assertFalse(problem["overrideable"])
+        self.assertFalse(report["can_manually_accept"])
+
+    def test_v5_and_v6_require_complete_audited_occurrence_spans(self):
+        pipeline = context_classical_pipeline()
+        base_chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        chunk = replace(
+            base_chunk,
+            words=(
+                replace(
+                    base_chunk.words[0],
+                    start_offset=None),
+                *base_chunk.words[1:],
+            ))
+        term_field, _sentences, _translations, meaning_field = (
+            process_text.get_response_field_names(pipeline))
+        contextual_cards = [
+            {term_field: "甲", meaning_field: "first"},
+            {term_field: "乙", meaning_field: "second"},
+        ]
+        context_translations = [{
+            "context_id": chunk.contexts[0].context_id,
+            "translation": "The complete shared source context.",
+        }]
+        cases = (
+            (
+                "v5",
+                {
+                    "cards": contextual_cards,
+                    "source_context_translations": context_translations,
+                },
+                False,
+            ),
+            (
+                "v6",
+                {
+                    "contextual_cards": contextual_cards,
+                    "additional_sense_cards": [],
+                    "source_context_translations": context_translations,
+                },
+                True,
+            ),
+        )
+
+        for version, payload, split_cards in cases:
+            with self.subTest(version=version):
+                report = inspect_pipeline_response(
+                    json.dumps(payload, ensure_ascii=False),
+                    pipeline,
+                    chunk,
+                    use_source_for_example_sentences=True,
+                    sentence_collections_as_arrays=True,
+                    use_source_context_translation_map=True,
+                    use_split_source_context_cards=split_cards)
+
+                problem = next(
+                    problem
+                    for problem in report["problems"]
+                    if problem["code"] == "missing_source_occurrence_span")
+                self.assertFalse(problem["overrideable"])
+                self.assertFalse(report["can_manually_accept"])
+
+    def test_v6_rejects_duplicate_examples_across_additional_senses(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        examples = [
+            "<strong>甲</strong>一。",
+            "<strong>甲</strong>二。",
+            "<strong>甲</strong>三。",
+            "<strong>甲</strong>四。",
+        ]
+        translations = ["First.", "Second.", "Third.", "Fourth."]
+        raw = json.dumps({
+            "contextual_cards": [
+                {term_field: "甲", meaning_field: "contextual"},
+                {term_field: "乙", meaning_field: "second"},
+            ],
+            "additional_sense_cards": [
+                {
+                    term_field: "甲",
+                    sentence_field: examples,
+                    sentence_translations_field: translations,
+                    meaning_field: "additional one",
+                },
+                {
+                    term_field: "甲",
+                    sentence_field: list(reversed(examples)),
+                    sentence_translations_field: list(
+                        reversed(translations)),
+                    meaning_field: "additional two",
+                },
+            ],
+            "source_context_translations": [{
+                "context_id": chunk.contexts[0].context_id,
+                "translation": "The complete shared source context.",
+            }],
+        }, ensure_ascii=False)
+
+        report = inspect_pipeline_response(
+            raw,
+            pipeline,
+            chunk,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True,
+            use_split_source_context_cards=True)
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"] == "duplicate_additional_sense_examples")
+        self.assertFalse(problem["overrideable"])
+
+    def test_split_response_rejects_duplicate_contextual_and_additional_sense(
+            self):
+        pipeline = detailed_context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        (
+            term_field,
+            sentence_field,
+            sentence_translation_field,
+            translation_field,
+            definition_field,
+        ) = process_text.get_response_field_names(pipeline)
+        raw = json.dumps({
+            process_text.SOURCE_CONTEXTUAL_CARDS_KEY: [
+                {
+                    term_field: "甲",
+                    translation_field: "to say!",
+                    definition_field: "to speak / say!",
+                },
+                {
+                    term_field: "乙",
+                    translation_field: "second",
+                    definition_field: "the item after the first",
+                },
+            ],
+            process_text.SOURCE_ADDITIONAL_SENSE_CARDS_KEY: [{
+                term_field: "甲",
+                sentence_field: [
+                    "<strong>甲</strong>一。",
+                    "<strong>甲</strong>二。",
+                    "<strong>甲</strong>三。",
+                    "<strong>甲</strong>四。",
+                ],
+                sentence_translation_field: [
+                    "First.",
+                    "Second.",
+                    "Third.",
+                    "Fourth.",
+                ],
+                translation_field: "to say",
+                definition_field: "To speak / say.",
+            }],
+            process_text.SOURCE_CONTEXT_TRANSLATIONS_KEY: [
+                {
+                    process_text.SOURCE_CONTEXT_ID_FIELD_NAME: (
+                        context.context_id),
+                    process_text.SOURCE_CONTEXT_TRANSLATION_FIELD_NAME: (
+                        "The complete retained context."),
+                }
+                for context in chunk.contexts
+            ],
+        }, ensure_ascii=False)
+
+        report = inspect_pipeline_response(
+            raw,
+            pipeline,
+            chunk,
+            use_source_for_example_sentences=True,
+            require_sentence_translations=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True,
+            use_split_source_context_cards=True)
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"] == "duplicate_source_sense")
+        self.assertFalse(report["valid"])
+        self.assertFalse(problem["overrideable"])
+        self.assertEqual(
+            problem["actual"]["duplicates_card"],
+            1)
+        self.assertFalse(report["can_manually_accept"])
+
+    def test_v5_source_example_highlights_only_the_ranked_occurrence(self):
+        pipeline = context_classical_pipeline()
+        source = make_source(section_texts=("道可道。",))
+        plan = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                chunk_size=10,
+                context_mode=ContextMode.SENTENCE,
+                request_stagger_ms=0))
+        chunk = plan.chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True)
+        (
+            term_field,
+            sentence_field,
+            _sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        raw = json.dumps({
+            "source_context_translations": [{
+                "context_id": chunk.contexts[0].context_id,
+                "translation": "The Way can be spoken as a way.",
+            }],
+            "cards": [
+                {term_field: "道", meaning_field: "the ranked use"},
+                {term_field: "可", meaning_field: "can"},
+            ],
+        }, ensure_ascii=False)
+
+        validated = validator(raw, chunk)["cards"]
+        source_example = validated[0][sentence_field]
+
+        self.assertIn("<strong>道</strong>可道。", source_example)
+        self.assertEqual(source_example.count("<strong>道</strong>"), 1)
+
+    def test_v5_context_map_requires_each_requested_id_exactly_once(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True)
+        term_field, _sentences, _translations, meaning_field = (
+            process_text.get_response_field_names(pipeline))
+        context_id = chunk.contexts[0].context_id
+        cards = [
+            {term_field: "甲", meaning_field: "first"},
+            {term_field: "乙", meaning_field: "second"},
+        ]
+
+        invalid_maps = {
+            "missing": [],
+            "duplicate": [
+                {"context_id": context_id, "translation": "First."},
+                {"context_id": context_id, "translation": "Second."},
+            ],
+            "unexpected": [
+                {"context_id": "not-requested", "translation": "Other."},
+            ],
+        }
+        for case, context_map in invalid_maps.items():
+            with self.subTest(case=case):
+                raw = json.dumps({
+                    "source_context_translations": context_map,
+                    "cards": cards,
+                }, ensure_ascii=False)
+                with self.assertRaises(
+                        process_text.GeneratedCardValidationError):
+                    validator(raw, chunk)
+
+    def test_v5_context_map_rejects_blank_pipe_and_html_translations(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        term_field, _sentences, _translations, meaning_field = (
+            process_text.get_response_field_names(pipeline))
+        cards = [
+            {term_field: "甲", meaning_field: "first"},
+            {term_field: "乙", meaning_field: "second"},
+        ]
+        cases = {
+            "blank": ("", "blank_source_context_translation"),
+            "pipe": (
+                "First fragment.|Second fragment.",
+                "sentence_translation_count_mismatch"),
+            "html": (
+                "A <strong>marked</strong> translation.",
+                "source_context_translation_contains_html"),
+        }
+
+        for case, (translation, expected_code) in cases.items():
+            with self.subTest(case=case):
+                raw = json.dumps({
+                    "source_context_translations": [{
+                        "context_id": chunk.contexts[0].context_id,
+                        "translation": translation,
+                    }],
+                    "cards": cards,
+                }, ensure_ascii=False)
+                report = inspect_pipeline_response(
+                    raw,
+                    pipeline,
+                    chunk,
+                    use_source_for_example_sentences=True,
+                    sentence_collections_as_arrays=True,
+                    use_source_context_translation_map=True)
+                self.assertFalse(report["valid"])
+                self.assertIn(
+                    expected_code,
+                    {
+                        problem["code"]
+                        for problem in report["problems"]
+                    })
+
+    def test_v5_rejects_pipe_strings_instead_of_fixed_arrays(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True)
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        raw = json.dumps({
+            "source_context_translations": [{
+                "context_id": chunk.contexts[0].context_id,
+                "translation": "Shared context.",
+            }],
+            "cards": [
+                {term_field: "甲", meaning_field: "contextual"},
+                {
+                    term_field: "甲",
+                    sentence_field: "一|二|三|四",
+                    sentence_translations_field: "1|2|3|4",
+                    meaning_field: "other",
+                },
+                {term_field: "乙", meaning_field: "contextual"},
+            ],
+        }, ensure_ascii=False)
+
+        with self.assertRaisesRegex(
+                process_text.GeneratedCardValidationError,
+                "JSON arrays"):
+            validator(raw, chunk)
+
+    def test_v5_does_not_silently_replace_model_context_examples(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        raw = json.dumps({
+            "source_context_translations": [{
+                "context_id": chunk.contexts[0].context_id,
+                "translation": "Shared context.",
+            }],
+            "cards": [
+                {
+                    term_field: "甲",
+                    sentence_field: [
+                        "<strong>甲</strong>一。",
+                        "<strong>甲</strong>二。",
+                        "<strong>甲</strong>三。",
+                        "<strong>甲</strong>四。",
+                    ],
+                    sentence_translations_field: [
+                        "One.", "Two.", "Three.", "Four.",
+                    ],
+                    meaning_field: "contextual",
+                },
+                {term_field: "乙", meaning_field: "contextual"},
+            ],
+        }, ensure_ascii=False)
+
+        report = inspect_pipeline_response(
+            raw,
+            pipeline,
+            chunk,
+            use_source_for_example_sentences=True,
+            sentence_collections_as_arrays=True,
+            use_source_context_translation_map=True)
+
+        problem_codes = {
+            problem["code"]
+            for problem in report["problems"]
+        }
+        self.assertIn(
+            "contextual_card_contains_sentences",
+            problem_codes)
+        self.assertIn(
+            "contextual_card_contains_translation",
+            problem_codes)
+        self.assertFalse(report["can_manually_accept"])
+
+    def test_source_context_requires_one_matching_translation_block(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True)
+        (
+            term_field,
+            _sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        raw = json.dumps({
+            "cards": [
+                {
+                    term_field: "甲",
+                    sentence_translations_field: (
+                        "One.|Two.|Three.|Four."),
+                    meaning_field: "first",
+                },
+                {
+                    term_field: "乙",
+                    sentence_translations_field: "Exact 乙 context.",
+                    meaning_field: "second",
+                },
+            ],
+        }, ensure_ascii=False)
+
+        report = inspect_pipeline_response(
+            raw,
+            pipeline,
+            chunk,
+            use_source_for_example_sentences=True)
+        mismatch = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"] == "sentence_translation_count_mismatch")
+        self.assertFalse(mismatch["overrideable"])
+        self.assertFalse(report["can_manually_accept"])
+        with self.assertRaisesRegex(
+                process_text.GeneratedCardValidationError,
+                "needs one complete English translation"):
+            validator(raw, chunk)
+
+    def test_source_context_with_literal_pipe_remains_one_example(self):
+        pipeline = context_classical_pipeline()
+        base_chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        marker = templates.SOURCE_CONTEXT_ESCAPE_MARKER
+        context = replace(
+            base_chunk.contexts[0],
+            text=f"甲曰 A|B，並記 {marker}。")
+        chunk = replace(
+            base_chunk,
+            contexts=(
+                context,
+                *base_chunk.contexts[1:]),
+            words=tuple(
+                replace(
+                    word,
+                    start_offset=None,
+                    end_offset=None)
+                for word in base_chunk.words))
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True)
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = process_text.get_response_field_names(pipeline)
+        raw = json.dumps({
+            "cards": [
+                {
+                    term_field: "甲",
+                    sentence_translations_field: (
+                        "A complete translation containing no delimiter."),
+                    meaning_field: "first",
+                },
+                {
+                    term_field: "乙",
+                    sentence_translations_field: "Exact 乙 context.",
+                    meaning_field: "second",
+                },
+            ],
+        }, ensure_ascii=False)
+
+        validated = validator(raw, chunk)
+
+        encoded = validated["cards"][0][sentence_field]
+        self.assertTrue(encoded.startswith(
+            templates.SOURCE_CONTEXT_BLOCK_PREFIX))
+        self.assertNotIn(
+            "|",
+            encoded[len(templates.SOURCE_CONTEXT_BLOCK_PREFIX):])
+        self.assertEqual(
+            validated["cards"][0][sentence_translations_field],
+            "A complete translation containing no delimiter.")
+
+    def test_source_context_is_not_inserted_when_option_is_off(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE_NEIGHBORS).chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=False)
+        (
+            term_field,
+            sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = (
+            process_text.get_response_field_names(pipeline))
+        first_examples = (
+            "<strong>甲</strong>一。|<strong>甲</strong>二。|"
+            "<strong>甲</strong>三。|<strong>甲</strong>四。")
+        second_examples = (
+            "<strong>乙</strong>一。|<strong>乙</strong>二。|"
+            "<strong>乙</strong>三。|<strong>乙</strong>四。")
+        first_translations = "甲 one.|甲 two.|甲 three.|甲 four."
+        second_translations = "乙 one.|乙 two.|乙 three.|乙 four."
+        raw = json.dumps({
+            "cards": [
+                {
+                    term_field: "甲",
+                    sentence_field: first_examples,
+                    sentence_translations_field: first_translations,
+                    meaning_field: "first",
+                },
+                {
+                    term_field: "乙",
+                    sentence_field: second_examples,
+                    sentence_translations_field: second_translations,
+                    meaning_field: "second",
+                },
+            ],
+        }, ensure_ascii=False)
+
+        validated = validator(raw, chunk)
+
+        self.assertEqual(
+            validated["cards"][0][sentence_field],
+            first_examples)
+        self.assertEqual(
+            validated["cards"][1][sentence_field],
+            second_examples)
+        self.assertNotEqual(
+            validated["cards"][0][sentence_field],
+            chunk.contexts[0].text)
+
+    def test_additional_sense_cannot_omit_generated_examples(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True)
+        (
+            term_field,
+            _sentence_field,
+            sentence_translations_field,
+            meaning_field,
+        ) = (
+            process_text.get_response_field_names(pipeline))
+        raw = json.dumps({
+            "cards": [
+                {
+                    term_field: "甲",
+                    sentence_translations_field: "Exact 甲 context.",
+                    meaning_field: "contextual",
+                },
+                {
+                    term_field: "甲",
+                    sentence_translations_field: (
+                        "One.|Two.|Three.|Four."),
+                    meaning_field: "other sense",
+                },
+                {
+                    term_field: "乙",
+                    sentence_translations_field: "Exact 乙 context.",
+                    meaning_field: "contextual",
+                },
+            ],
+        }, ensure_ascii=False)
+
+        with self.assertRaisesRegex(
+                process_text.GeneratedCardValidationError,
+                "additional sense needs four"):
+            validator(raw, chunk)
+
 
 class SourceBackendAdapterTests(unittest.TestCase):
     def setUp(self):
@@ -577,6 +2095,7 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertEqual(source["key"], "fixture_source")
         self.assertEqual(source["name"], "My Book")
         self.assertEqual(source["word_count"], 6)
+        self.assertEqual(source["token_occurrence_count"], 6)
         self.assertEqual(
             source["source_language_key"],
             "classical_chinese")
@@ -585,9 +2104,45 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertIn("estimated_cost_low_usd", estimate)
         self.assertIn("estimated_cost_high_usd", estimate)
         self.assertIn("input_tokens", estimate)
+        self.assertEqual(estimate["request_protocol"], "v9")
+        self.assertEqual(estimate["reasoning_effort"], "none")
+        self.assertEqual(estimate["execution_mode"], "standard")
+        self.assertEqual(
+            estimate["assumptions"]["schema_estimation_mode"],
+            "fixed_exact")
         self.assertEqual(
             self.exclusion_calls[0][0].card_template_name,
             "Recognition")
+
+    def test_estimator_reports_running_token_prefix_and_unique_candidates(self):
+        request = {
+            **self.request,
+            "source_prefix_token_limit": 3,
+        }
+
+        estimate = self.backend.estimate(request)
+
+        self.assertEqual(estimate["original_candidate_count"], 6)
+        self.assertEqual(estimate["source_prefix_token_limit"], 3)
+        self.assertEqual(estimate["source_prefix_token_count"], 3)
+        self.assertEqual(estimate["prefix_unique_candidate_count"], 3)
+        self.assertEqual(estimate["prefix_omitted_candidate_count"], 3)
+        self.assertEqual(estimate["excluded_candidate_count"], 1)
+        self.assertEqual(estimate["candidate_count"], 2)
+
+        job = self.backend.create_job({
+            **request,
+            "paid_confirmed": True,
+            "estimate": estimate,
+        })
+        manifest = json.loads(
+            (job.path / "manifest.json").read_text(encoding="utf-8"))
+        saved_plan = manifest["plan"]
+        self.assertEqual(
+            saved_plan["config"]["source_prefix_token_limit"],
+            3)
+        self.assertEqual(saved_plan["source_prefix_token_count"], 3)
+        self.assertEqual(saved_plan["prefix_unique_word_count"], 3)
 
     def test_estimator_unions_multiple_anki_exclusion_sources(self):
         def exclusion_resolver(specification, _loaded):
@@ -648,6 +2203,37 @@ class SourceBackendAdapterTests(unittest.TestCase):
             page["items"][0]["section_title"],
             "Section 1")
 
+    def test_preview_follows_a_new_latest_build_after_cache_warmup(self):
+        first_page = self.backend.preview({
+            "source_key": "fixture_source",
+            "offset": 0,
+            "limit": 10,
+        })
+        replacement = make_source(("庚辛。",))
+        replacement_snapshot = replace(
+            replacement.build.snapshot,
+            edition="Local document: My Book")
+        replacement_path = write_build(
+            replace(
+                replacement.build,
+                snapshot=replacement_snapshot),
+            self.corpus_root)
+
+        second_page = self.backend.preview({
+            "source_key": "fixture_source",
+            "offset": 0,
+            "limit": 10,
+        })
+
+        self.assertEqual(first_page["total"], 6)
+        self.assertEqual(second_page["total"], 2)
+        self.assertEqual(
+            tuple(item["term"] for item in second_page["items"]),
+            ("庚", "辛"))
+        self.assertEqual(
+            self.backend._load_source("fixture_source").run_path,
+            replacement_path)
+
     def test_preview_is_bounded_and_never_resolves_anki_exclusion(self):
         page = self.backend.preview({
             "source_key": "fixture_source",
@@ -701,7 +2287,8 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertEqual(contract["model"], SOURCE_REQUEST_MODEL)
         self.assertEqual(
             contract["reasoning"],
-            SOURCE_REQUEST_REASONING)
+            {"effort": "none"})
+        self.assertEqual(contract["schema_version"], 9)
         self.assertTrue(contract["response_format"]["strict"])
         self.assertEqual(
             json.loads(
@@ -752,20 +2339,57 @@ class SourceBackendAdapterTests(unittest.TestCase):
 
         self.assertEqual(self.backend.jobs.list(), ())
 
+    def test_create_job_rejects_stale_protocol_reasoning_and_mode(
+            self):
+        estimate = self.backend.estimate(self.request)
+        changed_settings = (
+            {
+                "request_protocol": "v8",
+                "reasoning_effort": "low",
+            },
+            {"reasoning_effort": "low"},
+            {"execution_mode": "economy"},
+        )
+
+        for settings in changed_settings:
+            with (
+                    self.subTest(settings=settings),
+                    self.assertRaisesRegex(
+                        PermissionError,
+                        "changed after authorization")):
+                self.backend.create_job({
+                    **self.request,
+                    **settings,
+                    "paid_confirmed": True,
+                    "estimate": estimate,
+                })
+
+        self.assertEqual(self.backend.jobs.list(), ())
+
     def test_request_contract_freezes_exact_prompt_schema_and_reasoning(self):
         pipeline = simple_classical_pipeline()
 
         contract = build_source_request_contract(pipeline)
 
-        self.assertEqual(contract["schema_version"], 2)
+        self.assertEqual(contract["schema_version"], 9)
         self.assertEqual(contract["model"], "gpt-5.4-mini")
-        self.assertEqual(contract["reasoning"], {"effort": "none"})
+        self.assertEqual(contract["reasoning"], {"effort": "low"})
         self.assertIn(
             "Here is the source batch JSON:",
             contract["composed_prompt"])
         self.assertIn(
             "never skip a supplied source term",
             contract["composed_prompt"])
+        normalized_prompt = " ".join(
+            contract["composed_prompt"].split())
+        self.assertIn(
+            "A context that unambiguously selects one sense does not remove "
+            "this requirement to include other common disjoint senses",
+            normalized_prompt)
+        self.assertIn(
+            "Within each response collection, preserve ascending source-rank "
+            "order",
+            normalized_prompt)
         self.assertEqual(
             contract["response_format"]["type"],
             "json_schema")
@@ -773,8 +2397,260 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertEqual(
             contract["max_output_tokens_by_chunk"],
             {})
+        self.assertEqual(contract["response_formats_by_chunk"], {})
         self.assertEqual(contract["tools"], [])
         self.assertEqual(contract["max_tool_calls"], 0)
+
+    def test_normalizer_keeps_legacy_none_reasoning_contracts_usable(self):
+        contract = build_source_request_contract(
+            simple_classical_pipeline())
+        contract["reasoning"] = {"effort": "none"}
+
+        normalized = normalise_source_request_contract(contract)
+
+        self.assertEqual(normalized["reasoning"], {"effort": "none"})
+        self.assertFalse(
+            contract["use_source_for_example_sentences"])
+        self.assertTrue(contract["require_sentence_translations"])
+        self.assertTrue(
+            contract["composed_prompt"].rstrip().endswith(
+                "Here is the source batch JSON:"))
+
+    def test_source_example_contract_freezes_prompt_and_omission_schema(self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=1,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+
+        contract = build_source_request_contract(
+            pipeline,
+            chunks=(chunk,),
+            use_source_for_example_sentences=True,
+            protocol_version=8,
+            reasoning_effort="low")
+
+        prompt_text = " ".join(contract["composed_prompt"].split())
+        self.assertIn(
+            '"Sentences" JSON array',
+            contract["composed_prompt"])
+        self.assertNotIn(
+            "pipe-separated example sentences",
+            contract["composed_prompt"])
+        self.assertIn(
+            '"contextual_sense" also excludes "Sentences" and "Sentence '
+            'Translations (English)"',
+            prompt_text)
+        self.assertIn(
+            "Every rank value contains exactly",
+            prompt_text)
+        self.assertIn(
+            "inspect every other occurrence of the same spelling",
+            prompt_text)
+        self.assertIn(
+            'that different sense MUST be an "additional_senses" item',
+            prompt_text)
+        response_schema = contract["response_formats_by_chunk"][
+            chunk.chunk_id]["schema"]
+        self.assertEqual(
+            set(response_schema["required"]),
+            {
+                "term_results",
+                "source_context_translations",
+            })
+        self.assertNotIn("cards", response_schema["properties"])
+        rank_key = str(chunk.words[0].rank)
+        term_results_schema = response_schema["properties"][
+            "term_results"]
+        self.assertEqual(term_results_schema["required"], [rank_key])
+        result_schema = term_results_schema["properties"][rank_key]
+        contextual_item_schema = result_schema["properties"][
+            "contextual_sense"]
+        additional_item_schema = result_schema["properties"][
+            "additional_senses"]["items"]
+        self.assertNotIn(
+            "Sentences",
+            contextual_item_schema["properties"])
+        self.assertNotIn(
+            "Sentence Translations (English)",
+            contextual_item_schema["properties"])
+        self.assertIn(
+            "Sentences",
+            additional_item_schema["required"])
+        self.assertEqual(
+            additional_item_schema["properties"]["Sentences"][
+                "minItems"],
+            4)
+        self.assertEqual(
+            additional_item_schema["properties"][
+                "Sentence Translations (English)"]["maxItems"],
+            4)
+        context_schema = response_schema["properties"][
+            "source_context_translations"]
+        self.assertIn(
+            "source_context_translations",
+            response_schema["required"])
+        self.assertEqual(
+            context_schema["required"],
+            [chunk.contexts[0].context_id])
+        self.assertTrue(
+            contract["use_source_for_example_sentences"])
+        self.assertFalse(
+            source_request_uses_split_contextual_cards(contract))
+        self.assertTrue(
+            source_request_uses_grouped_source_results(contract))
+        self.assertTrue(
+            source_request_uses_occurrence_locators(contract))
+        self.assertIn(
+            "For every object in the input \"contexts\" array",
+            prompt_text)
+        self.assertIn('"occurrence_span"', contract["composed_prompt"])
+        self.assertIn('"occurrence_locator"', contract["composed_prompt"])
+        self.assertIn(
+            '"contextual_sense" object MUST describe the grammatical role '
+            "and lexical sense",
+            prompt_text)
+        self.assertTrue(
+            contract["composed_prompt"].endswith(
+                "Here is the source batch JSON:\n"))
+        self.assertNotIn(
+            "Here are the Classical Chinese words or expressions:",
+            contract["composed_prompt"])
+
+    def test_current_source_contract_uses_safe_output_token_floor(self):
+        chunk = make_plan(
+            chunk_size=1,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+
+        contract = build_source_request_contract(
+            context_classical_pipeline(),
+            chunks=(chunk,),
+            use_source_for_example_sentences=True)
+
+        self.assertGreaterEqual(
+            contract["max_output_tokens_by_chunk"][chunk.chunk_id],
+            8_192)
+
+    def test_version_three_contract_keeps_legacy_response_schema(self):
+        pipeline = context_classical_pipeline()
+        contract = build_source_request_contract(
+            pipeline,
+            use_source_for_example_sentences=True,
+            protocol_version=8,
+            reasoning_effort="low")
+        contract["schema_version"] = 3
+        del contract["require_sentence_translations"]
+        del contract["response_formats_by_chunk"]
+        contract["response_format"] = process_text.build_response_format(
+            pipeline,
+            optional_fields=("Sentences",),
+            require_sentence_translations=False)
+
+        normalised = normalise_source_request_contract(contract)
+        validator = make_pipeline_response_validator(
+            pipeline,
+            use_source_for_example_sentences=True,
+            require_sentence_translations=(
+                source_request_requires_sentence_translations(normalised)))
+        chunk = make_plan(
+            chunk_size=2,
+            context_mode=ContextMode.SENTENCE).chunks[0]
+        term_field, _sentence_field, meaning_field = (
+            process_text.get_response_field_names(
+                pipeline,
+                include_sentence_translations=False))
+        raw = json.dumps({
+            "cards": [
+                {term_field: "甲", meaning_field: "first"},
+                {term_field: "乙", meaning_field: "second"},
+            ],
+        }, ensure_ascii=False)
+
+        validated = validator(raw, chunk)
+
+        self.assertFalse(
+            source_request_requires_sentence_translations(normalised))
+        self.assertFalse(
+            source_request_uses_sentence_arrays(normalised))
+        self.assertEqual(len(validated["cards"]), 2)
+
+    def test_version_four_source_context_protocol_is_identified_as_obsolete(
+            self):
+        contract = build_source_request_contract(
+            context_classical_pipeline(),
+            use_source_for_example_sentences=True,
+            protocol_version=8,
+            reasoning_effort="low")
+        contract["schema_version"] = 4
+        del contract["response_formats_by_chunk"]
+
+        normalised = normalise_source_request_contract(contract)
+
+        self.assertTrue(
+            source_request_uses_obsolete_context_translation_protocol(
+                normalised))
+        self.assertFalse(
+            source_request_uses_sentence_arrays(normalised))
+
+    def test_version_five_source_context_protocol_is_identified_as_obsolete(
+            self):
+        contract = build_source_request_contract(
+            context_classical_pipeline(),
+            use_source_for_example_sentences=True,
+            protocol_version=8,
+            reasoning_effort="low")
+        contract["schema_version"] = 5
+        del contract["response_formats_by_chunk"]
+
+        normalised = normalise_source_request_contract(contract)
+
+        self.assertTrue(
+            source_request_uses_obsolete_context_translation_protocol(
+                normalised))
+        self.assertTrue(
+            source_request_uses_sentence_arrays(normalised))
+        self.assertFalse(
+            source_request_uses_split_contextual_cards(normalised))
+
+    def test_version_six_source_context_protocol_is_identified_as_obsolete(
+            self):
+        contract = build_source_request_contract(
+            context_classical_pipeline(),
+            use_source_for_example_sentences=True,
+            protocol_version=8,
+            reasoning_effort="low")
+        contract["schema_version"] = 6
+        del contract["response_formats_by_chunk"]
+
+        normalised = normalise_source_request_contract(contract)
+
+        self.assertTrue(
+            source_request_uses_obsolete_context_translation_protocol(
+                normalised))
+        self.assertTrue(
+            source_request_uses_sentence_arrays(normalised))
+        self.assertTrue(
+            source_request_uses_split_contextual_cards(normalised))
+        self.assertFalse(
+            source_request_uses_occurrence_locators(normalised))
+
+    def test_legacy_overlong_schema_name_is_repaired_without_schema_change(
+            self):
+        contract = build_source_request_contract(
+            context_classical_pipeline(),
+            use_source_for_example_sentences=True)
+        original_schema = contract["response_format"]["schema"]
+        contract["response_format"]["name"] = (
+            "autoanki_classical_chinese_wang_bi_"
+            "context_optional_sentences_cards")
+
+        repaired = normalise_source_request_contract(contract)
+
+        self.assertLessEqual(
+            len(repaired["response_format"]["name"]),
+            64)
+        self.assertEqual(
+            repaired["response_format"]["schema"],
+            original_schema)
 
     def test_web_search_contract_freezes_tool_limit_and_prompt_guidance(self):
         pipeline = simple_classical_pipeline()

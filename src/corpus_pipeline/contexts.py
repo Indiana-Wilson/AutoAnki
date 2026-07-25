@@ -16,6 +16,37 @@ SECTION_SEPARATOR = "\n\n"
 TITLE_SEPARATOR = "\n\n"
 _PARAGRAPH_BREAK = re.compile(r"\n[ \t]*\n+")
 _SENTENCE_END = re.compile(r"[。！？!?]+[」』】）》”’]*")
+_HISTORICAL_ENGLISH_SENTENCE_END = re.compile(
+    r"[.!?]+[\"'”’»)\]]*")
+_HISTORICAL_ENGLISH_LANGUAGES = frozenset({
+    "middle_english",
+    "old_english",
+})
+_PERIOD_ABBREVIATIONS = frozenset({
+    "b.c",
+    "ca",
+    "cf",
+    "d.d",
+    "dr",
+    "e.g",
+    "ed",
+    "etc",
+    "i.e",
+    "jr",
+    "ll",
+    "m.a",
+    "mr",
+    "mrs",
+    "ms",
+    "no",
+    "prof",
+    "rev",
+    "sr",
+    "st",
+    "trans",
+    "vol",
+    "vs",
+})
 
 
 def _trim_span(text, start, end):
@@ -113,13 +144,57 @@ def _paragraph_spans(section):
     return spans
 
 
-def _sentence_spans(text, paragraph_start, paragraph_end):
+def _is_abbreviation_period(text, match, paragraph_start):
+    matched = match.group(0)
+    punctuation = matched.rstrip("\"'”’»)]")
+    if punctuation != ".":
+        return False
+    cursor = match.start()
+    token_start = cursor
+    while (
+            token_start > paragraph_start
+            and (
+                text[token_start - 1].isalpha()
+                or text[token_start - 1] == ".")):
+        token_start -= 1
+    token = text[token_start:cursor].strip(".").casefold()
+    if not token:
+        return False
+    if token in _PERIOD_ABBREVIATIONS:
+        return True
+    if len(token) == 1 and token.isalpha():
+        return True
+    dotted_parts = token.split(".")
+    return (
+        len(dotted_parts) > 1
+        and all(
+            len(part) == 1 and part.isalpha()
+            for part in dotted_parts)
+    )
+
+
+def _sentence_spans(
+        text,
+        paragraph_start,
+        paragraph_end,
+        source_language_key=None):
     spans = []
     cursor = paragraph_start
-    for match in _SENTENCE_END.finditer(
+    sentence_end = (
+        _HISTORICAL_ENGLISH_SENTENCE_END
+        if source_language_key in _HISTORICAL_ENGLISH_LANGUAGES
+        else _SENTENCE_END)
+    for match in sentence_end.finditer(
             text,
             paragraph_start,
             paragraph_end):
+        if (
+                source_language_key in _HISTORICAL_ENGLISH_LANGUAGES
+                and _is_abbreviation_period(
+                    text,
+                    match,
+                    paragraph_start)):
+            continue
         end = match.end()
         start, trimmed_end = _trim_span(text, cursor, end)
         if start < trimmed_end:
@@ -131,7 +206,11 @@ def _sentence_spans(text, paragraph_start, paragraph_end):
     return spans
 
 
-def build_contexts(canonical_text, sections):
+def build_contexts(
+        canonical_text,
+        sections,
+        *,
+        source_language_key=None):
     """Return exact paragraph and sentence spans in canonical text."""
     contexts = []
     for section in sections:
@@ -155,7 +234,8 @@ def build_contexts(canonical_text, sections):
             for sentence_start, sentence_end in _sentence_spans(
                     section.text,
                     local_start,
-                    local_end):
+                    local_end,
+                    source_language_key):
                 sentence_number += 1
                 sentence_global_start = (
                     section.start_offset + sentence_start)

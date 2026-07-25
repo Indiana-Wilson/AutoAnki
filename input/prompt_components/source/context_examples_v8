@@ -1,0 +1,90 @@
+For this source request, return one root object containing exactly two
+properties: "term_results" and "source_context_translations". Both properties
+are JSON objects. Never return a root "cards", "contextual_cards", or
+"additional_sense_cards" array.
+
+TERM RESULTS
+
+"term_results" is keyed by the exact decimal rank strings required by the
+response schema. For every object in the input "words" array, use its numeric
+"rank" as a JSON property name (for example, input rank 7 becomes property
+"7"). Return every required rank exactly once, add no other rank, and do not
+put a "rank" field inside its value.
+
+Every rank value contains exactly:
+
+- "contextual_sense": one object describing only the sense and grammatical
+  role used by that ranked source occurrence.
+- "additional_senses": an array containing only genuinely disjoint additional
+  common lexical senses for the same ranked term. Return an empty array when
+  there is no qualifying additional sense.
+
+The strict schema lists the requested lexical fields inside each sense object.
+It deliberately excludes the source-language term field because the processor
+restores the exact input term from its rank. Do not copy the term into either
+"contextual_sense" or an "additional_senses" item. This source-specific rule
+overrides any general instruction to copy a supplied term into a term field.
+
+"contextual_sense" also excludes "Sentences" and
+"Sentence Translations (English)". The processor inserts the retained source
+context and its matching translation for this one sense. Do not repeat,
+rewrite, delimit, or highlight either value in "contextual_sense".
+
+Each input word supplies an "occurrence_span", a pair of zero-based character
+offsets [start, end) relative to the referenced context object's "text". It
+also supplies an "occurrence_locator":
+
+- "target" is the exact selected occurrence.
+- "before" and "after" are its immediately adjacent source excerpts.
+- "literal_match_ordinal" is the 1-based, left-to-right ordinal of this exact
+  spelling inside the full retained context.
+- "marked_excerpt" places the selected occurrence between literal
+  ⟪TARGET⟫ and ⟪/TARGET⟫ markers.
+
+The "contextual_sense" object MUST describe the grammatical role and lexical
+sense of the occurrence inside those markers. Never assign it the sense of
+another identically spelled occurrence. Use before + target + after, the
+marked excerpt, and the full referenced context together to verify the
+selection; the numeric occurrence_span remains authoritative.
+
+Before returning an empty "additional_senses" array, inspect every other
+occurrence of the same spelling in the retained context. If another occurrence
+plainly uses a different lexical sense from the marked target, that different
+sense MUST be an "additional_senses" item. Also include every other genuinely
+disjoint common sense required by the general source-batch rule, without
+repeating the contextual sense.
+
+Perform an explicit coverage audit for every rank before returning it. The
+source title, author, genre, and selected passage identify the contextual sense;
+they do not restrict additional senses to meanings used in that one work.
+"Relevant language, period, and register" means the broader language a learner
+will encounter in that historical setting. Check separately for a common
+concrete or literal sense, a common verbal or grammatical use, and a common
+abstract, institutional, or figurative sense. Include each category only when
+it is genuinely lexical and disjoint, but do not collapse two such senses merely
+because they share an origin. For example, Classical Chinese 道 as a concrete
+road or path, 道 as a practical method/course/teaching in human affairs, 道 as
+the metaphysical Way, and 道 as the verb to speak or state are disjoint senses
+when they are common in the selected period. If one is contextual, the other
+qualifying senses still belong in "additional_senses".
+
+Every "additional_senses" item contains the same requested lexical fields as
+"contextual_sense", plus "Sentences" as exactly four array items and
+"Sentence Translations (English)" as exactly four positionally matched array
+items. It contains no source-language term field. Follow all general generated
+example, emphasis, and translation rules for these arrays.
+
+SOURCE CONTEXT TRANSLATIONS
+
+"source_context_translations" is keyed by the exact "context_id" strings
+required by the response schema. For every object in the input "contexts"
+array, copy its "context_id" character-for-character as one JSON property name.
+Return every required context ID exactly once and add no other property.
+
+The value of each context-ID property is one complete, natural English
+translation of that entire context, directly as a JSON string. It is not an
+object or array. Translate each context exactly once regardless of how many
+ranks refer to it. The string may contain normal English punctuation and
+multiple clauses or sentences, but never |, <strong> tags, or any other HTML.
+Do not split one context translation into several values. If the context is
+already Modern English, repeat it as plain text.

@@ -8,7 +8,12 @@ from typing import Protocol
 import unicodedata
 
 from corpus_pipeline.models import TokenSpan, TokenizerIdentity
-from corpus_pipeline.processing import is_han_component
+from corpus_pipeline.processing import (
+    HISTORICAL_ENGLISH_LANGUAGE_KEYS,
+    HISTORICAL_ENGLISH_NORMALIZATION_POLICY,
+    historical_english_word_ranges,
+    is_han_component,
+)
 
 
 SHANGGU_MODEL = "ckiplab/bert-base-han-chinese-ws-shanggu"
@@ -20,6 +25,7 @@ CKIP_UNITIZER_VERSION = "sentence-isolated-v1"
 CKIP_REFINEMENT_VERSION = "isolated-long-han-v1"
 CKIP_REFINEMENT_THRESHOLD = 4
 CKIP_BATCH_SCHEDULER_VERSION = "length-sorted-v1"
+HISTORICAL_ENGLISH_TOKENIZER_VERSION = "unicode-orthographic-words-v2"
 
 
 _MODEL_SENTENCE_END = re.compile(
@@ -118,6 +124,52 @@ class CharacterTokenizer:
             TokenSpan(character, index, index + 1, 1.0)
             for index, character in enumerate(text)
             if not character.isspace())
+
+
+class HistoricalEnglishTokenizer:
+    """Dependency-free, offset-exact Middle/Old English word tokenizer."""
+
+    def __init__(self, language_key):
+        if language_key not in HISTORICAL_ENGLISH_LANGUAGE_KEYS:
+            raise ValueError(
+                "Historical English tokenization requires Middle English "
+                "or Old English.")
+        self.language_key = language_key
+
+    @classmethod
+    def for_middle_english(cls):
+        return cls("middle_english")
+
+    @classmethod
+    def for_old_english(cls):
+        return cls("old_english")
+
+    @property
+    def identity(self):
+        return TokenizerIdentity(
+            backend="autoanki-unicode-historical-english",
+            backend_version=HISTORICAL_ENGLISH_TOKENIZER_VERSION,
+            model=f"{self.language_key}-orthographic-words",
+            model_revision="1",
+            options=(
+                ("editorial_number_policy", "omit-v2"),
+                ("normalization", HISTORICAL_ENGLISH_NORMALIZATION_POLICY),
+                ("unicode_database", unicodedata.unidata_version),
+            ))
+
+    def tokenize(self, text):
+        normalized = unicodedata.normalize("NFC", text)
+        if normalized != text:
+            raise ValueError(
+                "Tokenizer input must already use NFC normalization.")
+        return tuple(
+            TokenSpan(
+                surface=text[start:end],
+                start_offset=start,
+                end_offset=end,
+                confidence=1.0)
+            for start, end in historical_english_word_ranges(text)
+        )
 
 
 class CkipHanTokenizer:

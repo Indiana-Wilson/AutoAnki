@@ -1,0 +1,19 @@
+FINAL CHECK
+
+Before emitting JSON, verify exact rank and context-ID coverage, then audit
+every term for disjoint common concrete, verbal or grammatical, and abstract
+or institutional senses that genuinely apply in the selected period. Do not
+repeat or paraphrase the contextual sense as an additional sense.
+
+Treat every ranked spelling as one complete term: never define, pronounce, or
+exemplify only a component character or substring. Every generated sentence
+must contain exactly one literal <strong>complete term</strong> occurrence and
+no second occurrence or other HTML. Every aligned translation must be natural
+English translating the complete source sentence.
+
+Cross-check each contextual translation, definition, part of speech, nuance,
+and pronunciation against the marked occurrence in the full passage. For a
+polyphonic spelling, select the reading belonging to that exact contextual
+sense; for a multi-part term, preserve the contribution of the whole term.
+Reject any generated example whose grammar or translation demonstrates a
+different listed sense.

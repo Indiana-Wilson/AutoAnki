@@ -2,6 +2,7 @@
 
 from bisect import bisect_right
 from dataclasses import replace
+import re
 import unicodedata
 
 from corpus_pipeline.contexts import (
@@ -29,6 +30,16 @@ _VARIATION_RANGES = (
     (0xFE00, 0xFE0F),
     (0xE0100, 0xE01EF),
 )
+HISTORICAL_ENGLISH_LANGUAGE_KEYS = frozenset({
+    "middle_english",
+    "old_english",
+})
+HISTORICAL_ENGLISH_NORMALIZATION_POLICY = "NFC-casefold-v1"
+_WORD_APOSTROPHES = frozenset(("'", "\u2019", "\u02bc"))
+_WORD_HYPHENS = frozenset(("-", "\u2010", "\u2011"))
+_EDITORIAL_NUMBER_LINE = re.compile(
+    r"^[\[(]?(?:[A-Za-z]\s*)?\d+[a-z]?[.)\]\-]?$")
+_ROMAN_NUMERALS = frozenset("IVXLCDM")
 
 
 def _in_ranges(codepoint, ranges):
@@ -61,6 +72,131 @@ def is_han_word(text):
     return found_han
 
 
+def _is_word_letter(character):
+    # Unicode classifies the ordinal indicators ª and º as letters. They
+    # annotate numbers and citations rather than forming historical-English
+    # words.
+    return character.isalpha() and character not in "\u00aa\u00ba"
+
+
+def _is_word_mark(character):
+    return unicodedata.category(character).startswith("M")
+
+
+def _line_bounds(text, start, end):
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    if line_end < 0:
+        line_end = len(text)
+    return line_start, line_end
+
+
+def _is_editorial_historical_english_span(text, start, end):
+    """Reject standalone numbering labels while retaining lexical text."""
+    line_start, line_end = _line_bounds(text, start, end)
+    line = text[line_start:line_end].strip()
+    if _EDITORIAL_NUMBER_LINE.fullmatch(line):
+        return True
+
+    surface = text[start:end]
+    if (
+            surface.casefold() == "c"
+            and start > 0
+            and text[start - 1] == "&"
+            and end < len(text)
+            and text[end] == "."):
+        return True
+    if (
+            surface
+            and all(
+                character.upper() in _ROMAN_NUMERALS
+                for character in surface)
+            and text[end:end + 2].replace("_", "").startswith("\u00ba")):
+        return True
+    roman = (
+        bool(surface)
+        and all(character in _ROMAN_NUMERALS for character in surface))
+    if not roman:
+        return False
+    if (
+            not text[line_start:start].strip()
+            and end < len(text)
+            and text[end] in ".)"):
+        return True
+    # Roman-numeral chapter/page labels are editorial when they occupy the
+    # line by themselves (allowing conventional surrounding punctuation).
+    stripped = line.strip("[]().: \t")
+    return stripped == surface
+
+
+def historical_english_word_ranges(
+        text,
+        *,
+        reject_editorial_labels=True):
+    """Return deterministic Unicode word ranges for historical English.
+
+    A word begins with any Unicode letter, retains combining diacritics, and
+    may contain an apostrophe or a true hyphen only when that connector joins
+    two letter runs. Digits and standalone editorial numbering labels are not
+    vocabulary. The returned ranges always reproduce the source text exactly.
+    """
+    ranges = []
+    cursor = 0
+    while cursor < len(text):
+        if not _is_word_letter(text[cursor]):
+            cursor += 1
+            continue
+        start = cursor
+        cursor += 1
+        while cursor < len(text) and _is_word_mark(text[cursor]):
+            cursor += 1
+        while cursor < len(text):
+            character = text[cursor]
+            if _is_word_letter(character):
+                cursor += 1
+                while (
+                        cursor < len(text)
+                        and _is_word_mark(text[cursor])):
+                    cursor += 1
+                continue
+            if (
+                    character in _WORD_APOSTROPHES | _WORD_HYPHENS
+                    and cursor + 1 < len(text)
+                    and _is_word_letter(text[cursor + 1])):
+                cursor += 2
+                while (
+                        cursor < len(text)
+                        and _is_word_mark(text[cursor])):
+                    cursor += 1
+                continue
+            break
+        if (
+                not reject_editorial_labels
+                or not _is_editorial_historical_english_span(
+                    text,
+                    start,
+                    cursor)):
+            ranges.append((start, cursor))
+    return tuple(ranges)
+
+
+def is_historical_english_word(text):
+    """Return whether text is exactly one historical-English word span."""
+    return historical_english_word_ranges(
+        text,
+        reject_editorial_labels=False) == ((0, len(text)),)
+
+
+def normalize_word(surface, source_language_key):
+    """Return the language-aware vocabulary identity for one source form."""
+    normalized = unicodedata.normalize("NFC", surface)
+    if source_language_key in HISTORICAL_ENGLISH_LANGUAGE_KEYS:
+        # Sentence-initial capitalization is not a distinct vocabulary item.
+        # Keep the first surface/offset while counting all case variants.
+        return normalized.casefold()
+    return normalized
+
+
 def _han_subspans(token):
     """Keep maximal Han runs if a tokenizer joins text to punctuation."""
     runs = []
@@ -88,6 +224,26 @@ def _han_subspans(token):
                 end_offset=token.end_offset,
                 confidence=token.confidence))
     return tuple(runs)
+
+
+def _historical_english_subspans(token):
+    """Keep exact lexical runs if a tokenizer joins words to punctuation."""
+    return tuple(
+        TokenSpan(
+            surface=token.surface[start:end],
+            start_offset=token.start_offset + start,
+            end_offset=token.start_offset + end,
+            confidence=token.confidence)
+        for start, end in historical_english_word_ranges(
+            token.surface,
+            reject_editorial_labels=False)
+    )
+
+
+def _lexical_subspans(token, source_language_key):
+    if source_language_key in HISTORICAL_ENGLISH_LANGUAGE_KEYS:
+        return _historical_english_subspans(token)
+    return _han_subspans(token)
 
 
 class _ContextIndex:
@@ -123,7 +279,8 @@ def build_vocabulary(
     """Tokenize a cleaned snapshot without contacting OpenAI or Anki."""
     contexts = build_contexts(
         snapshot.canonical_text,
-        snapshot.sections)
+        snapshot.sections,
+        source_language_key=snapshot.source_language_key)
     sentence_neighbors = sentence_neighbor_ids(contexts)
     paragraphs = _ContextIndex(contexts, "paragraph")
     sentences = _ContextIndex(contexts, "sentence")
@@ -150,8 +307,13 @@ def build_vocabulary(
                 raise CorpusValidationError(
                     f"Tokenizer offsets failed in {section.section_id}.")
             previous_local_end = raw_token.end_offset
-            for token in _han_subspans(raw_token):
+            for token in _lexical_subspans(
+                    raw_token,
+                    snapshot.source_language_key):
                 surface = unicodedata.normalize("NFC", token.surface)
+                normalized = normalize_word(
+                    surface,
+                    snapshot.source_language_key)
                 global_start = section.start_offset + token.start_offset
                 global_end = section.start_offset + token.end_offset
                 paragraph = paragraphs.containing(
@@ -167,7 +329,7 @@ def build_vocabulary(
                     occurrence_id=f"token:{token_index:09d}",
                     token_index=token_index,
                     surface=surface,
-                    normalized=surface,
+                    normalized=normalized,
                     section_id=section.section_id,
                     start_offset=global_start,
                     end_offset=global_end,
@@ -175,8 +337,8 @@ def build_vocabulary(
                     sentence_id=sentence.context_id,
                     confidence=token.confidence)
                 occurrences.append(occurrence)
-                counts[surface] = counts.get(surface, 0) + 1
-                first_words.setdefault(surface, occurrence)
+                counts[normalized] = counts.get(normalized, 0) + 1
+                first_words.setdefault(normalized, occurrence)
         if progress_callback is not None:
             progress_callback(
                 section.order,

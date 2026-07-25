@@ -1,9 +1,22 @@
 Create vocabulary data for the supplied {source_language} words or expressions.
 
-Treat bracketed input as context for selecting the intended sense. If an entry
-has multiple relevant senses, create a separate JSON card entry for each sense.
-All requested fields in one card entry must describe the same sense. Skip an
-entry that does not exist and silently correct an obvious typo.
+Treat bracketed input as context for identifying the sense used there, but do
+not limit the result to that contextual sense. For each supplied term, identify
+every genuinely disjoint, commonly used lexical sense that a learner is
+reasonably likely to encounter in the relevant language, period, and register.
+Create a fully separate JSON card entry for each such sense, resulting in
+separate cards rather than combining multiple senses in one entry. Do this even
+when the supplied context makes one particular sense unambiguous. Return the
+contextual sense first, followed by the other common disjoint senses.
+
+Treat senses as disjoint only when the term expresses a genuinely different
+meaning, not merely a different connotation, degree, register, implication,
+typical context, or other nuance of the same underlying meaning. Do not create
+separate entries for rare, obsolete outside the selected historical register,
+or highly technical senses unless they are independently useful to the
+learner. All requested fields in one card entry must describe only that entry's
+single sense. Skip an entry that does not exist and silently correct an obvious
+typo.
 
 Return only the fields required by the supplied response schema. Never invent
 extra fields and never return null in place of requested text.

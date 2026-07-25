@@ -1,0 +1,2296 @@
+{
+  "additional_sense_count": 24,
+  "card_count": null,
+  "context_count": 19,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cached_input_aud": 0.0,
+    "cached_input_tokens": 0,
+    "cached_input_usd": 0.0,
+    "execution_mode": "standard",
+    "input_aud": 0.010344086021505376,
+    "input_tokens": 9620,
+    "input_usd": 0.007215,
+    "model": "gpt-5.4-mini",
+    "output_aud": 0.08934838709677419,
+    "output_tokens": 13849,
+    "output_usd": 0.0623205,
+    "pricing": {
+      "cached_input_usd_per_million": 0.075,
+      "input_usd_per_million": 0.75,
+      "label": "standard pricing published 2026-07-24",
+      "model": "gpt-5.4-mini",
+      "output_usd_per_million": 4.5
+    },
+    "pricing_label": "standard pricing published 2026-07-24",
+    "total_aud": 0.09969247311827957,
+    "total_tokens": 23469,
+    "total_usd": 0.0695355,
+    "uncached_input_aud": 0.010344086021505376,
+    "uncached_input_tokens": 9620,
+    "uncached_input_usd": 0.007215,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-25T13:58:04.748687+00:00",
+  "max_output_tokens": 78918,
+  "model": "gpt-5.4-mini",
+  "payload_estimated_tokens": 6568,
+  "prompt_estimated_tokens": 1715,
+  "protocol": "v9",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "translation": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name."
+      },
+      {
+        "context_id": "source-context-9d763a9d06321236e5f1",
+        "translation": "Without name, it is the beginning of Heaven and Earth; with name, it is the mother of the myriad things."
+      },
+      {
+        "context_id": "source-context-a0437bbc6bfb969f44fb",
+        "translation": "Therefore, one should constantly be without desire in order to observe its subtle mystery."
+      },
+      {
+        "context_id": "source-context-a424d6ece55a7d545520",
+        "translation": "One should constantly have desire in order to observe its border."
+      },
+      {
+        "context_id": "source-context-9a8214630e984de604cc",
+        "translation": "These two come forth together but are named differently; together they are called the profound."
+      },
+      {
+        "context_id": "source-context-3388aa6d59c18c53d536",
+        "translation": "Profound upon profound: the gate of all subtle wonders."
+      },
+      {
+        "context_id": "source-context-4413afde456bbd1ce9d9",
+        "translation": "When all under heaven know beauty as beauty, then ugliness has already appeared."
+      },
+      {
+        "context_id": "source-context-db83fa5c1feb4c99ba0b",
+        "translation": "When all know good as good, then what is not good has already appeared."
+      },
+      {
+        "context_id": "source-context-f237ae687159baa10c2d",
+        "translation": "Thus being and nonbeing give birth to each other, difficulty and ease complete each other, long and short compare with each other, high and low incline toward each other, sound and voice harmonize with each other, and front and back follow each other."
+      },
+      {
+        "context_id": "source-context-2c398c0b189a1a4a1982",
+        "translation": "Therefore the sage handles affairs without action,"
+      },
+      {
+        "context_id": "source-context-4685de02ef89dae1c9bb",
+        "translation": "and carries out teaching without words. The myriad things arise, and he does not refuse them; he gives birth to them but does not possess them; he acts but does not rely on his own strength;"
+      },
+      {
+        "context_id": "source-context-feaa73fa76a650622433",
+        "translation": "When his work is accomplished, he does not dwell on it."
+      },
+      {
+        "context_id": "source-context-360597c69e6676e3f2ab",
+        "translation": "Precisely because he does not dwell on it, it does not leave."
+      },
+      {
+        "context_id": "source-context-83dbd600117b4d66dde7",
+        "translation": "He does not exalt the worthy, and so the people do not contend; he does not value hard-to-get goods, and so the people do not become thieves; he does not display what is desirable, and so the people's minds are not thrown into disorder."
+      },
+      {
+        "context_id": "source-context-afc62565a0a498896d33",
+        "translation": "Thus in the sage's governance, he empties their minds and fills their bellies,"
+      },
+      {
+        "context_id": "source-context-1f993ef16d553463c81f",
+        "translation": "weakens their wills and strengthens their bones."
+      },
+      {
+        "context_id": "source-context-dfdad13807d31b6c73c3",
+        "translation": "He makes the wise dare not act."
+      },
+      {
+        "context_id": "source-context-f69da644306a92971040",
+        "translation": "If one acts by nonaction, then nothing will not be governed."
+      },
+      {
+        "context_id": "source-context-b1207290fecf85d73c75",
+        "translation": "The Way is empty, and when used it is perhaps never filled; so deep, it seems like the ancestor of the myriad things. It blunts its sharpness, unties its tangle, tempers its brightness, and mingles with its dust; so deep, it seems perhaps to exist."
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A physical route or passage along which one travels.",
+            "Nuance (English)": "Concrete spatial sense.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "There is a broad road ahead, and carts and horses may travel on it.",
+              "He entered the mountains by the path and did not lose his way.",
+              "The guest asked for the road, and the boy pointed to the west gate.",
+              "Traveling by night, he lost the path and then turned back home."
+            ],
+            "Sentences": [
+              "前有大<strong>道</strong>，車馬可行。",
+              "入山循<strong>道</strong>，不失其路。",
+              "客問其<strong>道</strong>，童指西門。",
+              "夜行迷<strong>道</strong>，乃反而歸。"
+            ],
+            "Translation (English)": "road; path"
+          },
+          {
+            "Dictionary Meaning (English)": "A way of doing something, especially a practical approach, procedure, or technique.",
+            "Nuance (English)": "Emphasizes practical procedure rather than a physical route.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "There is a proper method for governing the state, and then the people are at peace.",
+              "Each craft has its own method, and it must not be mixed up.",
+              "In learning, what matters is to grasp the right method.",
+              "Warfare also has its method, and it does not rely on force alone."
+            ],
+            "Sentences": [
+              "治國有其<strong>道</strong>，則民安。",
+              "工巧各有其<strong>道</strong>，不可亂也。",
+              "學問貴得其<strong>道</strong>。",
+              "兵亦有其<strong>道</strong>，非恃力也。"
+            ],
+            "Translation (English)": "method; way; means"
+          },
+          {
+            "Dictionary Meaning (English)": "To utter or state something verbally, or to talk about it explicitly.",
+            "Nuance (English)": "Used for verbal expression, not for naming as a label.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "I do not dare to speak of the details.",
+              "Do you want to speak of this matter?",
+              "The classic text does not fully say so.",
+              "All spoke of its beauty."
+            ],
+            "Sentences": [
+              "吾不敢<strong>道</strong>其詳。",
+              "子欲<strong>道</strong>此事乎？",
+              "經文不盡<strong>道</strong>之。",
+              "眾皆<strong>道</strong>其美。"
+            ],
+            "Translation (English)": "to say; to speak of"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The fundamental guiding principle, order, or path that structures reality and human conduct.",
+          "Nuance (English)": "In this context it names the absolute, underlying Way rather than a road, method, or verbal act of speaking.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "dào",
+          "Register (English)": "Classical Chinese; Laozi base text in the received Wang Bi recension",
+          "Translation (English)": "the Way"
+        },
+        "rank": 1
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Used predicatively to judge something as fitting, proper, or worth doing.",
+            "Nuance (English)": "Evaluative, not modal.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "This proposal is indeed acceptable.",
+              "His remarks are worthy of consideration.",
+              "The time is not yet ripe, so it is still not suitable.",
+              "This plan is the most workable."
+            ],
+            "Sentences": [
+              "此議誠<strong>可</strong>也。",
+              "其言<strong>可</strong>取。",
+              "時機未至，猶未<strong>可</strong>。",
+              "此策最<strong>可</strong>行。"
+            ],
+            "Translation (English)": "worthy of; suitable; acceptable"
+          },
+          {
+            "Dictionary Meaning (English)": "To agree to something or give it approval.",
+            "Nuance (English)": "Volitional or judgmental assent, not mere capability.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "I approved what you requested.",
+              "The opinions were not unified, and in the end it was not approved.",
+              "When the master heard the plan, he gave his approval.",
+              "The ruler had already approved his memorial."
+            ],
+            "Sentences": [
+              "君意所請，予<strong>可</strong>之。",
+              "眾論不一，終未<strong>可</strong>也。",
+              "師聞其策，乃<strong>可</strong>焉。",
+              "上既<strong>可</strong>其奏。"
+            ],
+            "Translation (English)": "approve; consent"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Expresses ability, possibility, or permission for an action to be done.",
+          "Nuance (English)": "Marks possibility or capability rather than evaluation.",
+          "Part of Speech (English)": "modal verb",
+          "Pronunciation (English)": "kě",
+          "Register (English)": "Classical Chinese; received Wang Bi recension",
+          "Translation (English)": "can; may"
+        },
+        "rank": 2
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Used to mark something as mistaken, improper, or not right.",
+            "Nuance (English)": "Judgment of correctness or propriety.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "His remark was completely wrong.",
+              "This action was very improper.",
+              "To take this as right is in fact mistaken.",
+              "Losing what is correct is a great error."
+            ],
+            "Sentences": [
+              "其言大<strong>非</strong>。",
+              "此舉甚<strong>非</strong>。",
+              "以此為是，實<strong>非</strong>也。",
+              "失其正，乃大<strong>非</strong>。"
+            ],
+            "Translation (English)": "wrong; incorrect"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Negates the following predicate or noun phrase, asserting nonidentity or exclusion.",
+          "Nuance (English)": "In this text it negates the noun phrase that follows.",
+          "Part of Speech (English)": "negative copula / negative predicate",
+          "Pronunciation (English)": "fēi",
+          "Register (English)": "Classical Chinese; received Wang Bi recension",
+          "Translation (English)": "not; is not"
+        },
+        "rank": 3
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The enduring, unchanging Way as a fixed principle.",
+          "Nuance (English)": "Names the Way as permanent and not subject to ordinary change.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "cháng dào",
+          "Register (English)": "Classical Chinese; Laozi base text in the received Wang Bi recension",
+          "Translation (English)": "constant Way"
+        },
+        "rank": 4
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To give something a name or explicitly call it by a term.",
+            "Nuance (English)": "Requires an act of naming or designation.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "míng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The father named the son.",
+              "I dare to name it.",
+              "When the mountains and streams were fixed, they then named the place.",
+              "All the mouths together named the affair."
+            ],
+            "Sentences": [
+              "父為子<strong>名</strong>。",
+              "臣敢<strong>名</strong>之。",
+              "山川既定，乃<strong>名</strong>其地。",
+              "眾口交<strong>名</strong>其事。"
+            ],
+            "Translation (English)": "to name; to designate"
+          },
+          {
+            "Dictionary Meaning (English)": "Publicly known standing or renown, whether good or bad.",
+            "Nuance (English)": "Covers reputation in society, not a literal label.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "míng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "A gentleman values his reputation.",
+              "After a long time, he gained fame.",
+              "His reputation was already well known, and near and far all knew it.",
+              "Wealth and rank are not worth valuing; only reputation is hard to preserve intact."
+            ],
+            "Sentences": [
+              "士重其<strong>名</strong>。",
+              "久而有<strong>名</strong>。",
+              "其<strong>名</strong>既著，遠近皆知。",
+              "富貴不足貴，惟<strong>名</strong>難全。"
+            ],
+            "Translation (English)": "fame; reputation"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A word or designation by which something is identified or called.",
+          "Nuance (English)": "Here it is the label or designation itself, not the act of naming.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "míng",
+          "Register (English)": "Classical Chinese; Laozi base text in the received Wang Bi recension",
+          "Translation (English)": "name"
+        },
+        "rank": 5
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A fixed, enduring designation that does not change.",
+          "Nuance (English)": "Emphasizes permanence of naming rather than the act of naming itself.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "cháng míng",
+          "Register (English)": "Classical Chinese; Laozi base text in the received Wang Bi recension",
+          "Translation (English)": "constant name"
+        },
+        "rank": 6
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A philosophical notion of lack of determinate being, or the state of being void of things.",
+            "Nuance (English)": "Abstract metaphysical sense, not simple negation.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "wú",
+            "Register (English)": "Classical Chinese; philosophical",
+            "Sentence Translations (English)": [
+              "The myriad things arise from nothingness.",
+              "The sage keeps to nonbeing in responding to things.",
+              "To know being and nothingness is then to see their completeness.",
+              "Emptiness and stillness are close to nonbeing."
+            ],
+            "Sentences": [
+              "萬物本於<strong>無</strong>。",
+              "聖人守<strong>無</strong>以應物。",
+              "知有與<strong>無</strong>，乃見其全。",
+              "虛靜近乎<strong>無</strong>。"
+            ],
+            "Translation (English)": "nothingness; nonbeing"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Negates possession or presence; marks that something is absent.",
+          "Nuance (English)": "In this context it contrasts the absence of a name with the presence of a name.",
+          "Part of Speech (English)": "negative existential verb / negator",
+          "Pronunciation (English)": "wú",
+          "Register (English)": "Classical Chinese; early philosophical layer preserved in the received Wang Bi recension",
+          "Translation (English)": "without; lacking"
+        },
+        "rank": 7
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The paired totality of heaven and earth, often referring to the natural world as a whole.",
+          "Nuance (English)": "A set binomial for the whole cosmos, not two separately focused nouns here.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "tiān dì",
+          "Register (English)": "Classical Chinese; received Wang Bi recension",
+          "Translation (English)": "heaven and earth; the cosmos"
+        },
+        "rank": 8
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A third-person object pronoun referring back to a previously mentioned person or thing.",
+            "Nuance (English)": "Object function, not structural linkage.",
+            "Part of Speech (English)": "pronoun",
+            "Pronunciation (English)": "zhī",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "I saw him in the courtyard.",
+              "Once one has obtained it, one does not lose one’s hold.",
+              "You may ask him.",
+              "I have never abandoned it."
+            ],
+            "Sentences": [
+              "吾見<strong>之</strong>於庭。",
+              "既得<strong>之</strong>，不失其守。",
+              "子可問<strong>之</strong>。",
+              "我未嘗棄<strong>之</strong>。"
+            ],
+            "Translation (English)": "him; her; it; them"
+          },
+          {
+            "Dictionary Meaning (English)": "A verb meaning to go toward or arrive at a place.",
+            "Nuance (English)": "Directional or goal-oriented motion.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "zhī",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "I shall go east.",
+              "Tomorrow I will go to Chu.",
+              "The boat may go to the river.",
+              "Where do you wish to go?"
+            ],
+            "Sentences": [
+              "吾將<strong>之</strong>東。",
+              "明日<strong>之</strong>楚。",
+              "舟可<strong>之</strong>江。",
+              "君欲<strong>之</strong>何處？"
+            ],
+            "Translation (English)": "to go to; to reach"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Links a modifier to the noun it qualifies, forming a genitive or attributive relationship.",
+          "Nuance (English)": "Marks possession, attribution, or nominal linkage.",
+          "Part of Speech (English)": "structural particle",
+          "Pronunciation (English)": "zhī",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "of"
+        },
+        "rank": 9
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To commence an action, process, or state.",
+            "Nuance (English)": "Describes actual inception.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "shǐ",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "When a matter is about to begin, one should be cautious.",
+              "When spring thunder had sounded, the farming work began.",
+              "After the state became chaotic, government reforms only then began.",
+              "They sat and discussed matters deep into the night, and only then was it settled to begin."
+            ],
+            "Sentences": [
+              "事將<strong>始</strong>，宜慎。",
+              "春雷既作，農事<strong>始</strong>焉。",
+              "國亂而後政<strong>始</strong>修。",
+              "夜分而坐論，乃<strong>始</strong>定。"
+            ],
+            "Translation (English)": "to begin; to start"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The point from which something starts or comes forth.",
+          "Nuance (English)": "Names a source point or first stage, not the act of beginning.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "shǐ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "beginning; origin"
+        },
+        "rank": 10
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Used before a noun to indicate an unspecified but real quantity or instance.",
+            "Nuance (English)": "Indefinite, not existential.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "yǒu",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "There is a tiger in the mountains.",
+              "There is a lamp inside the room.",
+              "There were some people of the time who knew this.",
+              "There is an old well in this place."
+            ],
+            "Sentences": [
+              "山中<strong>有</strong>虎。",
+              "室內<strong>有</strong>燈。",
+              "時人<strong>有</strong>知此者。",
+              "此地<strong>有</strong>舊井。"
+            ],
+            "Translation (English)": "some; certain"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Marks possession or existence, indicating that something is present or available.",
+          "Nuance (English)": "Existential or possessive presence, opposed in context to 無.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "yǒu",
+          "Register (English)": "Classical Chinese; early philosophical layer preserved in the received Wang Bi recension",
+          "Translation (English)": "has; there is"
+        },
+        "rank": 11
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The totality of created or existing things in the world.",
+          "Nuance (English)": "Collective philosophical sense, not a count of exactly ten thousand items.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "wàn wù",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "myriad things; all things"
+        },
+        "rank": 12
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A woman in the role of parent.",
+            "Nuance (English)": "Literal familial sense.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "mǔ",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "A mother teaches her child with ritual.",
+              "A kind mother loves her child.",
+              "After losing his mother, his cries were very sorrowful.",
+              "His mother was in the hall."
+            ],
+            "Sentences": [
+              "母教子以禮。」「慈<strong>母</strong>愛其子。",
+              "失其<strong>母</strong>，哀聲甚。",
+              "其<strong>母</strong>在堂。",
+              "問其<strong>母</strong>而後知之。"
+            ],
+            "Translation (English)": "female parent"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A source or origin compared to a mother who gives birth and nourishes.",
+          "Nuance (English)": "Metaphor for source or generative origin in this text.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "mǔ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "mother"
+        },
+        "rank": 13
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces a conclusion, inference, or result from what has just been said.",
+          "Nuance (English)": "Marks an inferential transition from premise to conclusion.",
+          "Part of Speech (English)": "adverb / conjunction",
+          "Pronunciation (English)": "gù",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "therefore; so"
+        },
+        "rank": 14
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Happening many times or at repeated intervals.",
+            "Nuance (English)": "Frequency rather than permanence.",
+            "Part of Speech (English)": "adverb",
+            "Pronunciation (English)": "cháng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "I often go there.",
+              "A worthy man is usually sparing of speech.",
+              "This matter is often seen in history.",
+              "The human heart often easily changes."
+            ],
+            "Sentences": [
+              "吾<strong>常</strong>至彼。",
+              "賢者<strong>常</strong>寡言。",
+              "此事<strong>常</strong>見於史。",
+              "人心<strong>常</strong>易移。"
+            ],
+            "Translation (English)": "often; frequently"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Continuing without interruption or lapse over time.",
+          "Nuance (English)": "Marks habitual or enduring continuity.",
+          "Part of Speech (English)": "adverb",
+          "Pronunciation (English)": "cháng",
+          "Register (English)": "Classical Chinese; received Wang Bi recension",
+          "Translation (English)": "constant; always"
+        },
+        "rank": 15
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To feel or express desire for something.",
+            "Nuance (English)": "Volitional wishing or wanting.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "yù",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "All people desire to live.",
+              "What do you wish to do?",
+              "I do not wish to say much.",
+              "The gentleman wants it to succeed."
+            ],
+            "Sentences": [
+              "人皆<strong>欲</strong>生。",
+              "君<strong>欲</strong>何為？",
+              "我不<strong>欲</strong>多言。",
+              "士<strong>欲</strong>其成。"
+            ],
+            "Translation (English)": "to desire; to want"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A wish or craving directed toward obtaining or doing something.",
+          "Nuance (English)": "Refers to appetitive longing, especially the kind to be quieted or reduced.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "yù",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "desire"
+        },
+        "rank": 16
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces the means, basis, or instrument used to carry out an action.",
+          "Nuance (English)": "Here it introduces purpose or means, not comparison or cause.",
+          "Part of Speech (English)": "preposition",
+          "Pronunciation (English)": "yǐ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "with; by means of"
+        },
+        "rank": 17
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To look at or observe something visually.",
+            "Nuance (English)": "Simple visual watching.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "guān",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "He ascended the tower and looked out.",
+              "The crowd watched the battle together.",
+              "I stood and watched it.",
+              "He watched the fish by the water."
+            ],
+            "Sentences": [
+              "登樓而<strong>觀</strong>。",
+              "眾人共<strong>觀</strong>其戰。",
+              "吾立而<strong>觀</strong>之。",
+              "臨水<strong>觀</strong>魚。"
+            ],
+            "Translation (English)": "to watch; to view"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To look at attentively in order to understand, inspect, or perceive.",
+          "Nuance (English)": "Directed, reflective seeing rather than casual looking.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "guān",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to observe; to contemplate"
+        },
+        "rank": 18
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Used demonstratively to point to a thing or group already identified.",
+            "Nuance (English)": "Deictic, not possessive.",
+            "Part of Speech (English)": "demonstrative pronoun",
+            "Pronunciation (English)": "qí",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "I took that one.",
+              "I saw that man and questioned him.",
+              "He loved that virtue.",
+              "Few are those who know that heart."
+            ],
+            "Sentences": [
+              "吾取<strong>其</strong>一。",
+              "見<strong>其</strong>人而問焉。",
+              "愛<strong>其</strong>德。",
+              "知<strong>其</strong>心者寡。"
+            ],
+            "Translation (English)": "that; those"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A third-person possessive or attributive pronoun referring to something already mentioned.",
+          "Nuance (English)": "Possessive reference to an antecedent.",
+          "Part of Speech (English)": "pronoun",
+          "Pronunciation (English)": "qí",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "its; their"
+        },
+        "rank": 19
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Delicately profound, fine beyond ordinary perception, and difficult to fully grasp.",
+          "Nuance (English)": "Here it describes an elusive subtlety rather than overt brilliance.",
+          "Part of Speech (English)": "adjective / noun",
+          "Pronunciation (English)": "miào",
+          "Register (English)": "Classical Chinese; philosophical",
+          "Translation (English)": "subtle; wondrous"
+        },
+        "rank": 20
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The limit or edge where something ends or is marked off.",
+          "Nuance (English)": "A limit or margin, not a measuring instrument or a boundary line in a technical sense.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "jiǎo",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "boundary; border; edge"
+        },
+        "rank": 21
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A demonstrative referring to something near at hand or immediately under discussion.",
+          "Nuance (English)": "Points to something present in discourse or context.",
+          "Part of Speech (English)": "demonstrative pronoun",
+          "Pronunciation (English)": "cǐ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "this"
+        },
+        "rank": 22
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The number 2, or a pair.",
+          "Nuance (English)": "Counts exactly two entities, often as a pair.",
+          "Part of Speech (English)": "numeral",
+          "Pronunciation (English)": "liǎng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "two"
+        },
+        "rank": 23
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A nominalizing suffix or marker used after a quantifier or pronoun to form a noun phrase referring to a person or thing.",
+          "Nuance (English)": "Creates a category of entities rather than asserting action.",
+          "Part of Speech (English)": "nominalizer / suffix",
+          "Pronunciation (English)": "zhě",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "that which; person/thing that"
+        },
+        "rank": 24
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates identity, sameness, or acting together as one.",
+          "Nuance (English)": "Focuses on sameness or shared action.",
+          "Part of Speech (English)": "adjective / adverb",
+          "Pronunciation (English)": "tóng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "same; together"
+        },
+        "rank": 25
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To go forth, issue from, or become visible.",
+          "Nuance (English)": "Movement or emergence outward.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "chū",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to come out; to emerge"
+        },
+        "rank": 26
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Connects clauses or phrases, often indicating sequence, continuation, or contrast.",
+          "Nuance (English)": "Flexible connective with broad syntactic linkage.",
+          "Part of Speech (English)": "conjunction",
+          "Pronunciation (English)": "ér",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "and; while; yet"
+        },
+        "rank": 27
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Not the same as what was just mentioned.",
+          "Nuance (English)": "Marks difference or nonidentity.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "yì",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "different; other"
+        },
+        "rank": 28
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To refer to something by a certain term or description.",
+          "Nuance (English)": "Predicative naming or designation.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "wèi",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "call; say of"
+        },
+        "rank": 29
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Deep, elusive, and beyond ordinary clear explanation.",
+          "Nuance (English)": "Suggests depth and obscurity rather than mere darkness.",
+          "Part of Speech (English)": "adjective / noun",
+          "Pronunciation (English)": "xuán",
+          "Register (English)": "Classical Chinese; philosophical",
+          "Translation (English)": "mysterious; profound"
+        },
+        "rank": 30
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Adds repetition or intensification, indicating one more step or occurrence.",
+          "Nuance (English)": "Can mark recurrence or added degree.",
+          "Part of Speech (English)": "adverb",
+          "Pronunciation (English)": "yòu",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "further; again"
+        },
+        "rank": 31
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A large number of people or things taken together.",
+          "Nuance (English)": "Collective plurality.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "zhòng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "many; all"
+        },
+        "rank": 32
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "An opening or entrance used for access or passage.",
+          "Nuance (English)": "Physical entrance, also used figuratively for an entry point.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "mén",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "gate; door"
+        },
+        "rank": 33
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The realm of human society or the whole world under heaven.",
+          "Nuance (English)": "Political-cosmological totality, not merely the globe.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "tiān xià",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "all under heaven; the world"
+        },
+        "rank": 34
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Including every member without exception.",
+          "Nuance (English)": "Universal quantification.",
+          "Part of Speech (English)": "adverb",
+          "Pronunciation (English)": "jiē",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "all; every"
+        },
+        "rank": 35
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To perceive, recognize, or understand something.",
+          "Nuance (English)": "Cognitive awareness or understanding.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "zhī",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to know"
+        },
+        "rank": 36
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A person or thing regarded as beautiful.",
+            "Nuance (English)": "Concrete noun use, not merely the quality.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "měi",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "Everyone loves beauty.",
+              "The beauty of the mountains and waters is worth appreciating.",
+              "His words had beauty in them.",
+              "Outwardly beautiful, but substantial within."
+            ],
+            "Sentences": [
+              "人皆愛<strong>美</strong>。",
+              "山水之<strong>美</strong>，可賞。",
+              "其言有<strong>美</strong>。",
+              "外<strong>美</strong>而內實。"
+            ],
+            "Translation (English)": "beauty; beautiful thing"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Pleasing in appearance or character, or the quality of such pleasingness.",
+          "Nuance (English)": "Can denote the quality or the beautiful thing itself.",
+          "Part of Speech (English)": "adjective / noun",
+          "Pronunciation (English)": "měi",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "beautiful; beauty"
+        },
+        "rank": 37
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To treat one thing as another, or to regard something in a certain way.",
+          "Nuance (English)": "Predicative identification or interpretation, not causation.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "wéi",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to make; to take as"
+        },
+        "rank": 38
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Marks the resulting conclusion or immediate consequence.",
+          "Nuance (English)": "Signals a direct result from the preceding statement.",
+          "Part of Speech (English)": "adverb",
+          "Pronunciation (English)": "sī",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "then; thereupon"
+        },
+        "rank": 39
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To feel aversion toward someone or something.",
+            "Nuance (English)": "Passionate aversion, not moral badness.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "wù",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "All detested it.",
+              "I greatly disliked his words.",
+              "All together hated oppressive rule.",
+              "A gentleman does not dislike learning because of poverty."
+            ],
+            "Sentences": [
+              "人皆<strong>惡</strong>之。",
+              "吾甚<strong>惡</strong>其言。",
+              "眾共<strong>惡</strong>暴政。",
+              "士不以貧而<strong>惡</strong>學。"
+            ],
+            "Translation (English)": "to hate; dislike"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Morally or socially bad, harmful, or undesirable.",
+          "Nuance (English)": "Negative evaluation, often contrasting with good.",
+          "Part of Speech (English)": "adjective / noun",
+          "Pronunciation (English)": "è",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "evil; bad"
+        },
+        "rank": 40
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates that something has come to completion or that a state has already been reached.",
+          "Nuance (English)": "Marks completion or settled fact.",
+          "Part of Speech (English)": "aspectual particle / adverb",
+          "Pronunciation (English)": "yǐ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "already; finished"
+        },
+        "rank": 41
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Morally right, beneficial, or of good quality.",
+          "Nuance (English)": "Here it names or qualifies what is morally good.",
+          "Part of Speech (English)": "adjective / noun",
+          "Pronunciation (English)": "shàn",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "good; good thing"
+        },
+        "rank": 42
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Negates the following word or phrase.",
+          "Nuance (English)": "General verbal or adjectival negation.",
+          "Part of Speech (English)": "negative particle",
+          "Pronunciation (English)": "bù",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "not"
+        },
+        "rank": 43
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates reciprocal relation or action between the items linked to it.",
+          "Nuance (English)": "Marks mutual or reciprocal interaction.",
+          "Part of Speech (English)": "adverb / reciprocal marker",
+          "Pronunciation (English)": "xiāng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "mutually; each other"
+        },
+        "rank": 44
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To cause something to come into being or appear.",
+          "Nuance (English)": "Causative emergence or generation.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "shēng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to give rise to; to produce"
+        },
+        "rank": 45
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The paired opposites of difficulty and ease.",
+          "Nuance (English)": "A fixed opposed pair.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "nán yì",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "hard and easy"
+        },
+        "rank": 46
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To bring something to completion or make it into something through interaction or support.",
+          "Nuance (English)": "Completion through reciprocal relation, not merely finishing.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "chéng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to complete; to make into"
+        },
+        "rank": 47
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The paired opposites of length and shortness.",
+          "Nuance (English)": "A fixed contrast pair.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "cháng duǎn",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "long and short"
+        },
+        "rank": 48
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To place side by side in order to judge relative degree or difference.",
+          "Nuance (English)": "Evaluative comparison, often by juxtaposition.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "jiào",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to compare; measure against"
+        },
+        "rank": 49
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The paired opposites of height and lowness, or rank and position.",
+          "Nuance (English)": "A fixed contrast pair.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "gāo xià",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "high and low"
+        },
+        "rank": 50
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To lean, incline, or cause instability so that something gives way.",
+          "Nuance (English)": "Suggests destabilizing displacement.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "qīng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to tilt; to topple"
+        },
+        "rank": 51
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Audible sound as a collective pair, often referring to musical or spoken sound.",
+          "Nuance (English)": "A paired expression for auditory phenomena.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "yīn shēng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "sound and voice"
+        },
+        "rank": 52
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To match, respond to, or agree in sound, feeling, or action.",
+          "Nuance (English)": "Reciprocal agreement or resonance.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "hé",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to harmonize; be in accord"
+        },
+        "rank": 53
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The paired positions or directions before and behind.",
+          "Nuance (English)": "A fixed relational pair.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "qián hòu",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "front and back"
+        },
+        "rank": 54
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To come after or move along with something else.",
+          "Nuance (English)": "Trailing or accompanying movement.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "suí",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to follow; to accompany"
+        },
+        "rank": 55
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces a conclusion drawn from what precedes.",
+          "Nuance (English)": "Inferential transition.",
+          "Part of Speech (English)": "conjunction / discourse marker",
+          "Pronunciation (English)": "shì yǐ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "therefore; hence"
+        },
+        "rank": 56
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A person of exceptional wisdom, moral insight, and enlightened conduct.",
+          "Nuance (English)": "In Daoist usage, an ideal ruler or exemplary person rather than a Confucian saint.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "shèng rén",
+          "Register (English)": "Classical Chinese; philosophical",
+          "Translation (English)": "sage; wise person"
+        },
+        "rank": 57
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To remain in, take up, or deal with a matter or situation.",
+          "Nuance (English)": "In this context, to take up or manage a matter.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "chǔ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to dwell; to handle; to manage"
+        },
+        "rank": 58
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "An action, matter, or thing that is done or dealt with.",
+          "Nuance (English)": "A practical affair or matter, not an event in the abstract.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "shì",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "matter; affair"
+        },
+        "rank": 59
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To move along or to put into practice.",
+          "Nuance (English)": "Here it means to practice or carry out.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "xíng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to walk; to carry out"
+        },
+        "rank": 60
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Spoken language or verbal expression.",
+          "Nuance (English)": "Oral expression, contrasted with silent teaching.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "yán",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "speech; words"
+        },
+        "rank": 61
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Guidance or doctrine given to others.",
+          "Nuance (English)": "Instruction as something imparted or transmitted.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "jiào",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "teaching; instruction"
+        },
+        "rank": 62
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To come into activity, take action, or produce an effect.",
+          "Nuance (English)": "Emergence into action or activity.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "zuò",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to arise; to act"
+        },
+        "rank": 63
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A locative or deictic element referring to a situation, place, or state already mentioned.",
+          "Nuance (English)": "Often marks location, state, or resultant circumstance.",
+          "Part of Speech (English)": "adverb / pronoun",
+          "Pronunciation (English)": "yān",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "there; in it"
+        },
+        "rank": 64
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To keep silent or not voice something.",
+          "Nuance (English)": "Refusal or abstention from speaking.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "cí",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to refuse to say; to be silent about"
+        },
+        "rank": 65
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To depend on something or hold it up as a support.",
+          "Nuance (English)": "Dependence or self-support through something.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "shì",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to rely on; to take pride in"
+        },
+        "rank": 66
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The result, accomplishment, or merit of effort.",
+          "Nuance (English)": "A completed beneficial result or achievement.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "gōng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "achievement; merit"
+        },
+        "rank": 67
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A literary negative form, often emphatic or formal in tone.",
+          "Nuance (English)": "More formal than 不.",
+          "Part of Speech (English)": "negative particle",
+          "Pronunciation (English)": "fú",
+          "Register (English)": "Classical Chinese; literary",
+          "Translation (English)": "not; never"
+        },
+        "rank": 68
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To take up a position or keep oneself in a place or state.",
+          "Nuance (English)": "Settled occupancy or retention.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "jū",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to occupy; remain in"
+        },
+        "rank": 69
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "An exclamatory or introductory particle used to launch a statement or emphasis.",
+          "Nuance (English)": "Discourse-opening or emphasis marker.",
+          "Part of Speech (English)": "particle",
+          "Pronunciation (English)": "fú",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "the man; the said"
+        },
+        "rank": 70
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Restricts the statement to one factor or condition.",
+          "Nuance (English)": "Exclusive or limiting only.",
+          "Part of Speech (English)": "adverb",
+          "Pronunciation (English)": "wéi",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "only; just"
+        },
+        "rank": 71
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To go away or move off from a place or state.",
+          "Nuance (English)": "Departure or removal.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "qù",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to leave; depart"
+        },
+        "rank": 72
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To regard something as important, worthy, or high in status.",
+          "Nuance (English)": "To prize or set high value on.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "shàng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to esteem; to value"
+        },
+        "rank": 73
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A morally or socially capable person regarded as worthy of honor or office.",
+          "Nuance (English)": "Someone esteemed for virtue or talent.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "xián",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "virtuous person; worthy"
+        },
+        "rank": 74
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To bring about or let something happen.",
+          "Nuance (English)": "Causative use.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "shǐ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to cause; to make"
+        },
+        "rank": 75
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The populace or common people as a collective.",
+          "Nuance (English)": "The general population, especially in governance contexts.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "mín",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "people"
+        },
+        "rank": 76
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To compete, dispute, or struggle against another.",
+          "Nuance (English)": "Conflict or competition for precedence.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "zhēng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to contend; strive"
+        },
+        "rank": 77
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To regard something as important, precious, or worth having.",
+          "Nuance (English)": "High valuation.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "guì",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to value; esteem"
+        },
+        "rank": 78
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Not easy to do, obtain, or endure.",
+          "Nuance (English)": "Difficulty of attainment or performance.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "nán",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "hard; difficult"
+        },
+        "rank": 79
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To acquire, reach, or gain possession of.",
+          "Nuance (English)": "Successful acquisition or attainment.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "dé",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to obtain; get"
+        },
+        "rank": 80
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Objects of value, especially commodities or possessions.",
+          "Nuance (English)": "Valuable property or merchandise.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "huò",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "goods; valuables"
+        },
+        "rank": 81
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A person who steals or commits robbery.",
+          "Nuance (English)": "Criminal who takes by stealth or force.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "dào",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "thief; robber"
+        },
+        "rank": 82
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To perceive visually or to make something visible.",
+          "Nuance (English)": "Here it is seeing or bringing into view.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "jiàn",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to see; to let appear"
+        },
+        "rank": 83
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The inner faculty of thought, feeling, and intention.",
+          "Nuance (English)": "Psychological and moral interior, not the physical heart alone.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "mín xīn",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "mind; heart-mind"
+        },
+        "rank": 84
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A state of confusion, turmoil, or lack of order.",
+          "Nuance (English)": "Disordered state, whether moral, political, or emotional.",
+          "Part of Speech (English)": "adjective / noun",
+          "Pronunciation (English)": "luàn",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to be in disorder; disorder"
+        },
+        "rank": 85
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To administer a state or direct affairs with authority.",
+            "Nuance (English)": "Active governing.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "zhì",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The king governs the state by virtue.",
+              "A good person can govern the people.",
+              "Harsh laws are hard to govern with.",
+              "First set oneself upright, and then govern others."
+            ],
+            "Sentences": [
+              "王以德<strong>治</strong>國。",
+              "善人能<strong>治</strong>眾。",
+              "苛法難<strong>治</strong>。",
+              "先正其身，而後<strong>治</strong>人。"
+            ],
+            "Translation (English)": "to govern; to rule"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The act or institution of governing and administering public affairs.",
+          "Nuance (English)": "Governance as a political order or practice.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "zhì",
+          "Register (English)": "Classical Chinese; philosophical/political",
+          "Translation (English)": "government; rule"
+        },
+        "rank": 86
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Lacking contents or not occupied; vacant.",
+            "Nuance (English)": "Descriptive emptiness.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "xū",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The room was empty and quiet.",
+              "His seat was already vacant.",
+              "Outwardly full, but inwardly empty.",
+              "If the heart can be empty, then it becomes clear."
+            ],
+            "Sentences": [
+              "室中<strong>虛</strong>而靜。",
+              "其位既<strong>虛</strong>。",
+              "外盛而內<strong>虛</strong>。",
+              "心若能<strong>虛</strong>，則明。"
+            ],
+            "Translation (English)": "empty; void"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To render something unfilled, less full, or devoid of what it previously had.",
+          "Nuance (English)": "In this context, to reduce or clear away inner content.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "xū",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to empty; make empty"
+        },
+        "rank": 87
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The inner seat of thought, feeling, intention, and awareness.",
+          "Nuance (English)": "The moral-psychological heart-mind rather than the physical organ alone.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "xīn",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "mind; heart"
+        },
+        "rank": 88
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To make something full or to supply it with what it needs.",
+          "Nuance (English)": "Filling up or strengthening by supplying substance.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "shí",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to fill; make full"
+        },
+        "rank": 89
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The stomach and lower trunk of the body.",
+          "Nuance (English)": "Physical belly, often extended metaphorically to bodily nourishment.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "fù",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "belly; abdomen"
+        },
+        "rank": 90
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To reduce strength, force, resolve, or intensity.",
+          "Nuance (English)": "Causative weakening.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "ruò",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to weaken; make weak"
+        },
+        "rank": 91
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Inner intention, purpose, or determination.",
+          "Nuance (English)": "Directed will or ambition.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "zhì",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "resolve; will"
+        },
+        "rank": 92
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To increase strength, firmness, or vigor.",
+          "Nuance (English)": "Causative strengthening.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "qiáng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to strengthen; make strong"
+        },
+        "rank": 93
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The hard parts of the body that support and give structure.",
+          "Nuance (English)": "Literal bodily bone, often suggesting firmness.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "gǔ",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "bone; bones"
+        },
+        "rank": 94
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A person who is intelligent or skillful in judgment, though not necessarily morally sage.",
+          "Nuance (English)": "One who has intelligence or practical understanding.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "zhì zhě",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "wise person; man of understanding"
+        },
+        "rank": 95
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To have the courage or presumption to do something.",
+          "Nuance (English)": "Expresses boldness or permission by internal stance.",
+          "Part of Speech (English)": "auxiliary verb",
+          "Pronunciation (English)": "gǎn",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "dare; be bold enough to"
+        },
+        "rank": 96
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A final particle that marks cadence, emphasis, or completion in classical prose.",
+          "Nuance (English)": "Softens or closes the statement.",
+          "Part of Speech (English)": "sentence-final particle",
+          "Pronunciation (English)": "yě",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "sentence-final particle"
+        },
+        "rank": 97
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces a consequence or logical result from the preceding condition.",
+          "Nuance (English)": "Resultative or conditional consequence marker.",
+          "Part of Speech (English)": "conjunction / adverb",
+          "Pronunciation (English)": "zé",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "then; so"
+        },
+        "rank": 98
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To become full or fill up to capacity.",
+            "Nuance (English)": "Filling or suffusing.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "chōng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The vessel gradually became full.",
+              "The spring vapors surged upward.",
+              "Its force was not yet fully filled.",
+              "The boat moved on the water, as if the air were already full."
+            ],
+            "Sentences": [
+              "器漸<strong>沖</strong>。",
+              "泉氣上<strong>沖</strong>。",
+              "其意未<strong>沖</strong>。",
+              "舟行水上，氣若既<strong>沖</strong>。"
+            ],
+            "Translation (English)": "to fill; to be full"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Lacking full substance or solid fullness; not densely packed.",
+          "Nuance (English)": "Suggests openness and emptiness rather than emptiness as lack alone.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "chōng",
+          "Register (English)": "Classical Chinese; philosophical",
+          "Translation (English)": "empty; hollow"
+        },
+        "rank": 99
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The usefulness or operative function of something.",
+            "Nuance (English)": "What something is good for, rather than the act of using it.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "yòng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The vessel has its use.",
+              "His book has no use.",
+              "Knowing its function, one does not discard it.",
+              "Though the wood is crude, its usefulness may still be taken."
+            ],
+            "Sentences": [
+              "器有其<strong>用</strong>。",
+              "其書無<strong>用</strong>。",
+              "知其<strong>用</strong>，則不廢。",
+              "木雖陋，而<strong>用</strong>可取。"
+            ],
+            "Translation (English)": "use; function"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To employ something for a purpose or put it into service.",
+          "Nuance (English)": "Functional employment, not mere possession.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "yòng",
+          "Register (English)": "Classical Chinese",
+          "Translation (English)": "to use"
+        },
+        "rank": 100
+      }
+    ]
+  },
+  "reasoning_effort": "none",
+  "response_id": "resp_0c81786934b43e79006a64c075b96c81969c9991cd6f340db9",
+  "response_status": "completed",
+  "schema_estimated_tokens": 530,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "term_result_count": 100,
+  "terms": [
+    {
+      "rank": 1,
+      "term": "道"
+    },
+    {
+      "rank": 2,
+      "term": "可"
+    },
+    {
+      "rank": 3,
+      "term": "非"
+    },
+    {
+      "rank": 4,
+      "term": "常道"
+    },
+    {
+      "rank": 5,
+      "term": "名"
+    },
+    {
+      "rank": 6,
+      "term": "常名"
+    },
+    {
+      "rank": 7,
+      "term": "無"
+    },
+    {
+      "rank": 8,
+      "term": "天地"
+    },
+    {
+      "rank": 9,
+      "term": "之"
+    },
+    {
+      "rank": 10,
+      "term": "始"
+    },
+    {
+      "rank": 11,
+      "term": "有"
+    },
+    {
+      "rank": 12,
+      "term": "萬物"
+    },
+    {
+      "rank": 13,
+      "term": "母"
+    },
+    {
+      "rank": 14,
+      "term": "故"
+    },
+    {
+      "rank": 15,
+      "term": "常"
+    },
+    {
+      "rank": 16,
+      "term": "欲"
+    },
+    {
+      "rank": 17,
+      "term": "以"
+    },
+    {
+      "rank": 18,
+      "term": "觀"
+    },
+    {
+      "rank": 19,
+      "term": "其"
+    },
+    {
+      "rank": 20,
+      "term": "妙"
+    },
+    {
+      "rank": 21,
+      "term": "徼"
+    },
+    {
+      "rank": 22,
+      "term": "此"
+    },
+    {
+      "rank": 23,
+      "term": "兩"
+    },
+    {
+      "rank": 24,
+      "term": "者"
+    },
+    {
+      "rank": 25,
+      "term": "同"
+    },
+    {
+      "rank": 26,
+      "term": "出"
+    },
+    {
+      "rank": 27,
+      "term": "而"
+    },
+    {
+      "rank": 28,
+      "term": "異"
+    },
+    {
+      "rank": 29,
+      "term": "謂"
+    },
+    {
+      "rank": 30,
+      "term": "玄"
+    },
+    {
+      "rank": 31,
+      "term": "又"
+    },
+    {
+      "rank": 32,
+      "term": "眾"
+    },
+    {
+      "rank": 33,
+      "term": "門"
+    },
+    {
+      "rank": 34,
+      "term": "天下"
+    },
+    {
+      "rank": 35,
+      "term": "皆"
+    },
+    {
+      "rank": 36,
+      "term": "知"
+    },
+    {
+      "rank": 37,
+      "term": "美"
+    },
+    {
+      "rank": 38,
+      "term": "為"
+    },
+    {
+      "rank": 39,
+      "term": "斯"
+    },
+    {
+      "rank": 40,
+      "term": "惡"
+    },
+    {
+      "rank": 41,
+      "term": "已"
+    },
+    {
+      "rank": 42,
+      "term": "善"
+    },
+    {
+      "rank": 43,
+      "term": "不"
+    },
+    {
+      "rank": 44,
+      "term": "相"
+    },
+    {
+      "rank": 45,
+      "term": "生"
+    },
+    {
+      "rank": 46,
+      "term": "難易"
+    },
+    {
+      "rank": 47,
+      "term": "成"
+    },
+    {
+      "rank": 48,
+      "term": "長短"
+    },
+    {
+      "rank": 49,
+      "term": "較"
+    },
+    {
+      "rank": 50,
+      "term": "高下"
+    },
+    {
+      "rank": 51,
+      "term": "傾"
+    },
+    {
+      "rank": 52,
+      "term": "音聲"
+    },
+    {
+      "rank": 53,
+      "term": "和"
+    },
+    {
+      "rank": 54,
+      "term": "前後"
+    },
+    {
+      "rank": 55,
+      "term": "隨"
+    },
+    {
+      "rank": 56,
+      "term": "是以"
+    },
+    {
+      "rank": 57,
+      "term": "聖人"
+    },
+    {
+      "rank": 58,
+      "term": "處"
+    },
+    {
+      "rank": 59,
+      "term": "事"
+    },
+    {
+      "rank": 60,
+      "term": "行"
+    },
+    {
+      "rank": 61,
+      "term": "言"
+    },
+    {
+      "rank": 62,
+      "term": "教"
+    },
+    {
+      "rank": 63,
+      "term": "作"
+    },
+    {
+      "rank": 64,
+      "term": "焉"
+    },
+    {
+      "rank": 65,
+      "term": "辭"
+    },
+    {
+      "rank": 66,
+      "term": "恃"
+    },
+    {
+      "rank": 67,
+      "term": "功"
+    },
+    {
+      "rank": 68,
+      "term": "弗"
+    },
+    {
+      "rank": 69,
+      "term": "居"
+    },
+    {
+      "rank": 70,
+      "term": "夫"
+    },
+    {
+      "rank": 71,
+      "term": "唯"
+    },
+    {
+      "rank": 72,
+      "term": "去"
+    },
+    {
+      "rank": 73,
+      "term": "尚"
+    },
+    {
+      "rank": 74,
+      "term": "賢"
+    },
+    {
+      "rank": 75,
+      "term": "使"
+    },
+    {
+      "rank": 76,
+      "term": "民"
+    },
+    {
+      "rank": 77,
+      "term": "爭"
+    },
+    {
+      "rank": 78,
+      "term": "貴"
+    },
+    {
+      "rank": 79,
+      "term": "難"
+    },
+    {
+      "rank": 80,
+      "term": "得"
+    },
+    {
+      "rank": 81,
+      "term": "貨"
+    },
+    {
+      "rank": 82,
+      "term": "盜"
+    },
+    {
+      "rank": 83,
+      "term": "見"
+    },
+    {
+      "rank": 84,
+      "term": "民心"
+    },
+    {
+      "rank": 85,
+      "term": "亂"
+    },
+    {
+      "rank": 86,
+      "term": "治"
+    },
+    {
+      "rank": 87,
+      "term": "虛"
+    },
+    {
+      "rank": 88,
+      "term": "心"
+    },
+    {
+      "rank": 89,
+      "term": "實"
+    },
+    {
+      "rank": 90,
+      "term": "腹"
+    },
+    {
+      "rank": 91,
+      "term": "弱"
+    },
+    {
+      "rank": 92,
+      "term": "志"
+    },
+    {
+      "rank": 93,
+      "term": "強"
+    },
+    {
+      "rank": 94,
+      "term": "骨"
+    },
+    {
+      "rank": 95,
+      "term": "智者"
+    },
+    {
+      "rank": 96,
+      "term": "敢"
+    },
+    {
+      "rank": 97,
+      "term": "也"
+    },
+    {
+      "rank": 98,
+      "term": "則"
+    },
+    {
+      "rank": 99,
+      "term": "沖"
+    },
+    {
+      "rank": 100,
+      "term": "用"
+    }
+  ],
+  "usage": {
+    "cached_input_tokens": 0,
+    "input_tokens": 9620,
+    "output_tokens": 13849,
+    "reasoning_tokens": 0,
+    "total_tokens": 23469,
+    "uncached_input_tokens": 9620,
+    "visible_output_tokens": 13849,
+    "web_search_calls": 0
+  },
+  "valid": false,
+  "validation_error": {
+    "message": "Every literal occurrence of the requested term in a generated additional-sense example must express that card's selected sense and be enclosed by exact <strong>...</strong> tags. Remove mixed-sense homographs from the example.",
+    "type": "GeneratedCardValidationError",
+    "validation_report": {
+      "accepted_problem_count": 0,
+      "all_problems_resolved": false,
+      "can_complete_with_manual_acceptance": true,
+      "can_manually_accept": true,
+      "full_retry_required": false,
+      "non_overrideable_problem_count": 0,
+      "overrideable_problem_count": 1,
+      "problem_count": 1,
+      "problems": [
+        {
+          "accepted": false,
+          "actual": {
+            "sentence": "母教子以禮。」「慈<strong>母</strong>愛其子。",
+            "unemphasized_character_offsets": [
+              0
+            ]
+          },
+          "card_index": 26,
+          "card_number": 27,
+          "code": "unemphasized_source_term_occurrence",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "No literal source-term occurrence outside <strong>母</strong>.",
+          "field_name": "Sentences",
+          "location": "Card 27 (“母”) → Sentences → item 1",
+          "message": "Every literal occurrence of the requested term in a generated additional-sense example must express that card's selected sense and be enclosed by exact <strong>...</strong> tags. Remove mixed-sense homographs from the example.",
+          "overrideable": true,
+          "path": "$.term_results[12].additional_senses[0][\"Sentences\"][0]",
+          "problem_id": "unemphasized_source_term_occurrence:69dc2018c20e7505",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 13
+          },
+          "scope": "field",
+          "source_rank": 13,
+          "suggestion": "Retry, or replace this sentence with one whose every occurrence of the term has the selected meaning and exact strong markup.",
+          "term": "母",
+          "title": "Example contains an unemboldened occurrence of the source term"
+        }
+      ],
+      "remaining_problem_count": 1,
+      "structurally_valid": true,
+      "syntax_valid": true,
+      "valid": false
+    }
+  },
+  "word_count": 100
+}

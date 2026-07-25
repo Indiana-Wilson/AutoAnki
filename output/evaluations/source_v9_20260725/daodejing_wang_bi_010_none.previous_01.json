@@ -1,0 +1,784 @@
+{
+  "additional_sense_count": 13,
+  "card_count": null,
+  "context_count": 2,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cached_input_aud": 0.0,
+    "cached_input_tokens": 0,
+    "cached_input_usd": 0.0,
+    "execution_mode": "standard",
+    "input_aud": 0.0032172043010752684,
+    "input_tokens": 2992,
+    "input_usd": 0.002244,
+    "model": "gpt-5.4-mini",
+    "output_aud": 0.022722580645161288,
+    "output_tokens": 3522,
+    "output_usd": 0.015849,
+    "pricing": {
+      "cached_input_usd_per_million": 0.075,
+      "input_usd_per_million": 0.75,
+      "label": "standard pricing published 2026-07-24",
+      "model": "gpt-5.4-mini",
+      "output_usd_per_million": 4.5
+    },
+    "pricing_label": "standard pricing published 2026-07-24",
+    "total_aud": 0.025939784946236555,
+    "total_tokens": 6514,
+    "total_usd": 0.018092999999999998,
+    "uncached_input_aud": 0.0032172043010752684,
+    "uncached_input_tokens": 2992,
+    "uncached_input_usd": 0.002244,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-25T13:46:42.960979+00:00",
+  "max_output_tokens": 8192,
+  "model": "gpt-5.4-mini",
+  "payload_estimated_tokens": 1176,
+  "prompt_estimated_tokens": 1715,
+  "protocol": "v9",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "translation": "The Way that can be spoken is not the constant Way; the name that can be named is not the constant name."
+      },
+      {
+        "context_id": "source-context-9d763a9d06321236e5f1",
+        "translation": "Without name, it is the beginning of Heaven and earth; with name, it is the mother of the myriad things."
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A physical route or track along which one travels.",
+            "Nuance (English)": "Concrete, spatial sense.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; common literary usage",
+            "Sentence Translations (English)": [
+              "When he went out, he followed the road.",
+              "There is a narrow path ahead that leads to the village.",
+              "He lost his way and did not turn back.",
+              "The cart travels on the road and does not enter the fields."
+            ],
+            "Sentences": [
+              "出門循<strong>道</strong>而行。",
+              "前有小<strong>道</strong>，可通村落。",
+              "迷而不返，失其<strong>道</strong>。",
+              "車行其<strong>道</strong>，不入田畝。"
+            ],
+            "Translation (English)": "road; path"
+          },
+          {
+            "Dictionary Meaning (English)": "A means, procedure, or course of action used to achieve something.",
+            "Nuance (English)": "Often stresses an established or effective course rather than a mere plan.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; common literary usage",
+            "Sentence Translations (English)": [
+              "There is a proper method for governing the state.",
+              "A learner values finding the right method.",
+              "In warfare, the method most prized is swift decision.",
+              "In all matters, if one gets the method right, then success follows."
+            ],
+            "Sentences": [
+              "治國有<strong>道</strong>。",
+              "學者貴得其<strong>道</strong>。",
+              "用兵之<strong>道</strong>，貴乎速決。",
+              "凡事得<strong>道</strong>，則成。"
+            ],
+            "Translation (English)": "method; way of doing something"
+          },
+          {
+            "Dictionary Meaning (English)": "To say, state, explain, or teach something in words.",
+            "Nuance (English)": "Verbal sense distinct from the noun; often formal and declarative.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; literary usage",
+            "Sentence Translations (English)": [
+              "The teacher explains it, and the disciples listen.",
+              "The father instructed his son in righteousness.",
+              "The worthy man does not lightly speak of another's faults.",
+              "When the gentleman sees something, he must explain the principle."
+            ],
+            "Sentences": [
+              "師者<strong>道</strong>之，弟子聽焉。",
+              "父以義<strong>道</strong>其子。",
+              "賢者不輕<strong>道</strong>人過。",
+              "君子有所見，必<strong>道</strong>其理。"
+            ],
+            "Translation (English)": "teach; speak"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The fundamental principle, path, or ordering reality being spoken of in this text.",
+          "Nuance (English)": "Here it refers to the ineffable, ultimate Way rather than any ordinary path or method.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "dào",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "Way"
+        },
+        "rank": 1
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Indicates that something is suitable, deserving, or deserving approval.",
+            "Nuance (English)": "Evaluative rather than modal; it judges suitability or merit.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese; common literary usage",
+            "Sentence Translations (English)": [
+              "This policy is workable.",
+              "His words are worth listening to.",
+              "Since people's hearts are not settled, one cannot act rashly.",
+              "This rite can be practiced for a long time."
+            ],
+            "Sentences": [
+              "此策<strong>可</strong>行。",
+              "其言<strong>可</strong>聽。",
+              "人心未定，不<strong>可</strong>輕舉。",
+              "此禮<strong>可</strong>久行。"
+            ],
+            "Translation (English)": "worthy of; fit to; acceptable"
+          },
+          {
+            "Dictionary Meaning (English)": "To agree to, allow, or give approval for something.",
+            "Nuance (English)": "This is an active granting of approval, not mere possibility.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese; literary usage",
+            "Sentence Translations (English)": [
+              "The king approved his request.",
+              "I do not dare decide on my own; I await the lord's approval.",
+              "When the assembly's discussion was settled, the matter was approved.",
+              "If the parents do not consent, the son does not proceed."
+            ],
+            "Sentences": [
+              "王<strong>可</strong>其請。",
+              "臣不敢專，俟君<strong>可</strong>之。",
+              "眾議既定，遂<strong>可</strong>其事。",
+              "父母不<strong>可</strong>，則子不行。"
+            ],
+            "Translation (English)": "approve; consent to"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Expresses ability, possibility, or permission before a verb.",
+          "Nuance (English)": "Marks possibility or capability rather than obligation.",
+          "Part of Speech (English)": "modal verb",
+          "Pronunciation (English)": "kě",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "can; be able to"
+        },
+        "rank": 2
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Indicates that a person, statement, or action is in error or not right.",
+            "Nuance (English)": "Judges correctness or propriety, not simple negation.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese; common literary usage",
+            "Sentence Translations (English)": [
+              "Right and wrong have not yet been distinguished; the voices of the crowd are chaotic.",
+              "His words are very wrong.",
+              "To know one's error and correct it is still not too late.",
+              "A small fault does not matter; it is not a great offense."
+            ],
+            "Sentences": [
+              "是非未判，眾口紛然。",
+              "其言甚<strong>非</strong>。",
+              "知<strong>非</strong>而改，猶未晚也。",
+              "小失不害，<strong>非</strong>大過也。"
+            ],
+            "Translation (English)": "wrong; mistaken"
+          },
+          {
+            "Dictionary Meaning (English)": "To blame, condemn, or object to someone or something.",
+            "Nuance (English)": "An act of censure or objection, not simple negation.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese; literary usage",
+            "Sentence Translations (English)": [
+              "Everyone disapproved of him.",
+              "People of the time criticized his government.",
+              "The gentleman does not condemn others recklessly.",
+              "When he heard of the mistake, he strongly criticized it."
+            ],
+            "Sentences": [
+              "眾皆<strong>非</strong>之。",
+              "時人多<strong>非</strong>其政。",
+              "君子不妄<strong>非</strong>人。",
+              "聞其失，乃大<strong>非</strong>焉。"
+            ],
+            "Translation (English)": "disapprove of; criticize"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Negates a predicate or quality; it states that something is not so.",
+          "Nuance (English)": "In this text it negates the following predicate phrase rather than forming the later fixed word 非常.",
+          "Part of Speech (English)": "negative copula / negative predicate",
+          "Pronunciation (English)": "fēi",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "not"
+        },
+        "rank": 3
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The enduring, unchanging Way as opposed to what is temporary or variable.",
+          "Nuance (English)": "Names the Way as permanent and reliable, not a transient course.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "cháng dào",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "constant Way"
+        },
+        "rank": 4
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To give something a name or designate it by a term.",
+            "Nuance (English)": "An active act of naming or calling by name.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "míng",
+            "Register (English)": "Classical Chinese; common literary usage",
+            "Sentence Translations (English)": [
+              "The master named it.",
+              "I do not dare name it carelessly.",
+              "That mountain is what ancient times named.",
+              "Please give this thing a good name."
+            ],
+            "Sentences": [
+              "子為之<strong>名</strong>。",
+              "臣不敢妄<strong>名</strong>。",
+              "彼山古所<strong>名</strong>也。",
+              "請以善<strong>名</strong>此物。"
+            ],
+            "Translation (English)": "to name; call"
+          },
+          {
+            "Dictionary Meaning (English)": "The esteem or public standing a person has among others.",
+            "Nuance (English)": "Concerns social standing and renown, not linguistic naming.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "míng",
+            "Register (English)": "Classical Chinese; common literary usage",
+            "Sentence Translations (English)": [
+              "A gentleman values his reputation.",
+              "His pure conduct was widely known, and his fame reached the four quarters.",
+              "Once one's reputation is lost, it is hard to restore.",
+              "The gentleman values substance, not empty fame."
+            ],
+            "Sentences": [
+              "士重其<strong>名</strong>。",
+              "清節遠著，<strong>名</strong>聞四方。",
+              "一失其<strong>名</strong>，難復矣。",
+              "君子貴實，不貴虛<strong>名</strong>。"
+            ],
+            "Translation (English)": "reputation; fame"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A word or designation by which something is called or identified.",
+          "Nuance (English)": "Refers to naming as linguistic designation, not reputation in this passage.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "míng",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "name"
+        },
+        "rank": 5
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A fixed, enduring designation, opposed to a shifting or temporary one.",
+          "Nuance (English)": "Stresses permanence in naming rather than the act of naming itself.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "cháng míng",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "constant name"
+        },
+        "rank": 6
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Abstract absence or nonexistence treated as a substantive concept.",
+            "Nuance (English)": "Used as a conceptual noun in philosophical discourse.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "wú",
+            "Register (English)": "Classical Chinese; philosophical literary usage",
+            "Sentence Translations (English)": [
+              "Being and nonbeing generate one another.",
+              "The sage dwells in nonbeing.",
+              "He observes its subtlety in nonbeing.",
+              "The myriad things return to nothingness."
+            ],
+            "Sentences": [
+              "有無相生。",
+              "聖人處<strong>無</strong>。",
+              "觀其妙於<strong>無</strong>。",
+              "萬物歸於<strong>無</strong>。"
+            ],
+            "Translation (English)": "nothingness; nonbeing"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Denies the presence, possession, or existence of what follows.",
+          "Nuance (English)": "In this context it marks absence rather than philosophical 'nothingness'.",
+          "Part of Speech (English)": "negative existential verb / negator",
+          "Pronunciation (English)": "wú",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "without; lacking"
+        },
+        "rank": 7
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The totality of the natural world, expressed by the paired terms heaven and earth.",
+          "Nuance (English)": "A fixed binomial naming the whole cosmic order, not two separately emphasized items here.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "tiān dì",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "heaven and earth; the cosmos"
+        },
+        "rank": 8
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A third-person pronoun referring back to a previously mentioned person or thing.",
+            "Nuance (English)": "Refers anaphorically to a known antecedent.",
+            "Part of Speech (English)": "pronoun",
+            "Pronunciation (English)": "zhī",
+            "Register (English)": "Classical Chinese; common literary usage",
+            "Sentence Translations (English)": [
+              "Seeing it, he was pleased.",
+              "He knows it and does not speak of it.",
+              "I love it.",
+              "Seek it and do not obtain it."
+            ],
+            "Sentences": [
+              "見之而喜。",
+              "知之不言。",
+              "吾愛<strong>之</strong>。",
+              "求<strong>之</strong>不得。"
+            ],
+            "Translation (English)": "it; them"
+          },
+          {
+            "Dictionary Meaning (English)": "Indicates movement or direction toward a place, person, or goal.",
+            "Nuance (English)": "Directional motion toward an endpoint.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "zhī",
+            "Register (English)": "Classical Chinese; literary usage",
+            "Sentence Translations (English)": [
+              "Go to the eastern suburbs.",
+              "He rode the boat toward the river.",
+              "He will go to the state gate.",
+              "From here to there."
+            ],
+            "Sentences": [
+              "往<strong>之</strong>東郊。",
+              "乘舟而<strong>之</strong>江上。",
+              "將<strong>之</strong>於國門。",
+              "自此<strong>之</strong>彼。"
+            ],
+            "Translation (English)": "to; toward"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Links a noun to the following noun to show possession, relation, or attribution.",
+          "Nuance (English)": "A grammatical connector, not a lexical noun or verb in this passage.",
+          "Part of Speech (English)": "structural particle",
+          "Pronunciation (English)": "zhī",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "of"
+        },
+        "rank": 9
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To cause or come into the first stage of an action, process, or state.",
+            "Nuance (English)": "Marks the onset of an activity or condition.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "shǐ",
+            "Register (English)": "Classical Chinese; common literary usage",
+            "Sentence Translations (English)": [
+              "Spring begins to become warm.",
+              "The army begins to move.",
+              "The affair has not yet begun.",
+              "When the day was already late, only then did he begin to return."
+            ],
+            "Sentences": [
+              "春<strong>始</strong>和。",
+              "軍<strong>始</strong>行。",
+              "事未<strong>始</strong>。",
+              "日既暮，乃<strong>始</strong>歸。"
+            ],
+            "Translation (English)": "begin; start"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The point from which something starts or first comes into being.",
+          "Nuance (English)": "Names the inception point or source, not the act of beginning.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "shǐ",
+          "Register (English)": "Classical Chinese; received Laozi text in Wang Bi recension",
+          "Translation (English)": "beginning; origin"
+        },
+        "rank": 10
+      }
+    ]
+  },
+  "reasoning_effort": "none",
+  "response_id": "resp_0e1f3b6a69918403006a64be3065b08195bf45808285950dce",
+  "response_status": "completed",
+  "schema_estimated_tokens": 519,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "term_result_count": 10,
+  "terms": [
+    {
+      "rank": 1,
+      "term": "道"
+    },
+    {
+      "rank": 2,
+      "term": "可"
+    },
+    {
+      "rank": 3,
+      "term": "非"
+    },
+    {
+      "rank": 4,
+      "term": "常道"
+    },
+    {
+      "rank": 5,
+      "term": "名"
+    },
+    {
+      "rank": 6,
+      "term": "常名"
+    },
+    {
+      "rank": 7,
+      "term": "無"
+    },
+    {
+      "rank": 8,
+      "term": "天地"
+    },
+    {
+      "rank": 9,
+      "term": "之"
+    },
+    {
+      "rank": 10,
+      "term": "始"
+    }
+  ],
+  "usage": {
+    "cached_input_tokens": 0,
+    "input_tokens": 2992,
+    "output_tokens": 3522,
+    "reasoning_tokens": 0,
+    "total_tokens": 6514,
+    "uncached_input_tokens": 2992,
+    "visible_output_tokens": 3522,
+    "web_search_calls": 0
+  },
+  "valid": false,
+  "validation_error": {
+    "message": "This exact retained occurrence has an unequivocal source-specific lexical value frozen into the current response contract.",
+    "type": "GeneratedCardValidationError",
+    "validation_report": {
+      "accepted_problem_count": 0,
+      "all_problems_resolved": false,
+      "can_complete_with_manual_acceptance": false,
+      "can_manually_accept": false,
+      "full_retry_required": false,
+      "non_overrideable_problem_count": 2,
+      "overrideable_problem_count": 7,
+      "problem_count": 9,
+      "problems": [
+        {
+          "accepted": false,
+          "actual": "The point from which something starts or first comes into being.",
+          "card_index": 21,
+          "card_number": 22,
+          "code": "contextual_source_field_mismatch",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "The starting point or origin of something.",
+          "field_name": "Dictionary Meaning (English)",
+          "location": "Response → term_results → rank 10 → contextual_sense → Dictionary Meaning (English)",
+          "message": "This exact retained occurrence has an unequivocal source-specific lexical value frozen into the current response contract.",
+          "overrideable": false,
+          "path": "$.term_results[9].contextual_sense[\"Dictionary Meaning (English)\"]",
+          "problem_id": "contextual_source_field_mismatch:5c8e869f1a6e3833",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 10
+          },
+          "scope": "field",
+          "source_rank": 10,
+          "suggestion": "Repair this rank without overriding the audited contextual grammar.",
+          "term": "始",
+          "title": "Contextual field contradicts the audited source"
+        },
+        {
+          "accepted": false,
+          "actual": "Names the inception point or source, not the act of beginning.",
+          "card_index": 21,
+          "card_number": 22,
+          "code": "contextual_source_field_mismatch",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "Here it names the origin of heaven and earth, not the verbal act of beginning.",
+          "field_name": "Nuance (English)",
+          "location": "Response → term_results → rank 10 → contextual_sense → Nuance (English)",
+          "message": "This exact retained occurrence has an unequivocal source-specific lexical value frozen into the current response contract.",
+          "overrideable": false,
+          "path": "$.term_results[9].contextual_sense[\"Nuance (English)\"]",
+          "problem_id": "contextual_source_field_mismatch:ed18f9e92aaeb334",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 10
+          },
+          "scope": "field",
+          "source_rank": 10,
+          "suggestion": "Repair this rank without overriding the audited contextual grammar.",
+          "term": "始",
+          "title": "Contextual field contradicts the audited source"
+        },
+        {
+          "accepted": false,
+          "actual": {
+            "sentences_without_emphasis": [
+              1
+            ]
+          },
+          "card_index": 8,
+          "card_number": 9,
+          "code": "missing_sentence_emphasis",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "At least one nonempty <strong>...</strong> usage in every example sentence.",
+          "field_name": "Sentences",
+          "location": "Card 9 (“非”) → Sentences",
+          "message": "Every generated example sentence must use <strong>...</strong> around every occurrence that expresses this card's particular meaning.",
+          "overrideable": true,
+          "path": "$.term_results[2].additional_senses[0][\"Sentences\"]",
+          "problem_id": "missing_sentence_emphasis:969a30e9cf545ce1",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 3
+          },
+          "scope": "field",
+          "source_rank": 3,
+          "suggestion": "Retry, or add strong tags around the intended usage in each listed sentence.",
+          "term": "非",
+          "title": "Defined usage is not emboldened"
+        },
+        {
+          "accepted": false,
+          "actual": {
+            "sentences_without_emphasis": [
+              1
+            ]
+          },
+          "card_index": 16,
+          "card_number": 17,
+          "code": "missing_sentence_emphasis",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "At least one nonempty <strong>...</strong> usage in every example sentence.",
+          "field_name": "Sentences",
+          "location": "Card 17 (“無”) → Sentences",
+          "message": "Every generated example sentence must use <strong>...</strong> around every occurrence that expresses this card's particular meaning.",
+          "overrideable": true,
+          "path": "$.term_results[6].additional_senses[0][\"Sentences\"]",
+          "problem_id": "missing_sentence_emphasis:26996db0ccd60895",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 7
+          },
+          "scope": "field",
+          "source_rank": 7,
+          "suggestion": "Retry, or add strong tags around the intended usage in each listed sentence.",
+          "term": "無",
+          "title": "Defined usage is not emboldened"
+        },
+        {
+          "accepted": false,
+          "actual": {
+            "sentences_without_emphasis": [
+              1,
+              2
+            ]
+          },
+          "card_index": 19,
+          "card_number": 20,
+          "code": "missing_sentence_emphasis",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "At least one nonempty <strong>...</strong> usage in every example sentence.",
+          "field_name": "Sentences",
+          "location": "Card 20 (“之”) → Sentences",
+          "message": "Every generated example sentence must use <strong>...</strong> around every occurrence that expresses this card's particular meaning.",
+          "overrideable": true,
+          "path": "$.term_results[8].additional_senses[0][\"Sentences\"]",
+          "problem_id": "missing_sentence_emphasis:99e1f283932a0988",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 9
+          },
+          "scope": "field",
+          "source_rank": 9,
+          "suggestion": "Retry, or add strong tags around the intended usage in each listed sentence.",
+          "term": "之",
+          "title": "Defined usage is not emboldened"
+        },
+        {
+          "accepted": false,
+          "actual": {
+            "sentence": "是非未判，眾口紛然。",
+            "unemphasized_character_offsets": [
+              1
+            ]
+          },
+          "card_index": 8,
+          "card_number": 9,
+          "code": "unemphasized_source_term_occurrence",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "No literal source-term occurrence outside <strong>非</strong>.",
+          "field_name": "Sentences",
+          "location": "Card 9 (“非”) → Sentences → item 1",
+          "message": "Every literal occurrence of the requested term in a generated additional-sense example must express that card's selected sense and be enclosed by exact <strong>...</strong> tags. Remove mixed-sense homographs from the example.",
+          "overrideable": true,
+          "path": "$.term_results[2].additional_senses[0][\"Sentences\"][0]",
+          "problem_id": "unemphasized_source_term_occurrence:6f00d0b28c3c95fd",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 3
+          },
+          "scope": "field",
+          "source_rank": 3,
+          "suggestion": "Retry, or replace this sentence with one whose every occurrence of the term has the selected meaning and exact strong markup.",
+          "term": "非",
+          "title": "Example contains an unemboldened occurrence of the source term"
+        },
+        {
+          "accepted": false,
+          "actual": {
+            "sentence": "有無相生。",
+            "unemphasized_character_offsets": [
+              1
+            ]
+          },
+          "card_index": 16,
+          "card_number": 17,
+          "code": "unemphasized_source_term_occurrence",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "No literal source-term occurrence outside <strong>無</strong>.",
+          "field_name": "Sentences",
+          "location": "Card 17 (“無”) → Sentences → item 1",
+          "message": "Every literal occurrence of the requested term in a generated additional-sense example must express that card's selected sense and be enclosed by exact <strong>...</strong> tags. Remove mixed-sense homographs from the example.",
+          "overrideable": true,
+          "path": "$.term_results[6].additional_senses[0][\"Sentences\"][0]",
+          "problem_id": "unemphasized_source_term_occurrence:cedcac4a1d5d48df",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 7
+          },
+          "scope": "field",
+          "source_rank": 7,
+          "suggestion": "Retry, or replace this sentence with one whose every occurrence of the term has the selected meaning and exact strong markup.",
+          "term": "無",
+          "title": "Example contains an unemboldened occurrence of the source term"
+        },
+        {
+          "accepted": false,
+          "actual": {
+            "sentence": "見之而喜。",
+            "unemphasized_character_offsets": [
+              1
+            ]
+          },
+          "card_index": 19,
+          "card_number": 20,
+          "code": "unemphasized_source_term_occurrence",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "No literal source-term occurrence outside <strong>之</strong>.",
+          "field_name": "Sentences",
+          "location": "Card 20 (“之”) → Sentences → item 1",
+          "message": "Every literal occurrence of the requested term in a generated additional-sense example must express that card's selected sense and be enclosed by exact <strong>...</strong> tags. Remove mixed-sense homographs from the example.",
+          "overrideable": true,
+          "path": "$.term_results[8].additional_senses[0][\"Sentences\"][0]",
+          "problem_id": "unemphasized_source_term_occurrence:70aae9321f548ff2",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 9
+          },
+          "scope": "field",
+          "source_rank": 9,
+          "suggestion": "Retry, or replace this sentence with one whose every occurrence of the term has the selected meaning and exact strong markup.",
+          "term": "之",
+          "title": "Example contains an unemboldened occurrence of the source term"
+        },
+        {
+          "accepted": false,
+          "actual": {
+            "sentence": "知之不言。",
+            "unemphasized_character_offsets": [
+              1
+            ]
+          },
+          "card_index": 19,
+          "card_number": 20,
+          "code": "unemphasized_source_term_occurrence",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "No literal source-term occurrence outside <strong>之</strong>.",
+          "field_name": "Sentences",
+          "location": "Card 20 (“之”) → Sentences → item 2",
+          "message": "Every literal occurrence of the requested term in a generated additional-sense example must express that card's selected sense and be enclosed by exact <strong>...</strong> tags. Remove mixed-sense homographs from the example.",
+          "overrideable": true,
+          "path": "$.term_results[8].additional_senses[0][\"Sentences\"][1]",
+          "problem_id": "unemphasized_source_term_occurrence:97d73ccc3c7b93de",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 9
+          },
+          "scope": "field",
+          "source_rank": 9,
+          "suggestion": "Retry, or replace this sentence with one whose every occurrence of the term has the selected meaning and exact strong markup.",
+          "term": "之",
+          "title": "Example contains an unemboldened occurrence of the source term"
+        }
+      ],
+      "remaining_problem_count": 9,
+      "structurally_valid": false,
+      "syntax_valid": true,
+      "valid": false
+    }
+  },
+  "word_count": 10
+}

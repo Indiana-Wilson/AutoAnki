@@ -2,7 +2,6 @@
 
 import hashlib
 import re
-import unicodedata
 
 from corpus_pipeline.chunks import make_chunks
 from corpus_pipeline.contexts import (
@@ -11,7 +10,13 @@ from corpus_pipeline.contexts import (
     sentence_neighbor_ids,
 )
 from corpus_pipeline.models import CorpusValidationError
-from corpus_pipeline.processing import is_han_component, is_han_word
+from corpus_pipeline.processing import (
+    HISTORICAL_ENGLISH_LANGUAGE_KEYS,
+    historical_english_word_ranges,
+    is_han_component,
+    is_han_word,
+    normalize_word,
+)
 
 
 _FORBIDDEN_CLEAN_PATTERNS = (
@@ -28,6 +33,17 @@ _FORBIDDEN_CLEAN_PATTERNS = (
 
 def _fail(message):
     raise CorpusValidationError(message)
+
+
+def _historical_english_ranges(snapshot):
+    return tuple(
+        (
+            section.start_offset + start,
+            section.start_offset + end,
+        )
+        for section in snapshot.sections
+        for start, end in historical_english_word_ranges(section.text)
+    )
 
 
 def audit_snapshot(
@@ -151,6 +167,14 @@ def audit_build(build):
     previous_end = -1
     occurrence_ids = set()
     covered_offsets = bytearray(len(canonical_text))
+    historical_english = (
+        build.snapshot.source_language_key
+        in HISTORICAL_ENGLISH_LANGUAGE_KEYS)
+    expected_historical_ranges = (
+        _historical_english_ranges(build.snapshot)
+        if historical_english
+        else ())
+    expected_historical_range_set = set(expected_historical_ranges)
     for expected_index, occurrence in enumerate(
             build.occurrences,
             start=1):
@@ -177,9 +201,20 @@ def audit_build(build):
             _fail(f"Token offset mismatch: {occurrence.occurrence_id}")
         if (
                 occurrence.normalized
-                != unicodedata.normalize("NFC", occurrence.surface)):
+                != normalize_word(
+                    occurrence.surface,
+                    build.snapshot.source_language_key)):
             _fail(f"Token normalization mismatch: {occurrence.occurrence_id}")
-        if not is_han_word(occurrence.surface):
+        if (
+                historical_english
+                and (
+                    occurrence.start_offset,
+                    occurrence.end_offset,
+                ) not in expected_historical_range_set):
+            _fail(
+                "Non-lexical historical-English token occurrence: "
+                f"{occurrence.occurrence_id}")
+        if not historical_english and not is_han_word(occurrence.surface):
             _fail(f"Non-Han token occurrence: {occurrence.occurrence_id}")
         paragraph = contexts.get(occurrence.paragraph_id)
         sentence = contexts.get(occurrence.sentence_id)
@@ -216,8 +251,18 @@ def audit_build(build):
             occurrence.end_offset - occurrence.start_offset)
         previous_end = occurrence.end_offset
 
-    for offset, character in enumerate(canonical_text):
-        if is_han_component(character) and not covered_offsets[offset]:
+    if historical_english:
+        for start, end in expected_historical_ranges:
+            if not all(covered_offsets[start:end]):
+                _fail(
+                    "Historical-English word span at "
+                    f"{start}:{end} is not covered by a token occurrence.")
+    else:
+        for offset, character in enumerate(canonical_text):
+            if not (
+                    is_han_component(character)
+                    and not covered_offsets[offset]):
+                continue
             _fail(
                 f"Han/variation code point at offset {offset} is not "
                 "covered by a token occurrence.")
@@ -309,6 +354,13 @@ def audit_vocabulary_view(view):
         contexts[context.context_id] = context
 
     sentence_neighbors = sentence_neighbor_ids(view.contexts)
+    historical_english = (
+        view.snapshot.source_language_key
+        in HISTORICAL_ENGLISH_LANGUAGE_KEYS)
+    expected_historical_range_set = (
+        set(_historical_english_ranges(view.snapshot))
+        if historical_english
+        else set())
     seen_words = set()
     previous_first_end = -1
     for expected_rank, word in enumerate(view.unique_words, start=1):
@@ -349,9 +401,18 @@ def audit_vocabulary_view(view):
             _fail(f"Unique-word offset mismatch for {word.surface}.")
         if (
                 word.normalized
-                != unicodedata.normalize("NFC", word.surface)):
+                != normalize_word(
+                    word.surface,
+                    view.snapshot.source_language_key)):
             _fail(f"Unique-word normalization mismatch for {word.surface}.")
-        if not is_han_word(word.surface):
+        if (
+                historical_english
+                and (word.start_offset, word.end_offset)
+                not in expected_historical_range_set):
+            _fail(
+                f"Non-lexical historical-English unique word: "
+                f"{word.surface}.")
+        if not historical_english and not is_han_word(word.surface):
             _fail(f"Non-Han unique word: {word.surface}.")
         expected_neighbors = sentence_neighbors.get(word.sentence_id)
         if (

@@ -54,6 +54,9 @@ CONTENT_FIELDS = (
 CONTENT_FIELD_NAMES = tuple(
     field_name
     for _field_key, field_name in CONTENT_FIELDS)
+SENTENCE_TRANSLATIONS_FIELD_NAME = "Sentence Translations (English)"
+SOURCE_CONTEXT_BLOCK_PREFIX = "\ue000S"
+SOURCE_CONTEXT_ESCAPE_MARKER = "\ue000"
 
 CARD_CSS = """.card {
   box-sizing: border-box;
@@ -90,6 +93,21 @@ CARD_CSS = """.card {
 .term {
   text-align: center;
 }
+
+.sentence {
+  max-width: 44em;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.sentence-translation {
+  max-width: 44em;
+  margin-bottom: 0.9em;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
 """
 
 
@@ -110,18 +128,44 @@ def _definition_stack():
 
 
 def _context_front(term_field):
-    return f"""<div id="sentence" class="sentence"></div>
+    return f"""<div id="sentence-source" hidden>{{{{Sentences}}}}</div>
+<div id="sentence" class="sentence"></div>
 <script>
 (function () {{
-  const raw = `{{{{Sentences}}}}`;
-  const sentences = raw.split("|").map(s => s.trim()).filter(Boolean);
-  const key = "autoanki-sentence-{{{{text:{term_field}}}}}";
-  let chosen = sessionStorage.getItem(key);
-  if (!chosen || !sentences.includes(chosen)) {{
-    chosen = sentences[Math.floor(Math.random() * sentences.length)];
-    sessionStorage.setItem(key, chosen);
+  const source = document.getElementById("sentence-source");
+  const raw = source ? source.innerHTML : "";
+  const blockPrefix = "\\uE000S";
+  const escapeMarker = "\\uE000";
+  let sentences;
+  if (raw.startsWith(blockPrefix)) {{
+    const encoded = raw.slice(blockPrefix.length);
+    sentences = [encoded
+      .split(escapeMarker + "1").join("|")
+      .split(escapeMarker + "0").join(escapeMarker)];
+  }} else {{
+    sentences = raw.includes("|")
+      ? raw.split("|").map(s => s.trim())
+      : (raw.trim() ? [raw.trim()] : []);
   }}
-  document.getElementById("sentence").innerHTML = chosen;
+  const candidateIndices = sentences
+    .map((sentence, index) => sentence ? index : -1)
+    .filter(index => index >= 0);
+  if (!candidateIndices.length) return;
+  let hash = 2166136261;
+  for (let index = 0; index < raw.length; index += 1) {{
+    hash ^= raw.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }}
+  const key = "autoanki-sentence-index-" + (hash >>> 0).toString(16);
+  let chosenIndex = Number.parseInt(sessionStorage.getItem(key), 10);
+  if (
+      !Number.isInteger(chosenIndex)
+      || !candidateIndices.includes(chosenIndex)) {{
+    chosenIndex = candidateIndices[
+      Math.floor(Math.random() * candidateIndices.length)];
+    sessionStorage.setItem(key, String(chosenIndex));
+  }}
+  document.getElementById("sentence").innerHTML = sentences[chosenIndex];
 }})();
 </script>"""
 
@@ -130,11 +174,43 @@ def _context_back(term_field):
     return f"""<div>
 {{{{FrontSide}}}}
 <hr>
+{{{{#{SENTENCE_TRANSLATIONS_FIELD_NAME}}}}}
+<div id="sentence-translations-source" hidden>
+  {{{{{SENTENCE_TRANSLATIONS_FIELD_NAME}}}}}
+</div>
+<div id="sentence-translation" class="sentence-translation"></div>
+{{{{/{SENTENCE_TRANSLATIONS_FIELD_NAME}}}}}
 {_definition_stack()}
 </div>
 <script>
-sessionStorage.removeItem(
-  "autoanki-sentence-{{{{text:{term_field}}}}}");
+(function () {{
+  const sentenceSource = document.getElementById("sentence-source");
+  const sentenceRaw = sentenceSource ? sentenceSource.innerHTML : "";
+  let hash = 2166136261;
+  for (let index = 0; index < sentenceRaw.length; index += 1) {{
+    hash ^= sentenceRaw.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }}
+  const key = "autoanki-sentence-index-" + (hash >>> 0).toString(16);
+  const chosenIndex = Number.parseInt(sessionStorage.getItem(key), 10);
+  const translationSource = document.getElementById(
+    "sentence-translations-source");
+  const translationRaw = translationSource
+    ? translationSource.innerHTML
+    : "";
+  const translations = translationRaw.includes("|")
+    ? translationRaw.split("|").map(s => s.trim())
+    : (translationRaw.trim() ? [translationRaw.trim()] : []);
+  const translation = (
+      Number.isInteger(chosenIndex)
+      && chosenIndex >= 0
+      && chosenIndex < translations.length)
+    ? translations[chosenIndex]
+    : "";
+  const target = document.getElementById("sentence-translation");
+  if (target && translation) target.innerHTML = translation;
+  sessionStorage.removeItem(key);
+}})();
 </script>"""
 
 
@@ -146,6 +222,9 @@ def _create_model(language_key, direction_key, model_id):
         {"name": term_field},
         {"name": "Sentences"},
         *({"name": field_name} for field_name in CONTENT_FIELD_NAMES),
+        # Append instead of inserting so every existing field keeps its Anki
+        # ordinal when these stable model IDs are imported as an update.
+        {"name": SENTENCE_TRANSLATIONS_FIELD_NAME},
     ]
 
     if direction_key == "context":

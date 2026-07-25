@@ -3,7 +3,8 @@
 import re
 
 from corpus_pipeline.catalogue import (
-    DAODEJING,
+    DAODEJING_MAWANGDUI,
+    DAODEJING_WANG_BI,
     JOURNEY_TO_THE_WEST,
     CorpusSpec,
 )
@@ -15,13 +16,24 @@ from corpus_pipeline.models import (
 )
 
 
-CLEANER_VERSION = "wikisource-wikitext-v4"
+CLEANER_VERSION = "wikisource-wikitext-v5"
 
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-_CHAPTER_HEADING = re.compile(
-    r"(?m)^[ \t]*===[ \t]*"
+_WANG_BI_CHAPTER_HEADING = re.compile(
+    r"(?m)^[ \t]*==[ \t]*"
     r"([〇零一二三四五六七八九十百兩]+)"
-    r"章[ \t]*===[ \t]*$"
+    r"章[ \t]*==[ \t]*$"
+)
+_MAWANGDUI_CHAPTER_HEADING = re.compile(
+    r"(?m)^[ \t]*===[ \t]*第"
+    r"([〇零一二三四五六七八九十百兩]+)"
+    r"章(?:[ \t]+([^=\n]+?))?[ \t]*===[ \t]*$"
+)
+_MAWANGDUI_RECEIVED_CHAPTER = re.compile(
+    r"\A\s*[（(]([0-9]{1,2})[）)]\s*"
+)
+_WANG_BI_TRAILING_MATERIAL = re.compile(
+    r"(?m)^[ \t]*=[^=]"
 )
 _ANY_HEADING = re.compile(
     r"(?m)^[ \t]*={2,6}.*?={2,6}[ \t]*$"
@@ -46,6 +58,7 @@ _FIRST_ARGUMENT_TEMPLATES = frozenset({
     "參",
 })
 _DISCARD_TEMPLATES = frozenset({
+    "*",
     "alsosee",
     "cjk-new-char",
     "col-begin",
@@ -57,6 +70,9 @@ _DISCARD_TEMPLATES = frozenset({
     "textquality",
     "wikipedia",
     "檢索",
+    "道德真經注",
+    "道德真经注",
+    "曹魏作品",
 })
 _ALLOWED_CONTAINER_TAGS = frozenset({
     "onlyinclude",
@@ -81,11 +97,6 @@ _INTERLANGUAGE_NAMESPACES = frozenset({
 # 台, 膻, or another historically distinct form. Broad OpenCC conversion
 # would also damage legitimate classical forms such as 后, 云, 里, 凶, 采,
 # 几, 帘, and 价.
-_DAODEJING_ORTHOGRAPHY = (
-    ("春登台", "春登臺"),
-    ("其事好还", "其事好還"),
-    ("九層之台", "九層之臺"),
-)
 _JOURNEY_ORTHOGRAPHY = (
     ("攛將上来", "攛將上來"),
     ("獅驼王", "獅駝王"),
@@ -367,21 +378,22 @@ def _chinese_number(value):
     return total + current
 
 
-def clean_daodejing(page: SourcePage):
-    """Split and clean exactly 81 chapters from 老子 (匯校版)."""
-    if page.title != DAODEJING.content_titles[0]:
-        raise CorpusValidationError(
-            "The Dao De Jing cleaner only accepts 老子 (匯校版).")
-    validate_page_provenance(page)
-    matches = tuple(_CHAPTER_HEADING.finditer(page.raw_wikitext))
-    numbers = tuple(
-        _chinese_number(match.group(1))
-        for match in matches
-    )
-    expected = tuple(range(1, DAODEJING.expected_section_count + 1))
+def _daodejing_spec_for_page(page):
+    for spec in (DAODEJING_WANG_BI, DAODEJING_MAWANGDUI):
+        if page.title == spec.content_titles[0]:
+            return spec
+    raise CorpusValidationError(
+        "The Dao De Jing cleaner only accepts the pinned Wang Bi or "
+        "Mawangdui edition.")
+
+
+def _clean_wang_bi_daodejing(page, spec):
+    matches = tuple(_WANG_BI_CHAPTER_HEADING.finditer(page.raw_wikitext))
+    numbers = tuple(_chinese_number(match.group(1)) for match in matches)
+    expected = tuple(range(1, spec.expected_section_count + 1))
     if numbers != expected:
         raise CorpusValidationError(
-            "老子 (匯校版) must contain chapter headings 1 through 81 "
+            "道德經 (王弼本) must contain chapter headings 1 through 81 "
             "exactly once and in order.")
 
     sections = []
@@ -391,22 +403,95 @@ def clean_daodejing(page: SourcePage):
             if index + 1 < len(matches)
             else len(page.raw_wikitext)
         )
-        text = _normalize_audited_phrases(
-            clean_wikitext(page.raw_wikitext[match.end():end]),
-            _DAODEJING_ORTHOGRAPHY)
+        body = page.raw_wikitext[match.end():end]
+        trailing_heading = _WANG_BI_TRAILING_MATERIAL.search(body)
+        if trailing_heading is not None:
+            body = body[:trailing_heading.start()]
+        text = clean_wikitext(body)
         if not text:
             raise CorpusValidationError(
-                f"Dao De Jing chapter {index + 1} is empty after cleaning.")
+                f"Wang Bi chapter {index + 1} is empty after cleaning.")
         sections.append(TextSection(
-            section_id=(
-                f"{DAODEJING.key}:chapter:{index + 1:03d}"
-            ),
+            section_id=f"{spec.key}:chapter:{index + 1:03d}",
             order=index + 1,
             title=f"第{match.group(1)}章",
             source_page_key=page.page_key,
             text=text,
         ))
+    if not sections[0].text.startswith("道可道，非常道"):
+        raise CorpusValidationError(
+            "The pinned Wang Bi edition no longer has the received-text "
+            "opening.")
     return tuple(sections)
+
+
+def _clean_mawangdui_daodejing(page, spec):
+    matches = tuple(_MAWANGDUI_CHAPTER_HEADING.finditer(page.raw_wikitext))
+    manuscript_numbers = tuple(
+        _chinese_number(match.group(1))
+        for match in matches)
+    expected = tuple(range(1, spec.expected_section_count + 1))
+    if manuscript_numbers != expected:
+        raise CorpusValidationError(
+            "老子 (帛書校勘版) must contain manuscript-order headings 1 "
+            "through 81 exactly once.")
+
+    sections = []
+    received_numbers = []
+    for index, match in enumerate(matches):
+        end = (
+            matches[index + 1].start()
+            if index + 1 < len(matches)
+            else len(page.raw_wikitext)
+        )
+        body = page.raw_wikitext[match.end():end]
+        received = _MAWANGDUI_RECEIVED_CHAPTER.match(body)
+        if received is None:
+            raise CorpusValidationError(
+                f"Mawangdui section {index + 1} has no received-edition "
+                "chapter mapping.")
+        received_number = int(received.group(1))
+        received_numbers.append(received_number)
+        text = clean_wikitext(body[received.end():])
+        if not text:
+            raise CorpusValidationError(
+                f"Mawangdui section {index + 1} is empty after cleaning.")
+        heading_label = " ".join((match.group(2) or "").split())
+        title = f"第{match.group(1)}章"
+        if heading_label:
+            title += f" {heading_label}"
+        title += f"（通行本第{received_number}章）"
+        sections.append(TextSection(
+            section_id=f"{spec.key}:chapter:{index + 1:03d}",
+            order=index + 1,
+            title=title,
+            source_page_key=page.page_key,
+            text=text,
+        ))
+    if set(received_numbers) != set(expected):
+        raise CorpusValidationError(
+            "The Mawangdui edition must map onto received chapters 1 "
+            "through 81 exactly once.")
+    chapter_one = sections[received_numbers.index(1)]
+    if not chapter_one.text.startswith("道可道也 非恆道也"):
+        raise CorpusValidationError(
+            "The pinned Mawangdui edition no longer has the silk-manuscript "
+            "opening.")
+    return tuple(sections)
+
+
+def clean_daodejing(page: SourcePage, spec=None):
+    """Split one pinned Daodejing edition into exactly 81 clean sections."""
+    spec = spec or _daodejing_spec_for_page(page)
+    if page.title != spec.content_titles[0]:
+        raise CorpusValidationError(
+            f"The Dao De Jing page does not match edition {spec.edition!r}.")
+    validate_page_provenance(page)
+    if spec.key == DAODEJING_WANG_BI.key:
+        return _clean_wang_bi_daodejing(page, spec)
+    if spec.key == DAODEJING_MAWANGDUI.key:
+        return _clean_mawangdui_daodejing(page, spec)
+    raise KeyError(f"No Dao De Jing cleaner for {spec.key!r}.")
 
 
 def validate_journey_index(index_page: SourcePage):
@@ -523,11 +608,13 @@ def clean_corpus_pages(spec: CorpusSpec, pages):
     if tuple(page.title for page in source_pages) != expected_titles:
         raise CorpusValidationError(
             f"Fetched pages do not match corpus catalogue {spec.key!r}.")
-    if spec.key == DAODEJING.key:
+    if spec.key in {
+            DAODEJING_WANG_BI.key,
+            DAODEJING_MAWANGDUI.key}:
         if len(source_pages) != 1:
             raise CorpusValidationError(
                 "The Dao De Jing source requires exactly one page.")
-        return clean_daodejing(source_pages[0])
+        return clean_daodejing(source_pages[0], spec)
     if spec.key == JOURNEY_TO_THE_WEST.key:
         index_page, *chapter_pages = source_pages
         linked_titles = validate_journey_index(index_page)

@@ -1,4 +1,45 @@
 Provide exactly four short, natural {source_language} example sentences for
-each sense, separated with the pipe character, |. Wrap the requested word or
-an inflected form of it in <strong>...</strong> in every sentence. Make each
-sentence unambiguously illustrate the selected sense.
+each sense entry, separated with the pipe character, |. Generate a distinct
+set of sentences for every separate sense entry; do not reuse a sentence
+between meanings. Write each sentence so that a reader can infer unambiguously
+which particular sense is being used without seeing the definition. Include
+the requested word or expression, or a grammatically appropriate inflected
+form of it, at least once in every sentence.
+
+In every sentence, wrap EVERY AND ONLY occurrence that expresses the
+particular sense defined by that card in literal <strong> and </strong> tags.
+This includes all relevant repeated occurrences and all relevant inflected
+forms. If the same spelling occurs elsewhere with a different meaning, leave
+that other occurrence completely untagged. Put the tags immediately around
+the word, inflected word, or complete multiword expression itself—never around
+surrounding words, punctuation, or the whole sentence. Every sentence must
+contain at least one nonempty <strong>...</strong> span. Use no other HTML or
+formatting.
+
+Markup examples for a card defining "run" in the sense "move quickly":
+
+VALID: She <strong>ran</strong> home.
+VALID: <strong>Run</strong> if you can <strong>run</strong> safely.
+VALID: She <strong>runs</strong> daily but runs a shop.
+
+INVALID: She ran home. (The intended usage is not tagged.)
+INVALID: She <strong>ran home</strong>. (The tag includes a surrounding word.)
+INVALID: <strong>She ran home.</strong> (The whole sentence is tagged.)
+INVALID: She <strong>runs</strong> daily but <strong>runs</strong> a shop.
+(The second "runs" has a different meaning and must remain untagged.)
+
+ABSOLUTE OUTPUT REQUIREMENT—NOT OPTIONAL:
+
+Every "Sentences" property that you return MUST already contain the literal
+<strong> and </strong> tags in its JSON string. Never return untagged example
+sentences and never assume that the caller will add the tags later. A response
+is INVALID if even one pipe-separated sentence lacks at least one correctly
+tagged occurrence of the term (or its relevant inflected form). Before
+returning the JSON, split every "Sentences" value mentally on | and verify
+EVERY individual sentence. For each sentence, verify all three conditions:
+
+1. At least one usage expressing this card's exact sense is tagged.
+2. Every usage expressing this card's exact sense is tagged, including
+   repeated or inflected usages.
+3. Nothing else is tagged: not another sense, neighbouring words,
+   punctuation, or the entire sentence.

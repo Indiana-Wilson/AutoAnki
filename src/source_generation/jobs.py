@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import errno
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -40,6 +41,10 @@ RETRYABLE_MANUALLY = frozenset({
 })
 _JOB_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 REQUEST_CONTRACT_FILE_NAME = "request_contract.json"
+MANUAL_VALIDATION_FILE_NAME = "manual_validation.json"
+MANUAL_VALIDATION_SCHEMA_VERSION = 1
+RESPONSE_RECORD_FILE_NAME = "response.json"
+RESPONSE_RECORD_SCHEMA_VERSION = 1
 
 
 def _utc_now():
@@ -306,6 +311,51 @@ class JobEvent:
 
 
 @dataclass(frozen=True)
+class PaidResponse:
+    """One paid API response with its exact text and billable usage.
+
+    The response record is persisted atomically before local validation.  It
+    therefore remains useful after a process interruption and prevents a
+    successfully received response from being paid for a second time merely
+    because ``raw.txt`` or validation had not yet been written.
+    """
+
+    raw_text: str
+    response_id: str | None = None
+    model: str | None = None
+    status: str | None = None
+    service_tier: str | None = None
+    usage: dict | None = None
+
+    def __post_init__(self):
+        if not isinstance(self.raw_text, str):
+            raise TypeError("A paid response body must be text.")
+        for name in (
+                "response_id",
+                "model",
+                "status",
+                "service_tier"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, str):
+                raise TypeError(
+                    f"Paid response {name} must be text when present.")
+        if self.usage is not None and not isinstance(self.usage, dict):
+            raise TypeError("Paid response usage must be an object.")
+
+    def to_record(self):
+        return {
+            "schema_version": RESPONSE_RECORD_SCHEMA_VERSION,
+            "response_id": self.response_id,
+            "model": self.model,
+            "status": self.status,
+            "service_tier": self.service_tier,
+            "raw_text": self.raw_text,
+            "usage": self.usage,
+            "received_at": _utc_now(),
+        }
+
+
+@dataclass(frozen=True)
 class JobSnapshot:
     job_id: str
     path: Path
@@ -498,6 +548,12 @@ class GenerationJobStore:
             self._job_path(job_id) / ".finalization.lock",
             blocking=blocking)
 
+    def economy_batch_lease(self, job_id, *, blocking=False):
+        """Return the one cross-process lease for Batch submit/collection."""
+        return _advisory_file_lock(
+            self._job_path(job_id) / ".economy_batch.lock",
+            blocking=blocking)
+
     def chunk_ids(self, job_id):
         chunks_path = self._job_path(job_id) / "chunks"
         if not chunks_path.is_dir():
@@ -568,6 +624,17 @@ class GenerationJobStore:
     def write_raw(self, attempt_path, raw_text):
         _atomic_write_text(Path(attempt_path) / "raw.txt", raw_text)
 
+    def write_response(self, attempt_path, response):
+        """Persist the paid response envelope before compatibility artifacts."""
+        if not isinstance(response, PaidResponse):
+            raise TypeError("A PaidResponse is required.")
+        record = response.to_record()
+        _atomic_write_json(
+            Path(attempt_path) / RESPONSE_RECORD_FILE_NAME,
+            record)
+        self.write_raw(attempt_path, response.raw_text)
+        return record
+
     def write_validated(self, attempt_path, value):
         _atomic_write_json(Path(attempt_path) / "validated.json", value)
 
@@ -580,6 +647,9 @@ class GenerationJobStore:
             "status_code": status_code,
             "timestamp": _utc_now(),
         }
+        validation = getattr(error, "validation_report", None)
+        if isinstance(validation, dict):
+            value["validation"] = validation
         _atomic_write_json(Path(attempt_path) / "error.json", value)
         return value
 
@@ -592,10 +662,196 @@ class GenerationJobStore:
             "status_code": _response_status_code(error),
             "timestamp": _utc_now(),
         }
+        validation = getattr(error, "validation_report", None)
+        if isinstance(validation, dict):
+            value["validation"] = validation
         _atomic_write_json(
             Path(attempt_path) / "recovery_error.json",
             value)
         return value
+
+    def load_manual_validation(self, job_id, chunk_id):
+        """Return the latest attempt's durable human-review audit, if any."""
+        attempt_path = self.latest_attempt_path(job_id, chunk_id)
+        if attempt_path is None:
+            return None
+        path = attempt_path / MANUAL_VALIDATION_FILE_NAME
+        if not path.is_file():
+            return None
+        value = _read_json(path)
+        if (
+                value.get("schema_version")
+                != MANUAL_VALIDATION_SCHEMA_VERSION
+                or value.get("job_id") != job_id
+                or value.get("chunk_id") != chunk_id
+                or value.get("attempt") != int(attempt_path.name)):
+            raise ValueError(
+                "Unsupported or inconsistent manual-validation audit.")
+        return value
+
+    def record_manual_acceptance(
+            self,
+            job_id,
+            chunk_id,
+            *,
+            raw_text,
+            problems,
+            problem_ids,
+            reason=None):
+        """Persist selected overrideable problem IDs with an audit trail."""
+        if not isinstance(raw_text, str):
+            raise TypeError("Retained response text is required.")
+        if reason is not None:
+            if not isinstance(reason, str):
+                raise TypeError("Manual-validation reason must be text.")
+            reason = reason.strip() or None
+            if reason is not None and len(reason) > 2_000:
+                raise ValueError(
+                    "Manual-validation reason cannot exceed 2,000 characters.")
+        selected = tuple(dict.fromkeys(problem_ids))
+        if any(
+                not isinstance(problem_id, str)
+                or not problem_id
+                for problem_id in selected):
+            raise ValueError(
+                "Manual-validation problem IDs must be non-empty text.")
+        problems_by_id = {
+            problem["problem_id"]: problem
+            for problem in problems
+        }
+        unknown = set(selected) - set(problems_by_id)
+        if unknown:
+            raise KeyError(
+                "Unknown or stale validation problems: "
+                + ", ".join(sorted(unknown)))
+        forbidden = [
+            problem_id
+            for problem_id in selected
+            if not problems_by_id[problem_id].get("overrideable")
+        ]
+        if forbidden:
+            raise ValueError(
+                "Structural validation problems cannot be manually accepted: "
+                + ", ".join(forbidden))
+
+        attempt_path = self.latest_attempt_path(job_id, chunk_id)
+        if attempt_path is None:
+            raise ValueError(
+                "This source chunk has no retained response to review.")
+        raw_sha256 = hashlib.sha256(
+            raw_text.encode("utf-8")).hexdigest()
+        path = attempt_path / MANUAL_VALIDATION_FILE_NAME
+        with self._lock:
+            existing = self.load_manual_validation(job_id, chunk_id)
+            if existing is None:
+                value = {
+                    "schema_version": MANUAL_VALIDATION_SCHEMA_VERSION,
+                    "job_id": job_id,
+                    "chunk_id": chunk_id,
+                    "attempt": int(attempt_path.name),
+                    "raw_sha256": raw_sha256,
+                    "accepted_problems": [],
+                    "history": [],
+                    "created_at": _utc_now(),
+                    "updated_at": _utc_now(),
+                }
+            else:
+                value = existing
+                if value.get("raw_sha256") != raw_sha256:
+                    raise ValueError(
+                        "The retained response changed after manual review; "
+                        "its prior decisions cannot be reused.")
+
+            accepted_by_id = {
+                item["problem_id"]: item
+                for item in value.get("accepted_problems", ())
+            }
+            timestamp = _utc_now()
+            newly_accepted = []
+            for problem_id in selected:
+                if problem_id in accepted_by_id:
+                    continue
+                problem = dict(problems_by_id[problem_id])
+                problem.update({
+                    "accepted_at": timestamp,
+                    "reason": reason,
+                })
+                accepted_by_id[problem_id] = problem
+                newly_accepted.append(problem_id)
+            if selected:
+                value.setdefault("history", []).append({
+                    "timestamp": timestamp,
+                    "requested_problem_ids": list(selected),
+                    "newly_accepted_problem_ids": newly_accepted,
+                    "reason": reason,
+                })
+            value["accepted_problems"] = list(
+                accepted_by_id.values())
+            value["updated_at"] = timestamp
+            _atomic_write_json(path, value)
+        return value
+
+    def mark_manually_validated(
+            self,
+            job_id,
+            chunk_id,
+            *,
+            validated,
+            validation_report):
+        """Promote a reviewed response after every current issue is accepted."""
+        if not isinstance(validated, dict):
+            raise TypeError(
+                "Canonical validated source response must be an object.")
+        if validation_report.get("remaining_problem_count") != 0:
+            raise ValueError(
+                "Every current validation problem must be resolved first.")
+        if not validation_report.get("structurally_valid"):
+            raise ValueError(
+                "Structurally invalid responses cannot be manually accepted.")
+        audit = self.load_manual_validation(job_id, chunk_id)
+        accepted_ids = {
+            item["problem_id"]
+            for item in (
+                (audit or {}).get("accepted_problems", ()))
+        }
+        current_ids = {
+            problem["problem_id"]
+            for problem in validation_report.get("problems", ())
+        }
+        if not current_ids <= accepted_ids:
+            raise ValueError(
+                "The manual-validation audit does not cover every problem.")
+        attempt_path = self.latest_attempt_path(job_id, chunk_id)
+        if attempt_path is None:
+            raise ValueError(
+                "This source chunk has no retained response to promote.")
+        completed_at = _utc_now()
+        self.write_validated(attempt_path, validated)
+        self._set_chunk_status(
+            job_id,
+            chunk_id,
+            status=CHUNK_SUCCEEDED,
+            worker="manual-review",
+            last_error=None,
+            validation_override={
+                "accepted_problem_ids": sorted(current_ids),
+                "accepted_problem_count": len(current_ids),
+                "audit_path": (
+                    f"{self.chunk_status(job_id, chunk_id)['latest_attempt_path']}"
+                    f"/{MANUAL_VALIDATION_FILE_NAME}"),
+                "completed_at": completed_at,
+            },
+            completed_at=completed_at,
+        )
+        self.event(
+            job_id,
+            chunk_id=chunk_id,
+            status=CHUNK_SUCCEEDED,
+            message=(
+                "A human reviewer accepted every remaining content "
+                "validation problem; structural checks still passed."),
+            attempt=int(attempt_path.name))
+        return self.refresh(job_id)
 
     def _append_event(self, event):
         with self._lock:
@@ -740,9 +996,11 @@ class GenerationJobStore:
                 record = {"attempt": int(attempt_path.name)}
                 for name, filename in (
                         ("raw_text", "raw.txt"),
+                        ("response", RESPONSE_RECORD_FILE_NAME),
                         ("validated", "validated.json"),
                         ("error", "error.json"),
-                        ("recovery_error", "recovery_error.json")):
+                        ("recovery_error", "recovery_error.json"),
+                        ("manual_validation", MANUAL_VALIDATION_FILE_NAME)):
                     path = attempt_path / filename
                     if not path.is_file():
                         continue
@@ -757,6 +1015,64 @@ class GenerationJobStore:
             "status": self.chunk_status(job_id, chunk_id),
             "attempts": attempts,
         }
+
+    def usage_summary(self, job_id):
+        """Aggregate exact API usage over every retained paid attempt.
+
+        Cached input is a subset of input and reasoning is a subset of output,
+        so neither is added to the corresponding billable total twice.
+        """
+        totals = {
+            "attempt_count": 0,
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "uncached_input_tokens": 0,
+            "output_tokens": 0,
+            "reasoning_tokens": 0,
+            "visible_output_tokens": 0,
+            "total_tokens": 0,
+            "web_search_calls": 0,
+        }
+        seen_response_ids = set()
+        for chunk_id in self.chunk_ids(job_id):
+            attempts_path = (
+                self._chunk_path(job_id, chunk_id) / "attempts")
+            if not attempts_path.is_dir():
+                continue
+            for attempt_path in sorted(attempts_path.iterdir()):
+                response_path = (
+                    attempt_path / RESPONSE_RECORD_FILE_NAME)
+                if not response_path.is_file():
+                    continue
+                record = _read_json(response_path)
+                response_id = record.get("response_id")
+                if (
+                        isinstance(response_id, str)
+                        and response_id):
+                    if response_id in seen_response_ids:
+                        continue
+                    seen_response_ids.add(response_id)
+                usage = record.get("usage")
+                if not isinstance(usage, dict):
+                    continue
+                totals["attempt_count"] += 1
+                for key in (
+                        "input_tokens",
+                        "cached_input_tokens",
+                        "uncached_input_tokens",
+                        "output_tokens",
+                        "reasoning_tokens",
+                        "visible_output_tokens",
+                        "total_tokens",
+                        "web_search_calls"):
+                    value = usage.get(key, 0)
+                    if (
+                            isinstance(value, bool)
+                            or not isinstance(value, int)
+                            or value < 0):
+                        continue
+                    totals[key] += value
+        return totals
 
     def reset_for_manual_retry(self, job_id, chunk_ids):
         selected = set(chunk_ids)
@@ -931,6 +1247,8 @@ class GenerationJobRunner:
                 "retained and no queued request will start."))
 
     def _raw_text(self, response):
+        if isinstance(response, PaidResponse):
+            return response.raw_text
         if isinstance(response, str):
             return response
         if isinstance(response, bytes):
@@ -982,6 +1300,12 @@ class GenerationJobRunner:
         if (status.get("last_error") or {}).get("type") != "InterruptedRun":
             return False
         raw_path = attempt_path / "raw.txt"
+        response_path = attempt_path / RESPONSE_RECORD_FILE_NAME
+        if not raw_path.is_file() and response_path.is_file():
+            response_record = _read_json(response_path)
+            retained_text = response_record.get("raw_text")
+            if isinstance(retained_text, str):
+                self.store.write_raw(attempt_path, retained_text)
         if not raw_path.is_file():
             validated_path = attempt_path / "validated.json"
             if not validated_path.is_file():
@@ -1113,11 +1437,22 @@ class GenerationJobRunner:
                 response = self.request_callable(chunk)
             except Exception as error:
                 transient = is_transient_request_error(error)
+                retained_response = getattr(
+                    error,
+                    "paid_response",
+                    None)
+                if isinstance(retained_response, PaidResponse):
+                    self.store.write_response(
+                        attempt_path,
+                        retained_response)
                 retained_raw = getattr(
                     error,
                     "raw_response_text",
                     None)
-                if isinstance(retained_raw, str) and retained_raw:
+                if (
+                        not isinstance(retained_response, PaidResponse)
+                        and isinstance(retained_raw, str)
+                        and retained_raw):
                     self.store.write_raw(
                         attempt_path,
                         retained_raw)
@@ -1180,7 +1515,12 @@ class GenerationJobRunner:
                 return
 
             raw_text = self._raw_text(response)
-            self.store.write_raw(attempt_path, raw_text)
+            if isinstance(response, PaidResponse):
+                self.store.write_response(
+                    attempt_path,
+                    response)
+            else:
+                self.store.write_raw(attempt_path, raw_text)
             try:
                 validated = self.response_validator(raw_text, chunk)
                 self.store.write_validated(attempt_path, validated)

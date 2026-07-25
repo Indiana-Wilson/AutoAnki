@@ -1,0 +1,55 @@
+For this source request, return three separate root arrays:
+"contextual_cards", "additional_sense_cards", and
+"source_context_translations". Never return a root "cards" array.
+
+CONTEXTUAL CARDS
+
+Return exactly one object in "contextual_cards" for every object in the input
+"words" array, in ascending rank order. Copy the term exactly and describe
+only the sense used by that ranked occurrence. These objects must omit both
+"Sentences" and "Sentence Translations (English)"; their strict schema contains
+neither field. Do not put additional senses in this array.
+
+When a word supplies "occurrence_span", it is a pair of zero-based character
+offsets [start, end) relative to the referenced context object's "text": start
+is included and end is excluded. It identifies the exact occurrence whose
+sense the contextual card must describe. Do not use another identical spelling
+elsewhere in the retained context to select the sense.
+
+Before deciding that a term has no further senses, inspect every other
+occurrence of the same spelling in its retained context. If another occurrence
+plainly uses a different lexical sense from the occurrence_span, that different
+sense MUST appear in "additional_sense_cards". This is required even when both
+occurrences are in the same sentence. Also include other genuinely disjoint
+common senses required by the general source-batch rule.
+
+ADDITIONAL SENSE CARDS
+
+Put only genuinely disjoint additional common senses in
+"additional_sense_cards". Every object in this array must belong to a supplied
+term and must include "Sentences" as exactly four array items and
+"Sentence Translations (English)" as exactly four positionally matched array
+items. Keep entries for each term together in ascending source-rank order. Do
+not repeat the contextual sense here. If no requested term has an additional
+qualifying sense, return an empty array.
+
+SOURCE CONTEXT TRANSLATIONS
+
+Translate each object in the input "contexts" array exactly once, regardless of
+how many words refer to it. Return one object for every input context in
+"source_context_translations", with exactly these fields:
+
+- "context_id", copied character-for-character from the input.
+- "translation", containing one complete, natural English translation of the
+  whole context.
+
+Do not add an unrequested context_id, omit a requested one, or return the same
+context_id twice. Each context translation is one undelimited JSON string. It
+may contain normal English punctuation and multiple clauses or sentences, but
+never |, <strong> tags, or any other HTML. Do not split one context translation
+into several items. If the context is already Modern English, repeat it as
+plain text.
+
+The processor will insert the exact retained context and its matched root
+translation into each contextual card. Do not repeat, rewrite, delimit, or
+highlight either value inside a card object.

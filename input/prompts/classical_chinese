@@ -4,6 +4,11 @@ For each word or expression, provide four short, idiomatic example sentences
 in Classical Chinese. Separate the sentences with the pipe character, |.
 Give the pronunciation in Hanyu Pinyin with tone marks.
 
+For those same four examples, provide four complete, natural English
+translations in the "Sentence Translations (English)" property, separated by |
+in exactly the same order. Translate each whole sentence, not only the defined
+expression, and never use | or HTML inside one translation.
+
 The response schema determines which definitions are needed. If it contains
 "Meaning", give concise English translation equivalent(s). If it contains "Native Meaning",
 give a concise definition in Chinese using traditional characters. If it
@@ -11,14 +16,27 @@ contains "Dictionary Meaning", give a concise English dictionary-style
 explanation of what the expression means, including important semantic nuance,
 register, implications, or typical usage where relevant; do not merely list
 possible English translations. If multiple definition fields are present, they
-must describe the same sense. If an expression has multiple relevant meanings,
-create a separate card entry for each meaning, with examples that make that
-meaning unambiguous.
+must describe the same sense. Create a fully separate card entry for every
+genuinely disjoint, commonly used lexical sense that a learner is reasonably
+likely to encounter in the relevant period and register. Do this even when
+bracketed context clearly selects one sense; return that contextual sense
+first. Do not split different nuances, connotations, degrees, registers, or
+typical contexts of the same underlying meaning. Give every separate sense its
+own distinct set of example sentences, without reusing sentences between
+senses, and make the intended sense unambiguously inferable from each sentence
+alone.
 
-In every example sentence, wrap the requested expression in
-<strong>expression</strong>. Preserve traditional Chinese characters unless
-the input explicitly uses or requests a different form. Anything in brackets
-is context for choosing the intended meaning.
+Include the requested expression, or a contextually appropriate inflected or
+variant form where applicable, at least once in every example sentence. In
+every sentence, wrap EVERY occurrence that expresses that card's particular
+sense in literal <strong> and </strong> tags, including relevant repeated
+occurrences. If the same spelling has a different meaning elsewhere in the
+sentence, do NOT embolden that occurrence. Every sentence must contain a
+nonempty <strong>...</strong> span. Use no other HTML or formatting. Preserve
+traditional Chinese characters unless the input
+explicitly uses or requests a different form. Anything in brackets is context
+for identifying the contextual meaning, not for excluding other common
+meanings.
 
 If an entry does not exist, skip it. If it is clearly a typo, use the corrected
 entry.

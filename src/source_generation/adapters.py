@@ -6,15 +6,18 @@ import hmac
 import json
 import threading
 
+import pipeline_store
 from source_generation.jobs import GenerationJobStore
-from source_generation.models import SourceGenerationConfig
+from source_generation.models import ContextMode, SourceGenerationConfig
 from source_generation.planning import (
     MODEL_CONTEXT_WINDOW_TOKENS,
+    MODEL_MAX_INPUT_TOKENS,
     MODEL_MAX_OUTPUT_TOKENS,
     estimate_plan_cost,
     list_processed_source_summaries,
     load_processed_source,
     plan_source_generation,
+    resolve_latest_processed_source_path,
 )
 from source_generation.requests import (
     build_source_request_contract,
@@ -22,7 +25,47 @@ from source_generation.requests import (
 )
 
 
-SOURCE_ESTIMATE_AUTHORIZATION_SCHEMA_VERSION = 1
+SOURCE_ESTIMATE_AUTHORIZATION_SCHEMA_VERSION = 2
+
+
+def _source_example_setting(request, plan, pipeline):
+    enabled = bool(request.get("use_source_for_example_sentences", False))
+    if not enabled:
+        return False
+    if plan.config.context_mode is ContextMode.NONE:
+        raise ValueError(
+            "Using source text for example sentences requires source "
+            "context. Choose a context option other than None.")
+    # The contract builder also checks this, but doing it here keeps the
+    # source-specific error next to the other source-plan validation.
+    if not pipeline_store.requires_sentences(pipeline):
+        raise ValueError(
+            "Using source text for example sentences requires the Context "
+            "card direction.")
+    return True
+
+
+def _request_protocol_version(config):
+    return int(config.request_protocol.removeprefix("v"))
+
+
+def _estimate_response_format_arguments(config, request_contract):
+    response_formats = request_contract.get(
+        "response_formats_by_chunk")
+    if config.request_protocol == "v9":
+        return {
+            "response_format": request_contract["response_format"],
+            "response_formats_by_chunk": None,
+        }
+    if request_contract.get("use_source_for_example_sentences"):
+        return {
+            "response_format": None,
+            "response_formats_by_chunk": response_formats,
+        }
+    return {
+        "response_format": request_contract["response_format"],
+        "response_formats_by_chunk": None,
+    }
 
 
 def _estimate_authorization_fingerprint(plan, request_contract, estimate):
@@ -34,6 +77,9 @@ def _estimate_authorization_fingerprint(plan, request_contract, estimate):
             "request_stagger_ms": plan.config.request_stagger_ms,
             "max_transient_retries": (
                 plan.config.max_transient_retries),
+            "request_protocol": plan.config.request_protocol,
+            "reasoning_effort": plan.config.reasoning_effort,
+            "execution_mode": plan.config.execution_mode,
         },
         "request_contract_sha256": source_request_contract_digest(
             request_contract),
@@ -73,11 +119,16 @@ class SourceGenerationBackend:
 
     def catalogue(self):
         preset_names = {
-            "daodejing_huijiao": "Daodejing",
+            "daodejing_wang_bi": "Daodejing [Wang Bi]",
+            "daodejing_mawangdui": "Daodejing [Mawangdui]",
             "journey_to_the_west": "Journey to the West",
         }
         sources = []
         for source in list_processed_source_summaries(self.corpus_root):
+            if source["key"] == "daodejing_huijiao":
+                # Superseded unsourced eclectic collation. Retain its files
+                # for recovery, but do not present it as a third Daodejing.
+                continue
             value = dict(source)
             preset_name = preset_names.get(source["key"])
             value["preset"] = preset_name is not None
@@ -88,13 +139,19 @@ class SourceGenerationBackend:
         return {"sources": sources}
 
     def _load_source(self, source_key, run_path=None):
-        cache_key = (source_key, run_path)
+        selected_path = (
+            resolve_latest_processed_source_path(
+                source_key,
+                corpus_root=self.corpus_root)
+            if run_path is None
+            else run_path)
+        cache_key = (source_key, str(selected_path))
         with self._source_lock:
             loaded = self._loaded_sources.get(cache_key)
             if loaded is None:
                 loaded = load_processed_source(
                     source_key,
-                    run_path=run_path,
+                    run_path=selected_path,
                     corpus_root=self.corpus_root)
                 self._loaded_sources[cache_key] = loaded
         return loaded
@@ -207,15 +264,29 @@ class SourceGenerationBackend:
         if pipeline is None:
             raise ValueError(
                 "Card Setup must provide a generation pipeline.")
+        use_source_examples = _source_example_setting(
+            request,
+            plan,
+            pipeline)
         request_contract = build_source_request_contract(
             pipeline,
             chunks=plan.chunks,
-            allow_web_search=bool(request.get("allow_web_search")))
+            allow_web_search=bool(request.get("allow_web_search")),
+            use_source_for_example_sentences=use_source_examples,
+            protocol_version=_request_protocol_version(plan.config),
+            reasoning_effort=plan.config.reasoning_effort)
         estimate = estimate_plan_cost(
             plan,
             pipeline,
             prompt_text=request_contract["composed_prompt"],
-            web_search_enabled=bool(request.get("allow_web_search")))
+            web_search_enabled=bool(request.get("allow_web_search")),
+            use_source_for_example_sentences=use_source_examples,
+            request_protocol=plan.config.request_protocol,
+            reasoning_effort=plan.config.reasoning_effort,
+            execution_mode=plan.config.execution_mode,
+            **_estimate_response_format_arguments(
+                plan.config,
+                request_contract))
         contract_digest = source_request_contract_digest(
             request_contract)
         authorization_fingerprint = (
@@ -234,7 +305,12 @@ class SourceGenerationBackend:
         high_total = request_assumptions[
             "largest_request_high_total_tokens"]
         warning = None
-        if high_output > MODEL_MAX_OUTPUT_TOKENS:
+        if largest_input > MODEL_MAX_INPUT_TOKENS:
+            warning = (
+                "The selected prompt, schema, and source payload may exceed "
+                "the model's maximum input. Reduce words per request or "
+                "source context.")
+        elif high_output > MODEL_MAX_OUTPUT_TOKENS:
             warning = (
                 "The selected chunk size may exceed the model's maximum "
                 "output. Reduce words per request before generation.")
@@ -249,9 +325,22 @@ class SourceGenerationBackend:
             "source_key": plan.source_key,
             "source_name": plan.source_title,
             "original_candidate_count": plan.original_word_count,
+            "source_prefix_token_limit": (
+                plan.config.source_prefix_token_limit),
+            "source_prefix_token_count": (
+                plan.source_prefix_token_count),
+            "prefix_unique_candidate_count": (
+                plan.prefix_unique_word_count),
+            "prefix_omitted_candidate_count": max(
+                0,
+                plan.original_word_count
+                - (plan.prefix_unique_word_count or 0)),
             "excluded_candidate_count": plan.excluded_word_count,
             "chunk_size": plan.config.chunk_size,
             "context_mode": plan.config.context_mode.value,
+            "request_protocol": plan.config.request_protocol,
+            "reasoning_effort": plan.config.reasoning_effort,
+            "execution_mode": plan.config.execution_mode,
             "largest_request_input_tokens": largest_input,
             "largest_request_output_tokens": largest_output,
             "largest_request_high_output_tokens": high_output,
@@ -270,15 +359,29 @@ class SourceGenerationBackend:
         if pipeline is None:
             raise ValueError(
                 "Card Setup must provide a generation pipeline.")
+        use_source_examples = _source_example_setting(
+            request,
+            plan,
+            pipeline)
         request_contract = build_source_request_contract(
             pipeline,
             chunks=plan.chunks,
-            allow_web_search=bool(request.get("allow_web_search")))
+            allow_web_search=bool(request.get("allow_web_search")),
+            use_source_for_example_sentences=use_source_examples,
+            protocol_version=_request_protocol_version(plan.config),
+            reasoning_effort=plan.config.reasoning_effort)
         estimate = estimate_plan_cost(
             plan,
             pipeline,
             prompt_text=request_contract["composed_prompt"],
-            web_search_enabled=bool(request.get("allow_web_search")))
+            web_search_enabled=bool(request.get("allow_web_search")),
+            use_source_for_example_sentences=use_source_examples,
+            request_protocol=plan.config.request_protocol,
+            reasoning_effort=plan.config.reasoning_effort,
+            execution_mode=plan.config.execution_mode,
+            **_estimate_response_format_arguments(
+                plan.config,
+                request_contract))
         expected_authorization = _estimate_authorization_fingerprint(
             plan,
             request_contract,
@@ -298,13 +401,21 @@ class SourceGenerationBackend:
                     expected_authorization))):
             raise PermissionError(
                 "The source, learned-word list, prompt, response schema, "
-                "model, or cost estimate changed after authorization. "
+                "model, protocol, reasoning, execution mode, or cost estimate "
+                "changed after authorization. "
                 "Recalculate the estimate and authorize the paid requests "
                 "again. No OpenAI request was made.")
         high_output = estimate.assumptions[
             "largest_request_high_output_tokens"]
+        largest_input = estimate.assumptions[
+            "largest_request_estimated_input_tokens"]
         high_total = estimate.assumptions[
             "largest_request_high_total_tokens"]
+        if largest_input > MODEL_MAX_INPUT_TOKENS:
+            raise ValueError(
+                "The estimated prompt, schema, and source payload for one "
+                f"chunk can exceed {MODEL_MAX_INPUT_TOKENS:,} input tokens. "
+                "Reduce words per OpenAI request or source context.")
         if high_output > MODEL_MAX_OUTPUT_TOKENS:
             raise ValueError(
                 "The estimated response for one chunk can exceed "
@@ -320,6 +431,9 @@ class SourceGenerationBackend:
             "authorization_bypassed_for_empty_plan": (
                 not plan.chunks),
             "pipeline": asdict(pipeline),
+            "request_protocol": plan.config.request_protocol,
+            "reasoning_effort": plan.config.reasoning_effort,
+            "execution_mode": plan.config.execution_mode,
             "request_contract": request_contract,
             "estimate": {
                 **estimate.to_dict(),
@@ -363,6 +477,28 @@ class SourceGenerationBackend:
         for snapshot in self.jobs.list():
             for chunk in snapshot.chunks:
                 error = chunk.get("last_error") or {}
+                validation = error.get("validation")
+                problem_count = (
+                    validation.get("problem_count", 0)
+                    if isinstance(validation, dict)
+                    else 0)
+                review = chunk.get("validation_review") or {}
+                detail = error.get("message", "")
+                if chunk["status"] == "invalid_response":
+                    if problem_count:
+                        accepted_count = int(review.get(
+                            "accepted_problem_count",
+                            0))
+                        remaining_count = int(review.get(
+                            "remaining_problem_count",
+                            problem_count))
+                        detail = (
+                            f"Validation failed — {problem_count:,} "
+                            f"problem(s), {accepted_count:,} manually "
+                            f"accepted, {remaining_count:,} remaining: "
+                            f"{detail}")
+                    elif detail:
+                        detail = "Validation failed: " + detail
                 rows.append({
                     "job_id": self._row_id(
                         snapshot.job_id,
@@ -375,7 +511,27 @@ class SourceGenerationBackend:
                     "worker": chunk.get("worker", "queued"),
                     "status": chunk["status"],
                     "attempts": chunk["attempts"],
-                    "detail": error.get("message", ""),
+                    "detail": detail,
+                    "detail_kind": (
+                        "validation_error"
+                        if chunk["status"] == "invalid_response"
+                        else (
+                            "connection_error"
+                            if chunk["status"] == "connection_failed"
+                            else chunk["status"])),
+                    "has_validation_error": (
+                        chunk["status"] == "invalid_response"),
+                    "validation_problem_count": problem_count,
+                    "accepted_problem_count": review.get(
+                        "accepted_problem_count",
+                        (
+                            chunk.get("validation_override") or {}).get(
+                                "accepted_problem_count",
+                                0)),
+                    "remaining_problem_count": review.get(
+                        "remaining_problem_count",
+                        problem_count),
+                    "created_at": snapshot.created_at,
                     "updated_at": chunk["updated_at"],
                 })
         return {"jobs": rows}

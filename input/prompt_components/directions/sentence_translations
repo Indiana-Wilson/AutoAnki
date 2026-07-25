@@ -1,0 +1,15 @@
+For those same four examples, provide four complete, natural English
+translations in the "Sentence Translations (English)" property. Separate the
+translations with | in exactly the same order as the source-language sentences:
+translation 1 must translate sentence 1, translation 2 must translate sentence
+2, and so on. Translate the whole sentence and preserve the precise lexical
+sense defined by that card; do not give only a gloss of the highlighted term.
+Do not put <strong> tags or any other HTML in the translations, and never use |
+inside an individual translation. If the source sentence is already Modern
+English, repeat it without the <strong> tags so that all four positions still
+match.
+
+Any JSON object or fragment shown in another prompt component illustrates only
+the rule discussed beside it. It may omit schema-dependent fields for brevity.
+Your actual response must still contain this translation property and every
+other field required by the supplied response schema.

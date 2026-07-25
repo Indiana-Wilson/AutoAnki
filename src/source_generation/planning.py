@@ -6,11 +6,11 @@ import hashlib
 import json
 import math
 from pathlib import Path
-import unicodedata
 
 import runtime_paths
 from corpus_pipeline.catalogue import get_corpus_spec
 from corpus_pipeline.models import CORPUS_SCHEMA_VERSION
+from corpus_pipeline.processing import normalize_word
 from corpus_pipeline.storage import (
     build_id,
     read_vocabulary_view,
@@ -24,18 +24,31 @@ from source_generation.models import (
     GenerationPlan,
     GenerationWord,
     LoadedSource,
+    OccurrenceLocator,
+    OCCURRENCE_LOCATOR_WINDOW_CHARS,
+    OCCURRENCE_TARGET_CLOSE,
+    OCCURRENCE_TARGET_OPEN,
     OutputDetail,
     Pricing,
     SourceGenerationConfig,
 )
 
 
-DEFAULT_PRICING = Pricing(
+STANDARD_PRICING = Pricing(
     model="gpt-5.4-mini",
     input_usd_per_million=0.75,
     output_usd_per_million=4.50,
     label="standard pricing published 2026-07-24",
+    cached_input_usd_per_million=0.075,
 )
+BATCH_PRICING = Pricing(
+    model="gpt-5.4-mini",
+    input_usd_per_million=0.375,
+    output_usd_per_million=2.25,
+    label="Batch/Flex pricing published 2026-07-24",
+    cached_input_usd_per_million=0.0375,
+)
+DEFAULT_PRICING = STANDARD_PRICING
 # OpenAI bills in USD.  This dated conversion keeps saved estimates
 # reproducible instead of silently changing between authorization and job
 # creation. RBA AUD/USD at 4:00 pm on 2026-07-24 was 0.6975.
@@ -49,7 +62,36 @@ AUD_EXCHANGE_RATE_LABEL = "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST"
 WEB_SEARCH_USD_PER_CALL = 0.01
 WEB_SEARCH_CONTENT_TOKENS_PER_CALL_HIGH = 8_000
 MODEL_CONTEXT_WINDOW_TOKENS = 400_000
+MODEL_MAX_INPUT_TOKENS = 272_000
 MODEL_MAX_OUTPUT_TOKENS = 128_000
+# Reasoning tokens are billed as output tokens. Their exact count is not
+# knowable before a request, so new low-effort source estimates reserve a
+# conservative fraction on top of the visible structured response estimate.
+LOW_REASONING_OUTPUT_RESERVE_MULTIPLIER = 1.50
+
+# Prompt caching begins only for sufficiently long shared prefixes. The
+# central estimate assumes that an identical prompt/schema prefix is cold once
+# and cached on later requests. The high estimate remains fully cold.
+PROMPT_CACHE_MINIMUM_TOKENS = 1_024
+
+# These are explicit planning assumptions derived from the response shapes the
+# application requests. They are not API guarantees. Generated-example mode
+# retains the historical expectation of two senses per word. Source-example
+# mode always has one lexical-only contextual sense, then a variable number of
+# additional generated-example senses.
+GENERATED_SENSES_PER_WORD_LOW_MULTIPLIER = 0.625
+GENERATED_SENSES_PER_WORD_HIGH_MULTIPLIER = 1.50
+SOURCE_ADDITIONAL_SENSES_PER_WORD_LOW = 0.50
+SOURCE_ADDITIONAL_SENSES_PER_WORD_CENTRAL = 1.00
+SOURCE_ADDITIONAL_SENSES_PER_WORD_HIGH = 2.00
+SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_LOW = 0.75
+SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_CENTRAL = 1.00
+SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_HIGH = 1.50
+LOW_REASONING_RESERVE_MULTIPLIERS = {
+    "low": 1.05,
+    "central": 1.20,
+    "high": 1.50,
+}
 
 # Deliberately visible assumptions: this is a planning estimate, not a promise
 # about model verbosity.  Values are expected output tokens per generated sense.
@@ -64,7 +106,10 @@ _FIELD_OUTPUT_TOKENS = {
 _TERM_OUTPUT_TOKENS = 5
 _JSON_OVERHEAD_TOKENS_PER_CARD = 13
 _EXAMPLE_SENTENCE_OUTPUT_TOKENS = 72
+_EXAMPLE_TRANSLATION_OUTPUT_TOKENS = 72
 _RESPONSE_ENVELOPE_TOKENS = 12
+_SOURCE_TERM_RESULT_OVERHEAD_TOKENS = 8
+_SOURCE_CONTEXT_TRANSLATION_OVERHEAD_TOKENS = 8
 
 
 @dataclass(frozen=True)
@@ -122,6 +167,20 @@ def _safe_latest_build_path(corpus_root, source_key):
     return candidate
 
 
+def resolve_latest_processed_source_path(source_key, corpus_root=None):
+    """Resolve the currently published immutable run for one source.
+
+    Keeping this lightweight pointer lookup separate from full build loading
+    lets long-lived GUI backends key their cache by the actual build path.
+    A source re-prepared while the application is open must not keep resolving
+    a stale object cached under the ambiguous value ``run_path=None``.
+    """
+    root = Path(
+        corpus_root
+        or runtime_paths.get_corpus_output_directory()).resolve()
+    return _safe_latest_build_path(root, source_key)
+
+
 def _source_title(source_key, build):
     try:
         return get_corpus_spec(source_key).title
@@ -149,9 +208,22 @@ def load_processed_source(
     selected_path = (
         Path(run_path).resolve()
         if run_path is not None
-        else _safe_latest_build_path(corpus_root, source_key)
+        else resolve_latest_processed_source_path(
+            source_key,
+            corpus_root=corpus_root)
     )
     build = read_vocabulary_view(selected_path)
+    manifest = json.loads(
+        (selected_path / "manifest.json").read_text(encoding="utf-8"))
+    token_occurrence_count = manifest.get(
+        "counts",
+        {}).get("token_occurrences")
+    if (
+            isinstance(token_occurrence_count, bool)
+            or not isinstance(token_occurrence_count, int)
+            or token_occurrence_count < 0):
+        raise ValueError(
+            "The processed source has an invalid token-occurrence count.")
     if build.snapshot.spec_key != source_key:
         raise ValueError(
             "The selected processed run belongs to another source.")
@@ -165,6 +237,7 @@ def load_processed_source(
         build_id=identifier,
         run_path=selected_path,
         build=build,
+        token_occurrence_count=token_occurrence_count,
     )
 
 
@@ -206,7 +279,9 @@ def list_processed_source_summaries(corpus_root=None):
     for pointer_path in sorted(root.glob("*/latest_build.json")):
         source_key = pointer_path.parent.name
         try:
-            build_path = _safe_latest_build_path(root, source_key)
+            build_path = resolve_latest_processed_source_path(
+                source_key,
+                corpus_root=root)
             manifest = json.loads(
                 (build_path / "manifest.json").read_text(
                     encoding="utf-8"))
@@ -218,11 +293,15 @@ def list_processed_source_summaries(corpus_root=None):
                 raise ValueError("Inconsistent processed-source manifest.")
             counts = manifest["counts"]
             word_count = counts["unique_words"]
+            token_occurrence_count = counts["token_occurrences"]
             section_count = counts["sections"]
             if (
                     isinstance(word_count, bool)
                     or not isinstance(word_count, int)
                     or word_count < 0
+                    or isinstance(token_occurrence_count, bool)
+                    or not isinstance(token_occurrence_count, int)
+                    or token_occurrence_count < 0
                     or isinstance(section_count, bool)
                     or not isinstance(section_count, int)
                     or section_count < 0):
@@ -242,6 +321,7 @@ def list_processed_source_summaries(corpus_root=None):
                 "build_id": build_path.name,
                 "run_path": str(build_path),
                 "word_count": word_count,
+                "token_occurrence_count": token_occurrence_count,
                 "section_count": section_count,
                 "source_language_key": str(
                     manifest.get("source_language_key", "")),
@@ -257,6 +337,41 @@ def _partition_words(words, chunk_size):
         for start in range(0, len(words), chunk_size)
         if words[start:start + chunk_size]
     )
+
+
+def _first_occurrence_token_index(word):
+    """Read the audited running-token index behind one vocabulary rank."""
+    prefix = "token:"
+    occurrence_id = word.first_occurrence_id
+    if (
+            not isinstance(occurrence_id, str)
+            or not occurrence_id.startswith(prefix)
+            or not occurrence_id[len(prefix):].isdecimal()):
+        raise ValueError(
+            "A source vocabulary item has an invalid first occurrence ID.")
+    token_index = int(occurrence_id[len(prefix):])
+    if token_index < 1:
+        raise ValueError(
+            "A source vocabulary item has an invalid first token index.")
+    return token_index
+
+
+def _source_token_occurrence_count(loaded_source):
+    count = loaded_source.token_occurrence_count
+    if count is not None:
+        return count
+    occurrences = getattr(loaded_source.build, "occurrences", None)
+    if occurrences is not None:
+        return len(occurrences)
+    # Production vocabulary views carry the manifest count on LoadedSource.
+    # This fallback keeps manually constructed integrations usable without
+    # loading the large repeated-occurrence artifact.
+    return max(
+        (
+            _first_occurrence_token_index(word)
+            for word in loaded_source.build.unique_words
+        ),
+        default=0)
 
 
 def _desired_intervals(build, words, mode):
@@ -384,6 +499,57 @@ def _make_context_units(
     return tuple(units), rank_to_context
 
 
+def _make_occurrence_locator(word, context):
+    """Persist a bounded, visibly marked locator for one audited occurrence."""
+    if context is None:
+        return None
+    relative_start = word.start_offset - context.start_offset
+    relative_end = word.end_offset - context.start_offset
+    if (
+            relative_start < 0
+            or relative_end <= relative_start
+            or relative_end > len(context.text)
+            or context.text[relative_start:relative_end] != word.surface):
+        raise ValueError(
+            "A source word's audited occurrence does not match its retained "
+            "context.")
+    ordinal = 0
+    cursor = 0
+    while True:
+        match_start = context.text.find(word.surface, cursor)
+        if match_start < 0 or match_start > relative_start:
+            break
+        ordinal += 1
+        if match_start == relative_start:
+            break
+        cursor = match_start + len(word.surface)
+    if match_start != relative_start:
+        raise ValueError(
+            "A source word's audited occurrence cannot be located inside its "
+            "retained context.")
+    before = context.text[
+        max(
+            0,
+            relative_start - OCCURRENCE_LOCATOR_WINDOW_CHARS):
+        relative_start]
+    target = context.text[relative_start:relative_end]
+    after = context.text[
+        relative_end:
+        relative_end + OCCURRENCE_LOCATOR_WINDOW_CHARS]
+    return OccurrenceLocator(
+        before=before,
+        target=target,
+        after=after,
+        literal_match_ordinal=ordinal,
+        marked_excerpt=(
+            before
+            + OCCURRENCE_TARGET_OPEN
+            + target
+            + OCCURRENCE_TARGET_CLOSE
+            + after),
+    )
+
+
 def plan_source_generation(loaded_source, config):
     """Repartition saved vocabulary and deduplicate context within each query."""
     if not isinstance(loaded_source, LoadedSource):
@@ -393,16 +559,35 @@ def plan_source_generation(loaded_source, config):
         raise ValueError(
             "Source generation settings select another processed source.")
 
+    source_language_key = (
+        loaded_source.build.snapshot.source_language_key)
     excluded = {
-        unicodedata.normalize("NFC", word.strip())
+        normalize_word(
+            word.strip(),
+            source_language_key)
         for word in config.excluded_words
         if word.strip()
     }
+    all_words = loaded_source.build.unique_words
+    if config.source_prefix_token_limit is None:
+        prefix_words = all_words
+        prefix_token_count = None
+    else:
+        prefix_words = tuple(
+            word
+            for word in all_words
+            if _first_occurrence_token_index(word)
+            <= config.source_prefix_token_limit)
+        prefix_token_count = min(
+            config.source_prefix_token_limit,
+            _source_token_occurrence_count(loaded_source))
     selected_words = tuple(
         word
-        for word in loaded_source.build.unique_words
+        for word in prefix_words
         if word.normalized not in excluded
-        and unicodedata.normalize("NFC", word.surface) not in excluded
+        and normalize_word(
+            word.surface,
+            source_language_key) not in excluded
     )
     groups = _partition_words(selected_words, config.chunk_size)
     total = len(groups)
@@ -413,6 +598,10 @@ def plan_source_generation(loaded_source, config):
             words,
             config.context_mode,
             source_build_id=loaded_source.build_id)
+        contexts_by_id = {
+            context.context_id: context
+            for context in context_units
+        }
         chunk_id = (
             f"{index:06d}-r{words[0].rank}-r{words[-1].rank}")
         chunks.append(GenerationChunk(
@@ -428,7 +617,13 @@ def plan_source_generation(loaded_source, config):
                     normalized=word.normalized,
                     section_id=word.section_id,
                     sentence_id=word.sentence_id,
-                    context_id=rank_to_context.get(word.rank))
+                    context_id=rank_to_context.get(word.rank),
+                    start_offset=word.start_offset,
+                    end_offset=word.end_offset,
+                    occurrence_locator=_make_occurrence_locator(
+                        word,
+                        contexts_by_id.get(
+                            rank_to_context.get(word.rank))))
                 for word in words
             ),
             contexts=context_units,
@@ -438,6 +633,7 @@ def plan_source_generation(loaded_source, config):
         "source_build_id": loaded_source.build_id,
         "chunk_size": config.chunk_size,
         "context_mode": config.context_mode.value,
+        "source_prefix_token_limit": config.source_prefix_token_limit,
         # Concurrency and staggering affect execution, not request contents.
         "selected_ranks": [
             word.rank
@@ -451,10 +647,11 @@ def plan_source_generation(loaded_source, config):
         source_build_id=loaded_source.build_id,
         source_run_path=str(loaded_source.run_path),
         config=config,
-        original_word_count=len(loaded_source.build.unique_words),
-        excluded_word_count=(
-            len(loaded_source.build.unique_words) - len(selected_words)),
+        original_word_count=len(all_words),
+        excluded_word_count=len(prefix_words) - len(selected_words),
         chunks=tuple(chunks),
+        source_prefix_token_count=prefix_token_count,
+        prefix_unique_word_count=len(prefix_words),
     )
 
 
@@ -490,18 +687,43 @@ def _schema_token_estimate(detail):
         *detail.field_keys,
     ]
     if detail.include_example_sentences:
-        field_names.append("Sentences")
+        field_names.extend((
+            "Sentences",
+            "Sentence Translations (English)",
+        ))
     # Strict JSON schema keywords and the repeated property/required names.
     return 80 + 2 * sum(
         estimate_text_tokens(field_name)
         for field_name in field_names)
 
 
+def _tokens_per_sense(
+        detail,
+        *,
+        include_term,
+        include_generated_examples):
+    return (
+        (_TERM_OUTPUT_TOKENS if include_term else 0)
+        + _JSON_OVERHEAD_TOKENS_PER_CARD
+        + sum(
+            _FIELD_OUTPUT_TOKENS.get(field_key, 24)
+            for field_key in detail.field_keys)
+        + (
+            (
+                _EXAMPLE_SENTENCE_OUTPUT_TOKENS
+                + _EXAMPLE_TRANSLATION_OUTPUT_TOKENS)
+            if (
+                include_generated_examples
+                and detail.include_example_sentences)
+            else 0)
+    )
+
+
 def estimate_chunk_output_tokens(
         detail,
         word_count,
         *,
-        senses_per_word=1.15,
+        senses_per_word=2.0,
         high_multiplier=1.0):
     """Estimate one response size for rate-limit and model-limit planning."""
     if isinstance(detail, dict):
@@ -523,17 +745,10 @@ def estimate_chunk_output_tokens(
             or not isinstance(high_multiplier, (int, float))
             or high_multiplier < 1):
         raise ValueError("Output safety multiplier must be at least one.")
-    tokens_per_sense = (
-        _TERM_OUTPUT_TOKENS
-        + _JSON_OVERHEAD_TOKENS_PER_CARD
-        + sum(
-            _FIELD_OUTPUT_TOKENS.get(field_key, 24)
-            for field_key in detail.field_keys)
-        + (
-            _EXAMPLE_SENTENCE_OUTPUT_TOKENS
-            if detail.include_example_sentences
-            else 0)
-    )
+    tokens_per_sense = _tokens_per_sense(
+        detail,
+        include_term=True,
+        include_generated_examples=True)
     return math.ceil(
         (
             word_count
@@ -543,20 +758,169 @@ def estimate_chunk_output_tokens(
         * high_multiplier)
 
 
+def _source_chunk_output_tokens(
+        detail,
+        chunk,
+        *,
+        additional_senses_per_word,
+        context_translation_token_ratio):
+    """Estimate the visible v8/v9 source-context response shape.
+
+    The contextual entry is lexical-only. Additional senses retain generated
+    examples, and each deduplicated source context is translated exactly once.
+    Terms themselves are restored from immutable ranks rather than echoed in
+    either source-result sense object.
+    """
+    contextual_tokens_per_word = _tokens_per_sense(
+        detail,
+        include_term=False,
+        include_generated_examples=False)
+    additional_tokens_per_sense = _tokens_per_sense(
+        detail,
+        include_term=False,
+        include_generated_examples=True)
+    context_translation_tokens = sum(
+        (
+            math.ceil(
+                estimate_text_tokens(context.text)
+                * context_translation_token_ratio)
+            + _SOURCE_CONTEXT_TRANSLATION_OVERHEAD_TOKENS)
+        for context in chunk.contexts
+    )
+    return math.ceil(
+        (
+            len(chunk.words)
+            * (
+                contextual_tokens_per_word
+                + _SOURCE_TERM_RESULT_OVERHEAD_TOKENS
+                + (
+                    additional_senses_per_word
+                    * additional_tokens_per_sense))
+        )
+        + context_translation_tokens
+        + _RESPONSE_ENVELOPE_TOKENS)
+
+
+def _reasoning_multiplier(reasoning_effort, scenario):
+    if reasoning_effort == "none":
+        return 1.0
+    if reasoning_effort == "low":
+        return LOW_REASONING_RESERVE_MULTIPLIERS[scenario]
+    raise ValueError(
+        'Source reasoning effort must be either "none" or "low".')
+
+
+def _pricing_for_execution_mode(execution_mode):
+    if execution_mode == "standard":
+        return STANDARD_PRICING
+    if execution_mode == "economy":
+        return BATCH_PRICING
+    raise ValueError(
+        'Source execution mode must be either "standard" or "economy".')
+
+
+def _usd_for_tokens(tokens, rate_per_million):
+    return tokens * rate_per_million / 1_000_000
+
+
+def price_source_usage(usage, *, execution_mode="standard"):
+    """Price an exact normalized source-generation usage summary.
+
+    ``cached_input_tokens`` and ``uncached_input_tokens`` are disjoint.
+    ``output_tokens`` includes both visible and reasoning output, matching the
+    billable total returned by the Responses API.
+    """
+    if not isinstance(usage, dict):
+        raise TypeError("Source usage must be an object.")
+    token_counts = {}
+    for key in (
+            "uncached_input_tokens",
+            "cached_input_tokens",
+            "output_tokens"):
+        value = usage.get(key, 0)
+        if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0):
+            raise ValueError(
+                f"Source usage {key} must be a non-negative integer.")
+        token_counts[key] = value
+    web_search_calls = usage.get("web_search_calls", 0)
+    if (
+            isinstance(web_search_calls, bool)
+            or not isinstance(web_search_calls, int)
+            or web_search_calls < 0):
+        raise ValueError(
+            "Source usage web_search_calls must be a non-negative integer.")
+
+    pricing = _pricing_for_execution_mode(execution_mode)
+    cached_input_rate = (
+        pricing.cached_input_usd_per_million
+        if pricing.cached_input_usd_per_million is not None
+        else pricing.input_usd_per_million)
+    uncached_input_usd = _usd_for_tokens(
+        token_counts["uncached_input_tokens"],
+        pricing.input_usd_per_million)
+    cached_input_usd = _usd_for_tokens(
+        token_counts["cached_input_tokens"],
+        cached_input_rate)
+    output_usd = _usd_for_tokens(
+        token_counts["output_tokens"],
+        pricing.output_usd_per_million)
+    web_search_usd = (
+        web_search_calls * WEB_SEARCH_USD_PER_CALL)
+    input_usd = uncached_input_usd + cached_input_usd
+    total_usd = input_usd + output_usd + web_search_usd
+
+    return {
+        "execution_mode": execution_mode,
+        "model": pricing.model,
+        "pricing_label": pricing.label,
+        "pricing": pricing.to_dict(),
+        **token_counts,
+        "web_search_calls": web_search_calls,
+        "input_tokens": (
+            token_counts["uncached_input_tokens"]
+            + token_counts["cached_input_tokens"]),
+        "total_tokens": (
+            token_counts["uncached_input_tokens"]
+            + token_counts["cached_input_tokens"]
+            + token_counts["output_tokens"]),
+        "uncached_input_usd": uncached_input_usd,
+        "cached_input_usd": cached_input_usd,
+        "input_usd": input_usd,
+        "output_usd": output_usd,
+        "web_search_usd": web_search_usd,
+        "total_usd": total_usd,
+        "uncached_input_aud": uncached_input_usd * USD_TO_AUD_RATE,
+        "cached_input_aud": cached_input_usd * USD_TO_AUD_RATE,
+        "input_aud": input_usd * USD_TO_AUD_RATE,
+        "output_aud": output_usd * USD_TO_AUD_RATE,
+        "web_search_aud": web_search_usd * USD_TO_AUD_RATE,
+        "total_aud": total_usd * USD_TO_AUD_RATE,
+        "usd_to_aud_rate": USD_TO_AUD_RATE,
+        "aud_exchange_rate": AUD_EXCHANGE_RATE_LABEL,
+    }
+
+
 def estimate_plan_cost(
         plan,
         detail,
         *,
         prompt_text="",
-        pricing=DEFAULT_PRICING,
-        senses_per_word=1.15,
-        web_search_enabled=False):
-    """Estimate standard API cost without contacting OpenAI.
+        pricing=None,
+        senses_per_word=2.0,
+        web_search_enabled=False,
+        response_format=None,
+        use_source_for_example_sentences=False,
+        request_protocol=None,
+        reasoning_effort=None,
+        execution_mode=None,
+        response_formats_by_chunk=None):
+    """Estimate one source plan without contacting OpenAI.
 
-    ``detail`` can be an :class:`OutputDetail`, its mapping form, or a saved
-    ``PipelineConfig``.  Prompt and schema costs are multiplied by the number
-    of requests, so changing the generation chunk size immediately changes the
-    estimate.
+    A fixed ``response_format`` represents v9's reusable schema.
+    ``response_formats_by_chunk`` represents v8's exact dynamic schemas.
     """
     if not isinstance(plan, GenerationPlan):
         raise TypeError("A source generation plan is required.")
@@ -569,61 +933,282 @@ def estimate_plan_cost(
             or not isinstance(senses_per_word, (int, float))
             or senses_per_word < 1):
         raise ValueError("Expected senses per word must be at least one.")
+    if not isinstance(use_source_for_example_sentences, bool):
+        raise TypeError(
+            "Source-example response mode must be true or false.")
+    reasoning_effort = (
+        plan.config.reasoning_effort
+        if reasoning_effort is None
+        else reasoning_effort)
+    request_protocol = (
+        plan.config.request_protocol
+        if request_protocol is None
+        else request_protocol)
+    execution_mode = (
+        plan.config.execution_mode
+        if execution_mode is None
+        else execution_mode)
+    if request_protocol not in {"v8", "v9"}:
+        raise ValueError(
+            'Source request protocol must be either "v8" or "v9".')
+    if request_protocol == "v8" and reasoning_effort != "low":
+        raise ValueError(
+            'Source request protocol "v8" requires reasoning effort "low".')
+    _reasoning_multiplier(reasoning_effort, "central")
+    selected_pricing = _pricing_for_execution_mode(execution_mode)
+    if pricing is None:
+        pricing = selected_pricing
     if not isinstance(pricing, Pricing):
         raise TypeError("A pricing profile is required.")
+    if (
+            response_format is not None
+            and response_formats_by_chunk is not None):
+        raise ValueError(
+            "Choose either one fixed response format or per-chunk response "
+            "formats, not both.")
+    if request_protocol == "v9" and response_formats_by_chunk is not None:
+        raise ValueError(
+            "Source request protocol v9 requires one fixed response format.")
+    if (
+            request_protocol == "v8"
+            and use_source_for_example_sentences
+            and response_format is not None):
+        raise ValueError(
+            "Source-context request protocol v8 requires per-chunk response "
+            "formats.")
+    if (
+            request_protocol == "v8"
+            and use_source_for_example_sentences
+            and response_formats_by_chunk is None):
+        raise ValueError(
+            "Source-context request protocol v8 requires per-chunk response "
+            "formats.")
+
+    # Imported here to keep planning's module import independent from the
+    # request module, whose contract builder imports estimator constants.
+    from source_generation.requests import render_chunk_input
 
     request_count = len(plan.chunks)
     prompt_tokens_per_request = estimate_text_tokens(prompt_text)
     prompt_tokens = prompt_tokens_per_request * request_count
-    payload_tokens = sum(
-        estimate_text_tokens(_canonical_json(chunk.request_payload()))
-        for chunk in plan.chunks)
-    schema_tokens_per_request = _schema_token_estimate(detail)
-    schema_tokens = schema_tokens_per_request * request_count
+    payload_tokens_by_chunk = {
+        chunk.chunk_id: estimate_text_tokens(
+            render_chunk_input(
+                chunk,
+                protocol_version=int(
+                    request_protocol.removeprefix("v"))))
+        for chunk in plan.chunks
+    }
+    payload_tokens = sum(payload_tokens_by_chunk.values())
+
+    schema_cache_shared = True
+    if response_format is not None:
+        if not isinstance(response_format, dict):
+            raise TypeError("The fixed response format must be an object.")
+        schema_tokens_per_request = estimate_text_tokens(
+            _canonical_json(response_format))
+        schema_tokens_by_chunk = {
+            chunk.chunk_id: schema_tokens_per_request
+            for chunk in plan.chunks
+        }
+        schema_estimation_mode = "fixed_exact"
+    elif response_formats_by_chunk is None:
+        schema_tokens_per_request = _schema_token_estimate(detail)
+        schema_tokens_by_chunk = {
+            chunk.chunk_id: schema_tokens_per_request
+            for chunk in plan.chunks
+        }
+        schema_estimation_mode = "detail_approximation"
+    else:
+        if not isinstance(response_formats_by_chunk, dict):
+            raise TypeError(
+                "Per-chunk response formats must be an object.")
+        expected_chunk_ids = {
+            chunk.chunk_id
+            for chunk in plan.chunks
+        }
+        if set(response_formats_by_chunk) != expected_chunk_ids:
+            raise ValueError(
+                "Per-chunk response formats do not match the generation "
+                "plan.")
+        canonical_formats = {
+            chunk_id: _canonical_json(response_formats_by_chunk[chunk_id])
+            for chunk_id in expected_chunk_ids
+        }
+        schema_tokens_by_chunk = {
+            chunk_id: estimate_text_tokens(canonical)
+            for chunk_id, canonical in canonical_formats.items()
+        }
+        schema_tokens_per_request = max(
+            schema_tokens_by_chunk.values(),
+            default=0)
+        schema_cache_shared = len(set(canonical_formats.values())) <= 1
+        schema_estimation_mode = "per_chunk_exact"
+    schema_tokens = sum(schema_tokens_by_chunk.values())
     input_tokens = prompt_tokens + payload_tokens + schema_tokens
 
-    request_output_tokens = tuple(
-        estimate_chunk_output_tokens(
-            detail,
-            len(chunk.words),
-            senses_per_word=senses_per_word)
-        for chunk in plan.chunks)
+    if use_source_for_example_sentences:
+        visible_output_tokens_by_scenario = {
+            "low": tuple(
+                _source_chunk_output_tokens(
+                    detail,
+                    chunk,
+                    additional_senses_per_word=(
+                        SOURCE_ADDITIONAL_SENSES_PER_WORD_LOW),
+                    context_translation_token_ratio=(
+                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_LOW))
+                for chunk in plan.chunks),
+            "central": tuple(
+                _source_chunk_output_tokens(
+                    detail,
+                    chunk,
+                    additional_senses_per_word=(
+                        SOURCE_ADDITIONAL_SENSES_PER_WORD_CENTRAL),
+                    context_translation_token_ratio=(
+                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_CENTRAL))
+                for chunk in plan.chunks),
+            "high": tuple(
+                _source_chunk_output_tokens(
+                    detail,
+                    chunk,
+                    additional_senses_per_word=(
+                        SOURCE_ADDITIONAL_SENSES_PER_WORD_HIGH),
+                    context_translation_token_ratio=(
+                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_HIGH))
+                for chunk in plan.chunks),
+        }
+        response_shape = "source_contextual_lexical_plus_additional"
+        output_shape_assumptions = {
+            "contextual_senses_per_word": 1.0,
+            "contextual_senses_include_generated_examples": False,
+            "additional_senses_per_word": {
+                "low": SOURCE_ADDITIONAL_SENSES_PER_WORD_LOW,
+                "central": SOURCE_ADDITIONAL_SENSES_PER_WORD_CENTRAL,
+                "high": SOURCE_ADDITIONAL_SENSES_PER_WORD_HIGH,
+            },
+            "additional_senses_include_generated_examples": bool(
+                detail.include_example_sentences),
+            "source_context_translations": (
+                "one output translation per deduplicated context"),
+            "source_context_translation_token_ratio": {
+                "low": SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_LOW,
+                "central": (
+                    SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_CENTRAL),
+                "high": SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_HIGH,
+            },
+        }
+    else:
+        low_senses_per_word = max(
+            1.0,
+            senses_per_word
+            * GENERATED_SENSES_PER_WORD_LOW_MULTIPLIER)
+        high_senses_per_word = (
+            senses_per_word
+            * GENERATED_SENSES_PER_WORD_HIGH_MULTIPLIER)
+        visible_output_tokens_by_scenario = {
+            "low": tuple(
+                estimate_chunk_output_tokens(
+                    detail,
+                    len(chunk.words),
+                    senses_per_word=low_senses_per_word)
+                for chunk in plan.chunks),
+            "central": tuple(
+                estimate_chunk_output_tokens(
+                    detail,
+                    len(chunk.words),
+                    senses_per_word=senses_per_word)
+                for chunk in plan.chunks),
+            "high": tuple(
+                estimate_chunk_output_tokens(
+                    detail,
+                    len(chunk.words),
+                    senses_per_word=high_senses_per_word)
+                for chunk in plan.chunks),
+        }
+        response_shape = "generated_examples_for_each_sense"
+        output_shape_assumptions = {
+            "senses_per_word": {
+                "low": low_senses_per_word,
+                "central": senses_per_word,
+                "high": high_senses_per_word,
+            },
+            "generated_examples_for_each_sense": bool(
+                detail.include_example_sentences),
+        }
+
+    output_tokens_by_scenario = {
+        scenario: tuple(
+            math.ceil(
+                visible_tokens
+                * _reasoning_multiplier(
+                    reasoning_effort,
+                    scenario))
+            for visible_tokens in visible_by_chunk)
+        for scenario, visible_by_chunk
+        in visible_output_tokens_by_scenario.items()
+    }
+    request_output_tokens = output_tokens_by_scenario["central"]
     output_tokens = sum(request_output_tokens)
+    low_output_tokens = sum(output_tokens_by_scenario["low"])
+    high_output_tokens = sum(output_tokens_by_scenario["high"])
     request_input_tokens = tuple(
         prompt_tokens_per_request
-        + schema_tokens_per_request
-        + estimate_text_tokens(_canonical_json(chunk.request_payload()))
-        for chunk in plan.chunks)
+        + schema_tokens_by_chunk[chunk.chunk_id]
+        + payload_tokens_by_chunk[chunk.chunk_id]
+        for chunk in plan.chunks
+    )
     largest_input = max(request_input_tokens, default=0)
     largest_output = max(request_output_tokens, default=0)
     largest_output_high = max(
-        (
-            estimate_chunk_output_tokens(
-                detail,
-                len(chunk.words),
-                senses_per_word=senses_per_word,
-                high_multiplier=1.50)
-            for chunk in plan.chunks
-        ),
+        output_tokens_by_scenario["high"],
         default=0)
     largest_total_high = largest_input + largest_output_high
-    input_usd = (
-        input_tokens
-        * pricing.input_usd_per_million
-        / 1_000_000)
-    output_usd = (
-        output_tokens
-        * pricing.output_usd_per_million
-        / 1_000_000)
+
+    shared_cache_prefix_tokens = prompt_tokens_per_request
+    if schema_cache_shared:
+        shared_cache_prefix_tokens += schema_tokens_per_request
+    cache_eligible = (
+        request_count > 1
+        and shared_cache_prefix_tokens >= PROMPT_CACHE_MINIMUM_TOKENS)
+    cached_input_tokens = (
+        (request_count - 1) * shared_cache_prefix_tokens
+        if cache_eligible
+        else 0)
+    cached_input_tokens = min(input_tokens, cached_input_tokens)
+    uncached_input_tokens = input_tokens - cached_input_tokens
+    cached_input_rate = (
+        pricing.cached_input_usd_per_million
+        if pricing.cached_input_usd_per_million is not None
+        else pricing.input_usd_per_million)
+    cached_input_usd = _usd_for_tokens(
+        cached_input_tokens,
+        cached_input_rate)
+    uncached_input_usd = _usd_for_tokens(
+        uncached_input_tokens,
+        pricing.input_usd_per_million)
+    input_usd = cached_input_usd + uncached_input_usd
+    cold_input_usd = _usd_for_tokens(
+        input_tokens,
+        pricing.input_usd_per_million)
+    low_output_usd = _usd_for_tokens(
+        low_output_tokens,
+        pricing.output_usd_per_million)
+    output_usd = _usd_for_tokens(
+        output_tokens,
+        pricing.output_usd_per_million)
+    high_output_usd = _usd_for_tokens(
+        high_output_tokens,
+        pricing.output_usd_per_million)
     total = input_usd + output_usd
+
     web_search_high_usd = 0.0
     if web_search_enabled:
         web_search_high_usd = request_count * (
             WEB_SEARCH_USD_PER_CALL
-            + (
-                WEB_SEARCH_CONTENT_TOKENS_PER_CALL_HIGH
-                * pricing.input_usd_per_million
-                / 1_000_000))
+            + _usd_for_tokens(
+                WEB_SEARCH_CONTENT_TOKENS_PER_CALL_HIGH,
+                pricing.input_usd_per_million))
+
     return CostEstimate(
         model=pricing.model,
         pricing_label=pricing.label,
@@ -633,25 +1218,80 @@ def estimate_plan_cost(
         payload_tokens=payload_tokens,
         schema_tokens=schema_tokens,
         estimated_input_tokens=input_tokens,
+        estimated_cached_input_tokens=cached_input_tokens,
+        estimated_uncached_input_tokens=uncached_input_tokens,
         estimated_output_tokens=output_tokens,
         estimated_input_usd=input_usd,
+        estimated_cached_input_usd=cached_input_usd,
+        estimated_uncached_input_usd=uncached_input_usd,
         estimated_output_usd=output_usd,
         estimated_total_usd=total,
-        low_total_usd=total * 0.70,
-        high_total_usd=total * 1.50 + web_search_high_usd,
+        low_total_usd=input_usd + low_output_usd,
+        high_total_usd=(
+            cold_input_usd
+            + high_output_usd
+            + web_search_high_usd),
         usd_to_aud_rate=USD_TO_AUD_RATE,
         assumptions={
             "token_estimator": (
                 "deterministic character-class approximation; no API call"),
-            "senses_per_word": senses_per_word,
+            "estimate_scenarios": (
+                "empirical low/central/high response-shape assumptions; "
+                "not an API guarantee"),
+            "response_shape": response_shape,
+            "output_shape": output_shape_assumptions,
+            "reasoning_effort": reasoning_effort,
+            "reasoning_output_reserve_multiplier": (
+                _reasoning_multiplier(
+                    reasoning_effort,
+                    "central")),
+            "reasoning_output_reserve_multipliers": {
+                scenario: _reasoning_multiplier(
+                    reasoning_effort,
+                    scenario)
+                for scenario in ("low", "central", "high")
+            },
+            "visible_output_tokens": {
+                scenario: sum(tokens)
+                for scenario, tokens
+                in visible_output_tokens_by_scenario.items()
+            },
+            "output_tokens": {
+                scenario: sum(tokens)
+                for scenario, tokens
+                in output_tokens_by_scenario.items()
+            },
+            "execution_mode": execution_mode,
+            "request_protocol": request_protocol,
+            "pricing": pricing.to_dict(),
             "prompt_tokens_per_request": prompt_tokens_per_request,
+            "schema_estimation_mode": schema_estimation_mode,
             "schema_tokens_per_request": schema_tokens_per_request,
+            "schema_tokens_by_chunk": dict(schema_tokens_by_chunk),
+            "central_cache_assumption": (
+                "the first identical prompt/schema prefix is cold and later "
+                "eligible prefixes are cached; payloads and dynamic schemas "
+                "remain uncached"),
+            "high_input_assumption": "all input tokens are cold",
+            "prompt_cache_minimum_tokens": (
+                PROMPT_CACHE_MINIMUM_TOKENS),
+            "shared_cache_prefix_tokens_per_later_request": (
+                shared_cache_prefix_tokens
+                if cache_eligible
+                else 0),
+            "estimated_cached_input_tokens": cached_input_tokens,
+            "estimated_uncached_input_tokens": uncached_input_tokens,
+            "cold_input_usd": cold_input_usd,
             "field_output_tokens_per_sense": {
                 field_key: _FIELD_OUTPUT_TOKENS.get(field_key, 24)
                 for field_key in detail.field_keys
             },
             "example_sentence_tokens_per_sense": (
                 _EXAMPLE_SENTENCE_OUTPUT_TOKENS
+                if detail.include_example_sentences
+                else 0),
+            "example_translation_tokens_per_sense": (
+                _EXAMPLE_TRANSLATION_OUTPUT_TOKENS
                 if detail.include_example_sentences
                 else 0),
             "context_deduplication_scope": "within each request",
@@ -674,6 +1314,7 @@ def estimate_plan_cost(
             "largest_request_high_output_tokens": largest_output_high,
             "largest_request_high_total_tokens": largest_total_high,
             "model_context_window_tokens": MODEL_CONTEXT_WINDOW_TOKENS,
+            "model_max_input_tokens": MODEL_MAX_INPUT_TOKENS,
             "model_max_output_tokens": MODEL_MAX_OUTPUT_TOKENS,
         },
     )

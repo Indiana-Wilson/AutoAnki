@@ -1,0 +1,405 @@
+{
+  "additional_sense_count": 9,
+  "card_count": null,
+  "context_count": 3,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cached_input_aud": 0.0,
+    "cached_input_tokens": 0,
+    "cached_input_usd": 0.0,
+    "execution_mode": "standard",
+    "input_aud": 0.0029440860215053767,
+    "input_tokens": 2738,
+    "input_usd": 0.0020535,
+    "model": "gpt-5.4-mini",
+    "output_aud": 0.015529032258064518,
+    "output_tokens": 2407,
+    "output_usd": 0.0108315,
+    "pricing": {
+      "cached_input_usd_per_million": 0.075,
+      "input_usd_per_million": 0.75,
+      "label": "standard pricing published 2026-07-24",
+      "model": "gpt-5.4-mini",
+      "output_usd_per_million": 4.5
+    },
+    "pricing_label": "standard pricing published 2026-07-24",
+    "total_aud": 0.01847311827956989,
+    "total_tokens": 5145,
+    "total_usd": 0.012885,
+    "uncached_input_aud": 0.0029440860215053767,
+    "uncached_input_tokens": 2738,
+    "uncached_input_usd": 0.0020535,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-25T14:25:19.652682+00:00",
+  "max_output_tokens": 11889,
+  "model": "gpt-5.4-mini",
+  "payload_estimated_tokens": 819,
+  "prompt_estimated_tokens": 1806,
+  "protocol": "v9",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-4413afde456bbd1ce9d9",
+        "translation": "All under heaven know beauty as beauty, and this is ugliness already."
+      },
+      {
+        "context_id": "source-context-4685de02ef89dae1c9bb",
+        "translation": "He carries out the teaching without words; all things arise, and he does not refuse them, gives birth to them and does not possess them, acts and does not rely on them,"
+      },
+      {
+        "context_id": "source-context-feaa73fa76a650622433",
+        "translation": "accomplishes the work and does not claim it."
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Having beauty; pleasing to the eye or senses because of form, appearance, or character.",
+            "Nuance (English)": "Used predicatively or attributively of a person, thing, or scene.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "měi",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "The mountains and rivers are very beautiful.",
+              "His appearance is very beautiful.",
+              "This vessel is very beautiful.",
+              "The words are also beautiful."
+            ],
+            "Sentences": [
+              "山川甚<strong>美</strong>。",
+              "其容甚<strong>美</strong>。",
+              "斯器甚<strong>美</strong>。",
+              "言辭亦<strong>美</strong>。"
+            ],
+            "Translation (English)": "beautiful"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The quality or thing that is beautiful, especially beauty treated as an object of knowledge or judgment.",
+          "Nuance (English)": "",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "měi",
+          "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+          "Translation (English)": "beauty; the beautiful"
+        },
+        "rank": 37
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To perform an action or bring something about; the ordinary transitive verb of acting or making.",
+            "Nuance (English)": "Often covers both doing and making, depending on the object.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "wéi",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "The gentleman does not act for petty gain.",
+              "The people all do their own affairs of themselves.",
+              "The sage does not make the world serve private will.",
+              "He wants to make a vessel."
+            ],
+            "Sentences": [
+              "君子不<strong>為</strong>苟得。",
+              "民皆自<strong>為</strong>其事。",
+              "聖人不以私意<strong>為</strong>天下。",
+              "彼欲<strong>為</strong>器。"
+            ],
+            "Translation (English)": "to do; to make"
+          },
+          {
+            "Dictionary Meaning (English)": "To carry on rule or administration over people or affairs.",
+            "Nuance (English)": "Used for exercising rule, management, or official control.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "wéi",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "A good ruler governs the state by non-action, and it is well ordered.",
+              "The king administers government with virtue.",
+              "When the ruler loses the Way, those below are hard to govern.",
+              "The sage takes non-action as the way to order the world."
+            ],
+            "Sentences": [
+              "善<strong>為</strong>國者，無為而治。",
+              "王以德<strong>為</strong>政。",
+              "上失其道，則下難<strong>為</strong>。",
+              "聖人以無事<strong>為</strong>天下。"
+            ],
+            "Translation (English)": "to govern; to administer"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To function as the classifying or predicative link that identifies one thing as another or treats it under a certain description.",
+          "Nuance (English)": "Copular or classificatory use rather than a concrete action verb.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "wéi",
+          "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+          "Translation (English)": "to be regarded as; to constitute"
+        },
+        "rank": 38
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Morally bad conduct, harmfulness, or what is judged wrong or undesirable.",
+            "Nuance (English)": "Used broadly for moral or practical badness, not physical ugliness.",
+            "Part of Speech (English)": "adjective/noun",
+            "Pronunciation (English)": "è",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "When people know the good, they stay away from evil.",
+              "The petty man likes evil and does not know where to stop.",
+              "If government is harsh, badness increases day by day.",
+              "Remove evil as one removes weeds."
+            ],
+            "Sentences": [
+              "人心知善而遠<strong>惡</strong>。",
+              "小人好<strong>惡</strong>，不知所止。",
+              "政苛則<strong>惡</strong>日滋。",
+              "去<strong>惡</strong>如去草。"
+            ],
+            "Translation (English)": "evil; bad"
+          },
+          {
+            "Dictionary Meaning (English)": "To feel aversion toward someone or something and want no part of it.",
+            "Nuance (English)": "This is the verbal reading, distinct from the noun/adjective è.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "wù",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "All the crowd dislike him.",
+              "The people do not hate labor.",
+              "The gentleman does not dislike his uprightness.",
+              "Why should I alone hate this?"
+            ],
+            "Sentences": [
+              "眾皆<strong>惡</strong>之。",
+              "民不<strong>惡</strong>勞。",
+              "君子不<strong>惡</strong>其直。",
+              "我獨何<strong>惡</strong>乎此。"
+            ],
+            "Translation (English)": "to dislike; to hate"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The quality or thing that is ugly, especially ugliness treated as the opposite of beauty.",
+          "Nuance (English)": "",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "è",
+          "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+          "Translation (English)": "ugliness; the ugly"
+        },
+        "rank": 40
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Language expressed in speaking or writing; a statement or utterance.",
+            "Nuance (English)": "Can mean a statement, expression, or verbal form.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "cí",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "Its words are concise and clear.",
+              "Good speech is not wasteful.",
+              "By hearing his words, one knows his intent.",
+              "This wording is very ancient."
+            ],
+            "Sentences": [
+              "其<strong>辭</strong>約而明。",
+              "善<strong>辭</strong>不費。",
+              "聞其<strong>辭</strong>，知其志。",
+              "此<strong>辭</strong>甚古。"
+            ],
+            "Translation (English)": "words; speech"
+          },
+          {
+            "Dictionary Meaning (English)": "To say farewell and leave, or by extension to leave a place or person.",
+            "Nuance (English)": "Used for formal leave-taking or withdrawal.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "cí",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "The guest rose and took leave.",
+              "The minister is about to take leave of the ruler.",
+              "A friend came to say farewell.",
+              "Long staying is not the way to depart."
+            ],
+            "Sentences": [
+              "賓起而<strong>辭</strong>。",
+              "臣將<strong>辭</strong>君。",
+              "友人來<strong>辭</strong>。",
+              "久留非所以<strong>辭</strong>。"
+            ],
+            "Translation (English)": "to take leave; to depart"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To turn down or not accept something offered, requested, or implied.",
+          "Nuance (English)": "A refusal of acceptance or taking, not merely speaking or departing.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "cí",
+          "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+          "Translation (English)": "to decline; to refuse"
+        },
+        "rank": 65
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To live in a place or stay somewhere as one’s home or lodging.",
+            "Nuance (English)": "Often refers to settled residence rather than a temporary stop.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "jū",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "He dwells alone in the mountains.",
+              "Laozi once resided in Zhou.",
+              "A scholar is not at ease in his dwelling.",
+              "The people each have their own homes."
+            ],
+            "Sentences": [
+              "山中獨<strong>居</strong>。",
+              "老子嘗<strong>居</strong>周。",
+              "士不安於<strong>居</strong>。",
+              "民各有其<strong>居</strong>。"
+            ],
+            "Translation (English)": "to dwell; to reside"
+          },
+          {
+            "Dictionary Meaning (English)": "To take up and hold a place, position, or space; to inhabit or be situated in it.",
+            "Nuance (English)": "Can stress occupancy or holding a place rather than home life.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "jū",
+            "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+            "Sentence Translations (English)": [
+              "The troops occupy the outside of the city.",
+              "The flock of birds inhabits the woods.",
+              "He long occupies that position without change.",
+              "The boat rests on the water."
+            ],
+            "Sentences": [
+              "兵<strong>居</strong>城外。",
+              "群鳥<strong>居</strong>於林。",
+              "其位久<strong>居</strong>不易。",
+              "舟<strong>居</strong>水上。"
+            ],
+            "Translation (English)": "to occupy; to inhabit"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To take achievement, merit, or credit for oneself instead of letting it remain unclaimed or attributed elsewhere.",
+          "Nuance (English)": "Here the sense is self-attribution of merit, not physical dwelling or occupancy.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "jū",
+          "Register (English)": "Classical Chinese, Laozi base text as transmitted in the Wang Bi recension",
+          "Translation (English)": "to claim or appropriate credit"
+        },
+        "rank": 69
+      }
+    ]
+  },
+  "reasoning_effort": "none",
+  "response_id": "resp_051d43104af00941006a64c7400b7c819aba284924e5c7de01",
+  "response_status": "completed",
+  "schema_estimated_tokens": 530,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "target_ranks": [
+    37,
+    38,
+    40,
+    65,
+    69
+  ],
+  "term_result_count": 5,
+  "terms": [
+    {
+      "rank": 37,
+      "term": "美"
+    },
+    {
+      "rank": 38,
+      "term": "為"
+    },
+    {
+      "rank": 40,
+      "term": "惡"
+    },
+    {
+      "rank": 65,
+      "term": "辭"
+    },
+    {
+      "rank": 69,
+      "term": "居"
+    }
+  ],
+  "usage": {
+    "cached_input_tokens": 0,
+    "input_tokens": 2738,
+    "output_tokens": 2407,
+    "reasoning_tokens": 0,
+    "total_tokens": 5145,
+    "uncached_input_tokens": 2738,
+    "visible_output_tokens": 2407,
+    "web_search_calls": 0
+  },
+  "valid": false,
+  "validation_error": {
+    "message": "Every literal occurrence of the requested term in a generated additional-sense example must express that card's selected sense and be enclosed by exact <strong>...</strong> tags. Remove mixed-sense homographs from the example.",
+    "type": "GeneratedCardValidationError",
+    "validation_report": {
+      "accepted_problem_count": 0,
+      "all_problems_resolved": false,
+      "can_complete_with_manual_acceptance": true,
+      "can_manually_accept": true,
+      "full_retry_required": false,
+      "non_overrideable_problem_count": 0,
+      "overrideable_problem_count": 1,
+      "problem_count": 1,
+      "problems": [
+        {
+          "accepted": false,
+          "actual": {
+            "sentence": "善<strong>為</strong>國者，無為而治。",
+            "unemphasized_character_offsets": [
+              23
+            ]
+          },
+          "card_index": 4,
+          "card_number": 5,
+          "code": "unemphasized_source_term_occurrence",
+          "context_id": "source-context-4413afde456bbd1ce9d9",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "No literal source-term occurrence outside <strong>為</strong>.",
+          "field_name": "Sentences",
+          "location": "Card 5 (“為”) → Sentences → item 1",
+          "message": "Every literal occurrence of the requested term in a generated additional-sense example must express that card's selected sense and be enclosed by exact <strong>...</strong> tags. Remove mixed-sense homographs from the example.",
+          "overrideable": true,
+          "path": "$.term_results[1].additional_senses[1][\"Sentences\"][0]",
+          "problem_id": "unemphasized_source_term_occurrence:2ac8153cbba2f56c",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 38
+          },
+          "scope": "field",
+          "source_rank": 38,
+          "suggestion": "Retry, or replace this sentence with one whose every occurrence of the term has the selected meaning and exact strong markup.",
+          "term": "為",
+          "title": "Example contains an unemboldened occurrence of the source term"
+        }
+      ],
+      "remaining_problem_count": 1,
+      "structurally_valid": true,
+      "syntax_valid": true,
+      "valid": false
+    }
+  },
+  "word_count": 5
+}

@@ -52,8 +52,11 @@ CHINESE_NUMERALS = tuple(
 def _daodejing_wikitext(first_chapter="道德。"):
     chapters = []
     for number, numeral in enumerate(CHINESE_NUMERALS, start=1):
-        body = first_chapter if number == 1 else "天地。"
-        chapters.append(f"=== {numeral}章 ===\n{body}\n")
+        body = (
+            "道可道，非常道。" + first_chapter
+            if number == 1
+            else "天地。")
+        chapters.append(f"=={numeral}章==\n{body}\n")
     return (
         "{{header|title=老子}}\n"
         "== 道經 ==\n"
@@ -176,13 +179,15 @@ class SnapshotServiceTests(unittest.TestCase):
         self.assertEqual(len(snapshot.sections), 81)
         self.assertEqual(
             snapshot.sections[0].section_id,
-            "daodejing_huijiao:chapter:001",
+            "daodejing_wang_bi:chapter:001",
         )
         self.assertEqual(
             snapshot.sections[-1].section_id,
-            "daodejing_huijiao:chapter:081",
+            "daodejing_wang_bi:chapter:081",
         )
-        self.assertEqual(snapshot.sections[0].text, "道德。")
+        self.assertEqual(
+            snapshot.sections[0].text,
+            "道可道，非常道。道德。")
         for section in snapshot.sections:
             self.assertEqual(
                 snapshot.canonical_text[
@@ -317,7 +322,7 @@ class SnapshotServiceTests(unittest.TestCase):
                 root,
                 expected_section_count=81,
                 expected_section_ids=tuple(
-                    f"daodejing_huijiao:chapter:{number:03d}"
+                    f"daodejing_wang_bi:chapter:{number:03d}"
                     for number in range(1, 82)),
                 require_no_latin=True)
             client = NeverCalledClient()
@@ -334,7 +339,7 @@ class SnapshotServiceTests(unittest.TestCase):
                 CLEANER_VERSION)
             self.assertEqual(
                 result.snapshot.sections[0].text,
-                "其事好還。")
+                "道可道，非常道。其事好还。")
 
 
 class BuildServiceTests(unittest.TestCase):
@@ -363,7 +368,7 @@ class BuildServiceTests(unittest.TestCase):
                     word.surface
                     for word in result.build.unique_words
                 ),
-                ("道", "德", "天", "地"),
+                ("道", "可", "非", "常", "德", "天", "地"),
             )
             self.assertTrue(result.path.is_dir())
             pointer = json.loads(
@@ -403,8 +408,8 @@ class BuildServiceTests(unittest.TestCase):
                 tuple((event.current, event.total) for event in write_events),
                 ((0, 1), (1, 1)),
             )
-            self.assertIn(
-                "Saved 4 unique words.",
+        self.assertIn(
+            "Saved 7 unique words.",
                 write_events[-1].message,
             )
 
@@ -720,7 +725,10 @@ class CliTests(unittest.TestCase):
         service_class.return_value.fetch.assert_not_called()
         service_class.return_value.build.assert_not_called()
         rendered = output.getvalue()
-        self.assertIn("daodejing_huijiao\t道德經", rendered)
+        self.assertIn("daodejing_wang_bi\t道德經\t王弼本", rendered)
+        self.assertIn(
+            "daodejing_mawangdui\t道德經\t馬王堆帛書校勘版",
+            rendered)
         self.assertIn("journey_to_the_west\t西遊記", rendered)
         self.assertIn("81 sections", rendered)
         self.assertIn("100 sections", rendered)

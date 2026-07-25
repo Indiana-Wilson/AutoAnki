@@ -75,6 +75,16 @@ def _expected_section_ids(spec):
     )
 
 
+def _is_local_custom_snapshot(snapshot):
+    """Identify snapshots produced by the registered local-source workflow."""
+    return (
+        snapshot.spec_key.startswith("custom-")
+        and snapshot.edition.startswith("Local document:")
+        and bool(snapshot.pages)
+        and all(page.url.startswith("local:") for page in snapshot.pages)
+    )
+
+
 def make_snapshot(spec, pages):
     """Clean fetched pages and assign exact global offsets."""
     source_pages = tuple(pages)
@@ -101,7 +111,10 @@ def default_tokenizer(spec):
         "device": "auto",
         "batch_size": recommended_hardware_batch_size(),
     }
-    if spec.source_language_key == "classical_chinese_warring_states":
+    if spec.source_language_key in {
+            "classical_chinese_han",
+            "classical_chinese_wang_bi",
+            "classical_chinese_warring_states"}:
         return CkipHanTokenizer.for_shanggu(**options)
     if spec.source_language_key == "classical_chinese_ming":
         return CkipHanTokenizer.for_jindai(**options)
@@ -432,10 +445,20 @@ class CorpusService:
         else:
             raise ValueError(
                 "Corpus artifacts do not match the manifest kind.")
-        spec = get_corpus_spec(snapshot.spec_key)
-        audit_snapshot(
-            snapshot,
-            expected_section_count=spec.expected_section_count,
-            expected_section_ids=_expected_section_ids(spec),
-            require_no_latin=True)
+        try:
+            spec = get_corpus_spec(snapshot.spec_key)
+        except KeyError:
+            if not _is_local_custom_snapshot(snapshot):
+                raise
+            # read_snapshot/read_build already performed the complete generic
+            # snapshot/build audit. Repeat the public snapshot audit here to
+            # make this branch explicit without imposing built-in Chinese
+            # section identities or a no-Latin rule on local historical text.
+            audit_snapshot(snapshot)
+        else:
+            audit_snapshot(
+                snapshot,
+                expected_section_count=spec.expected_section_count,
+                expected_section_ids=_expected_section_ids(spec),
+                require_no_latin=True)
         return True

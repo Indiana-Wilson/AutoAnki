@@ -7,11 +7,16 @@ contains "Dictionary Meaning", give a concise English dictionary-style
 explanation of what the expression means, including important semantic nuance,
 register, implications, or typical usage where relevant; do not merely list
 possible English translations. If multiple definition fields are present, they
-must describe the same sense. If an expression has multiple relevant meanings,
-create a separate card entry for each meaning.
+must describe the same sense. Create a fully separate card entry for every
+genuinely disjoint, commonly used lexical sense that a learner is reasonably
+likely to encounter in the relevant period and register. Do this even when
+bracketed context clearly selects one sense; return that contextual sense
+first. Do not split different nuances, connotations, degrees, registers, or
+typical contexts of the same underlying meaning.
 
 Preserve traditional Chinese characters unless the input explicitly uses or
-requests a different form. Anything in brackets is context for choosing the
-intended meaning. Skip nonexistent entries; correct an obvious typo.
+requests a different form. Anything in brackets identifies the contextual
+meaning without excluding other common meanings. Skip nonexistent entries;
+correct an obvious typo.
 
 Here are the Classical Chinese words or expressions:

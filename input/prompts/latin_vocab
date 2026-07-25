@@ -2,6 +2,11 @@ Define the following Latin words or expressions. For each entry, provide
 exactly four idiomatic Latin example sentences separated by the pipe character,
 |, and a reconstructed Classical Latin IPA pronunciation.
 
+For those same four examples, provide four complete, natural English
+translations in the "Sentence Translations (English)" property, separated by |
+in exactly the same order. Translate each whole sentence, not only the defined
+expression, and never use | or HTML inside one translation.
+
 The response schema determines which definitions are needed. If it contains
 "Meaning", give concise English translation equivalent(s). If it contains "Native Meaning",
 give a concise definition written in clear Latin. If it contains
@@ -9,13 +14,25 @@ give a concise definition written in clear Latin. If it contains
 entry means, including important semantic nuance, register, implications, or
 typical usage where relevant; do not merely list possible English
 translations. If multiple definition fields are present, they must describe
-the same sense. If an entry has multiple relevant meanings, create a separate
-card entry for each meaning and make its examples unambiguous.
+the same sense. Create a fully separate card entry for every genuinely
+disjoint, commonly used lexical sense that a learner is reasonably likely to
+encounter in the relevant historical register. Do this even when bracketed
+context clearly selects one sense; return that contextual sense first. Do not
+split different nuances, connotations, degrees, registers, or typical contexts
+of the same underlying meaning. Give every separate sense its own distinct set
+of example sentences, without reusing sentences between senses, and make the
+intended sense unambiguously inferable from each sentence alone.
 
-Wrap the requested word or its inflected form in
-<strong>expression</strong> in every sentence. Use macrons where they are
-known and useful, while accepting unmarked input. Anything in brackets is
-context for choosing the intended meaning. Skip nonexistent entries; correct
-an obvious typo.
+Include the requested word or expression, or a grammatically appropriate
+inflected form, at least once in every sentence. In every sentence, wrap EVERY
+occurrence that expresses that card's particular sense in literal <strong>
+and </strong> tags, including relevant repeated and inflected occurrences. If
+the same spelling has a different meaning elsewhere in the sentence, do NOT
+embolden that occurrence. Every sentence must contain a nonempty
+<strong>...</strong> span. Use no other HTML or formatting. Use macrons where
+they are known and useful, while accepting
+unmarked input. Anything in brackets is context for choosing the intended
+meaning but does not exclude other common meanings. Skip nonexistent entries;
+correct an obvious typo.
 
 Here are the Latin words or expressions:

@@ -11,6 +11,7 @@ from source_generation.jobs import (
     GenerationJobStore,
     JobEvent,
     JobSnapshot,
+    PaidResponse,
     RetryPolicy,
     is_transient_request_error,
 )
@@ -29,9 +30,13 @@ from source_generation.models import (
 )
 from source_generation.planning import (
     AUD_EXCHANGE_RATE_LABEL,
+    BATCH_PRICING,
     DEFAULT_PRICING,
+    LOW_REASONING_OUTPUT_RESERVE_MULTIPLIER,
     MODEL_CONTEXT_WINDOW_TOKENS,
+    MODEL_MAX_INPUT_TOKENS,
     MODEL_MAX_OUTPUT_TOKENS,
+    STANDARD_PRICING,
     USD_TO_AUD_RATE,
     estimate_plan_cost,
     estimate_chunk_output_tokens,
@@ -40,8 +45,14 @@ from source_generation.planning import (
     list_processed_sources,
     load_processed_source,
     plan_source_generation,
+    price_source_usage,
+    resolve_latest_processed_source_path,
 )
-from source_generation.validation import make_pipeline_response_validator
+from source_generation.validation import (
+    inspect_pipeline_response,
+    make_pipeline_response_validator,
+    public_validation_report,
+)
 from source_generation.requests import (
     SOURCE_BATCH_INSTRUCTIONS,
     SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION,
@@ -54,6 +65,13 @@ from source_generation.requests import (
     normalise_source_request_contract,
     render_chunk_input,
     source_request_contract_digest,
+    source_request_requires_sentence_translations,
+    source_request_uses_compact_source_results,
+    source_request_uses_grouped_source_results,
+    source_request_uses_obsolete_context_translation_protocol,
+    source_request_uses_occurrence_locators,
+    source_request_uses_sentence_arrays,
+    source_request_uses_split_contextual_cards,
 )
 
 __all__ = (
@@ -62,9 +80,12 @@ __all__ = (
     "ContextUnit",
     "CostEstimate",
     "AUD_EXCHANGE_RATE_LABEL",
+    "BATCH_PRICING",
     "DEFAULT_PRICING",
     "MODEL_CONTEXT_WINDOW_TOKENS",
+    "MODEL_MAX_INPUT_TOKENS",
     "MODEL_MAX_OUTPUT_TOKENS",
+    "STANDARD_PRICING",
     "USD_TO_AUD_RATE",
     "GenerationChunk",
     "GenerationJobRunner",
@@ -74,7 +95,9 @@ __all__ = (
     "JobEvent",
     "JobSnapshot",
     "LoadedSource",
+    "LOW_REASONING_OUTPUT_RESERVE_MULTIPLIER",
     "OutputDetail",
+    "PaidResponse",
     "Pricing",
     "RetryPolicy",
     "SourceGenerationConfig",
@@ -92,11 +115,22 @@ __all__ = (
     "estimate_chunk_output_tokens",
     "estimate_text_tokens",
     "is_transient_request_error",
+    "inspect_pipeline_response",
     "list_processed_source_summaries",
     "list_processed_sources",
     "load_processed_source",
     "make_pipeline_response_validator",
     "plan_source_generation",
+    "price_source_usage",
+    "resolve_latest_processed_source_path",
     "render_chunk_input",
+    "public_validation_report",
     "source_request_contract_digest",
+    "source_request_requires_sentence_translations",
+    "source_request_uses_compact_source_results",
+    "source_request_uses_grouped_source_results",
+    "source_request_uses_obsolete_context_translation_protocol",
+    "source_request_uses_occurrence_locators",
+    "source_request_uses_sentence_arrays",
+    "source_request_uses_split_contextual_cards",
 )

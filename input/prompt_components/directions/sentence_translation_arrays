@@ -1,0 +1,16 @@
+For the four generated examples, provide exactly four complete, natural
+English translations as four separate strings in the
+"Sentence Translations (English)" JSON array. Translation item 1 must translate
+sentence item 1, item 2 must translate sentence item 2, and so on. Translate
+the whole sentence and preserve the precise lexical sense defined by that
+card; do not give only a gloss of the highlighted term.
+
+Do not put <strong> tags or any other HTML in a translation. Never join
+translations with | and never put | inside an array item. If a source sentence
+is already Modern English, repeat it without the <strong> tags so that all four
+array positions still match.
+
+Any JSON object or fragment shown in another prompt component illustrates only
+the rule discussed beside it. It may omit schema-dependent fields for brevity.
+Your actual response must still contain every field required by the supplied
+response schema.

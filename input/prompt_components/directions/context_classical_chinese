@@ -1,0 +1,21 @@
+CLASSICAL CHINESE EMPHASIS EXAMPLE:
+
+The following partial object fragment is INVALID with respect to emphasis
+because all four examples use 善時 without the mandatory tags. It illustrates
+only the term and sentence fields, not every field required by the response
+schema:
+
+{{
+  "Classical Chinese": "善時",
+  "Sentences": "動善時。|知善時而動。|失善時則敗。|守其善時。"
+}}
+
+The following partial object fragment is VALID with respect to emphasis because
+every separate example contains the complete expression 善時, and every
+occurrence expressing this sense is immediately and exclusively enclosed by
+the required tags:
+
+{{
+  "Classical Chinese": "善時",
+  "Sentences": "用兵貴<strong>善時</strong>。|知<strong>善時</strong>者事半而功倍。|君子觀變以擇<strong>善時</strong>。|失<strong>善時</strong>則雖勇無功。"
+}}

@@ -18,8 +18,10 @@ From Source contains five pages:
 4. **Codex Retrieve** gives an explicitly authorized Codex CLI process a
    source-retrieval description, then prepares the retrieved files.
 5. **Jobs & Failures** shows each saved request, its attempts, and the final
-   package/import step. Raw and validated output can be inspected before an
-   individual or bulk retry is authorized.
+   package/import step. Each deck-generation job is an expandable group, with
+   its request chunks in order and its Deck packaging/import row last.
+   **Inspect selected stage** separates the exact request from the retained
+   response in two tabs; it inspects one chunk, not the whole job.
 
 Daodejing and Journey to the West are the built-in presets. Locally prepared
 files appear in the same source selector after preparation succeeds. A preset
@@ -43,7 +45,20 @@ controls:
   - Current sentence
   - Current, previous, and next sentence
   - Complete source span covered by the chunk
+- **Use source for example sentences**, available when source context and the
+  Context card direction are enabled
+- optional **Generate only from the first N token occurrences**, measured in
+  running source words before vocabulary deduplication
 - **Words per OpenAI request**, which is the generation chunk size
+- **Request protocol**
+  - Compact v9, the default fixed-schema protocol
+  - Legacy v8, a one-click rollback that preserves its grouped behavior
+- **Reasoning**
+  - None, the default economy-oriented setting
+  - Low, an optional quality/cost trade-off
+- **Processing**
+  - Standard synchronous requests
+  - Economy, an asynchronous OpenAI Batch at half token pricing
 - **Max parallel requests**
 - **Minimum start stagger**
 - optional web search when a meaning remains unclear
@@ -56,8 +71,20 @@ overhead but create larger inputs and outputs. AutoAnki blocks generation when
 the estimate indicates that one request may exceed the configured model
 limits.
 
-The defaults are 30 words per request, eight concurrent workers, and a 100 ms
-minimum interval between request starts. OpenAI limits vary by account,
+The source-prefix option is a true text cutoff, not a limit on unique cards.
+For example, if the first 100 running words contain 63 distinct normalized
+forms, at most those 63 forms are candidates. Repeated words still consume
+positions in the 100-word prefix. AutoAnki first selects the vocabulary whose
+first occurrence falls inside that prefix, then applies learned-word
+exclusions, and only then partitions the remainder into OpenAI requests. The
+estimate distinguishes the requested/actual prefix length, unique forms in
+the prefix, forms omitted because they first occur later, learned-word
+exclusions, and final candidate count. The cutoff and all of those counts are
+retained in the saved plan.
+
+The defaults are 30 words per request, compact v9, no reasoning, Standard
+processing, eight concurrent workers, and a 100 ms minimum interval between
+request starts. OpenAI limits vary by account,
 project, model, and usage tier, so there is no universal safe maximum worker
 count. Eight is the higher conservative startup value; the shared coordinator
 honours server `Retry-After` instructions and automatically backs off all
@@ -66,8 +93,10 @@ not-yet-started workers after a rate-limit response.
 The displayed cost is an estimate in Australian dollars, not a quote. OpenAI
 prices are calculated in USD, then converted using the frozen RBA AUD/USD
 rate of 0.6975 published at 4:00 pm on 2026-07-24. The configured pricing
-profile is `gpt-5.4-mini` at US$0.75 per million input tokens and US$4.50 per
-million output tokens, labelled **standard pricing published 2026-07-24**.
+profile is `gpt-5.4-mini` at US$0.75 per million uncached input tokens,
+US$0.075 per million cached input tokens, and US$4.50 per million output
+tokens, labelled **standard pricing published 2026-07-24**. Economy uses the
+documented Batch rates of US$0.375, US$0.0375, and US$2.25 respectively.
 Freezing the exchange rate makes the estimate reproducible between
 authorization and job creation. It does not include card-issuer
 currency-conversion fees. The configured request guards are a 400,000-token
@@ -76,13 +105,26 @@ constants, not a live price or model-metadata lookup; check the
 [current official model page](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
 before relying on them at a later date.
 
-The estimate includes selected Card setup fields and examples, expected
-response length, prompt/schema repetition, source context, and the number of
-words left after exclusion. Token counts use a deterministic character-class
-approximation, and the displayed low/high range is deliberately wider than
-the point estimate. Estimation never calls OpenAI. If Anki exclusion is
-enabled, calculating the estimate makes a read-only AnkiConnect query or
-reuses the matching read-only result for up to 30 seconds.
+The estimate includes selected Card setup fields and examples, the separate
+contextual and additional-sense response shapes, one translation per shared
+source context, exact serialized payload/schema sizes, prompt repetition, and
+the number of words left after exclusion. Its headline is the modelled central
+value; a labelled low/high range remains visible rather than being presented
+as the likely bill. For cache-eligible requests, the central estimate treats
+the first shared prefix as cold and later identical prefixes as cached; the
+high estimate keeps every input cold. Token counts use a deterministic
+character-class approximation. Estimation never calls OpenAI. If Anki
+exclusion is enabled, calculating the estimate makes a read-only AnkiConnect
+query or reuses the matching read-only result for up to 30 seconds.
+
+Every received paid response separately records provider-reported input,
+cached-input, output, reasoning, and total tokens before local validation.
+Jobs & Failures prices that retained usage at the job's frozen Standard or
+Economy profile and shows the dated USD/AUD basis. Reasoning is already a
+subset of output and cached input is already a subset of input, so neither is
+double-counted. Recorded web-search calls are added separately. Recovery may
+retain the same provider response in more than one attempt directory; repeated
+nonempty provider response IDs are counted only once in the displayed usage.
 
 When web search is enabled, the model is told to use it only if the retained
 context and its knowledge are insufficient. Each response is capped at one
@@ -103,7 +145,9 @@ No source card request is sent until the estimate is available and
 Every saved candidate retains its first occurrence, section, paragraph, and
 previous/current/next sentence metadata. A request contains one ordered word
 record per candidate and a `context_id` that points to a separate context
-record.
+record. Current jobs also persist a bounded `occurrence_locator` beside that
+word. Its visibly marked target and adjacent excerpts make repeated spellings
+unambiguous to the model without duplicating an entire long context.
 
 Identical sentence contexts are serialized once per request. Overlapping
 three-sentence windows are unioned into one interval, so words sharing any
@@ -114,6 +158,86 @@ contain no newly selected word. At the beginning or end of a source, a
 missing previous or next sentence is simply omitted. Context cannot be
 deduplicated across
 different API requests because each request must be self-contained.
+
+When **Use source for example sentences** is enabled, compact v9 uses one
+fixed strict schema for every request. Its `term_results` array contains an
+integer `rank`, one lexical-only `contextual_sense`, and an
+`additional_senses` array. A second `source_context_translations` array carries
+one `{context_id, translation}` item per shared passage. The immutable local
+chunk, not a chunk-specific schema or model-echoed term, defines the exact
+allowed rank and context-ID sets. AutoAnki rejects omissions, duplicates,
+unknown identities, wrong ordering, or unsafe fields before packaging.
+
+The v9 request payload omits redundant chunk/range/offset structures, keeps
+only rank, term, context ID, a bounded marked occurrence when needed, and each
+deduplicated context. Audited ambiguous Wang Bi occurrences carry short
+term-local quality hints instead of repeating the old multi-page checks in
+every request. Their unequivocal translation, reading, and grammatical role
+are also checked locally, so a contradictory contextual card is retained for
+review/repair rather than entering the deck. The fixed prompt/schema prefix is
+eligible for automatic prompt caching. Legacy v8 remains selectable and
+continues to build one exact, rank-keyed schema per chunk; existing v8 request
+bytes and saved contracts are not migrated.
+
+Each v8 or v9 rank
+contains one lexical-only `contextual_sense` and an `additional_senses` array.
+Additional senses contain four generated sentences and four aligned
+translations as fixed-length JSON arrays. Sense objects omit the
+source-language term, which AutoAnki restores from the immutable rank-to-word
+mapping instead of trusting model-echoed spelling.
+
+The root source-context collection translates each exact shared context once.
+AutoAnki validates the exact root, rank, group, and context-ID keys, inserts
+the exact context record as each contextual card's sole example, then merges
+the contextual and additional senses in source-rank order. The inserted
+context may contain one sentence, several sentences, or a larger text block.
+A literal `|` already present in source text remains part of that one example
+rather than becoming a delimiter. With the option off, every sense continues
+to require four generated examples.
+
+Every new Context card also stores an English translation positionally aligned
+with each example. The back of the card shows the translation of the randomly
+selected front example above the definition fields. Generated senses require
+four translations in the same order as their four examples. A retained source
+passage is one example and therefore requires one complete translation of that
+whole passage. The exact request contract remains frozen with its job.
+Obsolete v4-v7 source-context jobs remain inspectable, but cannot be retried or
+finalized: their older shapes cannot structurally require every requested
+rank, and earlier versions also had ambiguous sense grouping or occurrence
+selection. Create a new v9 job instead. Older non-source-context contracts
+retain their frozen behavior.
+
+For model-generated examples, the model must wrap the usage that expresses the
+card's particular sense in `<strong>...</strong>`. Grouped v8 and compact v9
+source requests require the exact requested spelling once per example, inside
+one exact strong span. Validation reports both repeated emphasized uses and
+any remaining unmarked literal occurrence, including an occurrence embedded
+in a compound. The v8 per-rank schema can require the exact marked surface for
+one-character CJK terms. The fixed v9 schema requires a nonempty strong span
+in every generated example; its immutable rank-to-term mapping and local
+validation then enforce the exact requested spelling and reject any additional
+unmarked occurrence.
+
+Where an audited source-specific construction has one unequivocal analysis,
+the v8 per-rank schema may freeze that occurrence's lexical constants. Compact
+v9 instead carries a short term-local quality hint and repeats only concise
+immutable facts in local validation. The Wang Bi opening's `天地之始`, for
+example, constrains contextual `始` to `beginning; origin` as a noun; retained
+raw output cannot bypass that local check.
+Older contracts may mark an appropriate inflected form rather than merely
+repeating the response term. Validation also rejects source-language text
+copied into an English translation, including exact sentence copies and
+Han-only values, and applies the same guard to the shared context translations.
+Packaging preserves validated strong spans while escaping all other HTML.
+
+Source passages are inserted only after the response, so the model cannot mark
+them. AutoAnki uses the audited zero-based `[start, end)` occurrence span stored
+with each requested word to highlight exactly the occurrence that selected the
+contextual sense, even when the same surface form appears elsewhere in the
+retained passage. A current source-context job with a missing, partial, or
+inconsistent span fails non-overrideable validation and must be recreated from
+the current audited corpus build. The locator is prompt guidance only; the
+audited offsets remain authoritative for highlighting.
 
 ## Anki exclusion
 
@@ -151,11 +275,11 @@ plan. It therefore does not rely on the estimate's cached collection view for
 the actual request set. The Manual Input exclusion path likewise forces a
 fresh read before any card request.
 
-## Requests, concurrency, and rate limits
+## Requests, Economy Batch, concurrency, and rate limits
 
-Generation creates one independent OpenAI request unit per source chunk; each
-attempt for that unit calls the Responses API. Request workers use a bounded
-thread pool; the default is four workers with at least 100 ms between request
+Standard generation creates one independent OpenAI request unit per source
+chunk; each attempt for that unit calls the Responses API. Request workers use
+a bounded thread pool; the default is eight workers with at least 100 ms between request
 starts. This parallelism reduces time spent waiting on network responses. A
 larger number is not automatically better: the account/model
 request-per-minute and token-per-minute limits still apply.
@@ -177,6 +301,42 @@ in those retries. **Retry selected** resets and runs only the selected failed
 request rows; its remaining-failure notice is scoped to the selected parent
 jobs rather than unrelated old jobs.
 
+Economy writes the same frozen `/v1/responses` request bodies to a JSONL file,
+uploads it with `purpose=batch`, and creates one asynchronous 24-hour Batch.
+Concurrency, staggering, and synchronous transient retries do not apply. The
+prepared, uploaded, submitted, and collected states are saved separately with
+an input SHA-256, stable `custom_id` map, OpenAI file/Batch IDs, and a
+cross-process lease. Resuming first reconciles or retrieves that saved Batch;
+it does not submit completed work again. Input is rejected before upload above
+50,000 requests or 200 MB, and returned IDs/custom IDs must match the saved
+state exactly.
+
+For compact v9 validation failures, an explicitly authorized Standard retry
+derives the smallest safe scope from the retained diagnostics. If every
+problem maps to known ranks or context IDs, only those identities are requested
+again; the response is merged by immutable identity and the entire candidate
+is revalidated. The original response, exact paid repair response, repair
+scope, and merged candidate remain separately inspectable. An unscoped/root
+problem falls back to a full-chunk retry.
+
+For an `invalid_response`, **View problems** presents every detected issue as
+a card/field location, plain-language explanation, expected value, actual
+value, suggested next step, and exact JSON path. Selecting an issue also shows
+the affected returned card or response section. Malformed JSON, unsafe root
+or card shape, missing/unexpected fields, and non-text field values are locked:
+they cannot be manually accepted. If syntax and structure are safe, individual
+content constraints—such as an empty field, the wrong example count, an
+omitted requested term, or an extra legitimate source form—may be explicitly
+accepted after human review.
+
+Manual acceptance does not edit the model response and is not a general
+“ignore validation” switch. Every selected problem is reidentified against
+the retained response, the raw response hash and decision history are saved,
+and all structural checks run again during packaging. A chunk becomes usable
+only after every current problem is resolved. Resolving the final incomplete
+chunk can immediately start the existing job's package/import stage; it does
+not make another OpenAI request.
+
 The worker pool is for network requests. The computer's GPU does not accelerate
 OpenAI requests. GPU acceleration applies only to optional local CKIP source
 tokenization described in [Corpus preparation](corpus_pipeline.md).
@@ -188,8 +348,9 @@ Creating an authorized source job freezes these OpenAI-facing settings in
 
 - model (`gpt-5.4-mini`);
 - the fully composed prompt, including the Advanced-tab source component;
-- the complete strict JSON response schema; and
-- reasoning effort (`none`);
+- the complete strict JSON response schema, including the exact per-chunk
+  schemas for v8 or the fixed compact schema for v9;
+- request protocol, reasoning effort, and Standard/Economy processing mode;
 - optional web-search access and its one-call cap.
 
 The corresponding source-batch payload is also saved in each chunk's
@@ -203,8 +364,14 @@ later retries.
 
 This immutability applies to a saved job. Starting a new job intentionally
 captures the Card setup and prompt components that exist at that time.
-Reasoning effort `none` is a cost/latency choice, not a guarantee about output
-length or validity; strict schema output is still validated locally.
+Reasoning effort `low` gives the mini model a bounded budget for contextual
+parsing, sense separation, example grammar, translation, and markup. `none`
+avoids reasoning-token output charges and is the default; strict schema output
+is validated locally in both cases. Cost estimates model low/central/high
+reasoning separately. The hard v9 output ceiling has additional headroom for
+unusually polysemous chunks and optional hidden deliberation. A ceiling is not
+a prepaid reservation, and exhausting it would otherwise turn a paid response
+into incomplete JSON.
 
 ## Persistence and recovery
 
@@ -225,8 +392,18 @@ output/source_generation_jobs/<job-id>/
             attempts/
                 0001/
                     raw.txt          # when a response was received
+                    response.json    # exact provider ID, status, and usage
                     validated.json   # only after validation
                     error.json       # when an attempt failed
+                    repair_scope.json
+                    repair_raw.txt   # exact selective-repair response
+                    manual_validation.json
+                                     # explicit per-problem review audit
+    economy/
+        batch_0001/
+            input.jsonl
+            output.jsonl             # retained after collection
+            errors.jsonl
 ```
 
 Paths move to the per-user AutoAnki output directory in a packaged
@@ -265,15 +442,23 @@ managed workflow should still be treated as a deliberate operation.
 
 ## Local file preparation
 
-Prepare File currently supports historical Chinese source processing:
+Prepare File supports these historical-language source variants:
 
 - Classical Chinese (Warring States) uses the pinned CKIP Shanggu model.
 - Classical Chinese (Ming) uses the pinned CKIP Jindai model plus the pinned
   Traditional Jieba refinement policy for unresolved long spans.
+- Middle English and Old English use the built-in deterministic Unicode
+  orthographic-word tokenizer. It retains letters such as `þ`, `ð`, `æ`, `ƿ`,
+  and `ȝ`, combining diacritics, internal apostrophes/elisions, and hyphenated
+  compounds with exact source offsets. Numeric and standalone Roman-numeral
+  editorial labels are omitted.
 
-Although other card-generation languages exist, local source tokenization
-currently stops with a clear error for them; it does not silently apply a
-modern-Chinese or character fallback.
+Historical-English candidate identity is NFC plus Unicode case-folding, so a
+sentence-initial `Whan` and later `whan` produce one candidate while retaining
+the first spelling and every exact occurrence offset. Chinese deduplication
+remains exact NFC surface-form matching. Middle/Old English contexts recognize
+periods as sentence endings but do not split common editorial abbreviations or
+initials; Chinese punctuation behavior is unchanged.
 
 The accepted input formats are:
 
@@ -285,15 +470,21 @@ There is no OCR engine. A scan/image-only PDF is rejected with instructions
 to run OCR externally and provide a searchable PDF or UTF-8 text. PDF text
 extraction cannot reliably infer reading order for every multi-column layout,
 remove recurring headers/footers, or correct bad embedded character maps.
-The local cleaner removes only limited URL/HTML/wiki-like artifacts. Always
-use Inspect Source and, when necessary, inspect the retained canonical/raw
-artifacts before authorizing paid generation.
+The generic local cleaner removes only limited URL/HTML/wiki-like artifacts.
+One exact-signature exception handles the retained body of Project Gutenberg
+ebook 22120, Skeat's *Canterbury Tales*: it separates the selected text from
+the interleaved critical apparatus and applies the volume's published
+corrections and preferred readings. It fails closed if the audited layout
+changes. Always use Inspect Source and, when necessary, inspect the retained
+canonical/raw artifacts before authorizing paid generation for any other
+source.
 
 The original input file, its hash, exact extracted page/section text, canonical
 text, contexts, occurrences, first-occurrence vocabulary, and audit reports
 are retained under `output/corpora/`. Preparation may download pinned CKIP
 models and the Ming refinement dictionary, but it does not call the OpenAI
-card API and does not touch Anki.
+card API and does not touch Anki. Middle/Old English tokenization has no model
+download and does not use the GPU preference.
 
 Local preparation writes an atomic tokenization checkpoint after each
 completed source section. If a later section or process fails, running
@@ -351,9 +542,10 @@ from source_generation import (
     plan_source_generation,
 )
 
-source = load_processed_source("daodejing_huijiao")
+source = load_processed_source("daodejing_wang_bi")
 config = SourceGenerationConfig(
     source_key=source.key,
+    source_prefix_token_limit=100,
     chunk_size=30,
     context_mode="sentence_neighbors",
 )

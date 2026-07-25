@@ -52,6 +52,25 @@ def source_pipeline():
         active_language_key="classical_chinese")
 
 
+def context_source_pipeline():
+    pipeline = source_pipeline()
+    settings = pipeline_store.get_language_settings(
+        pipeline,
+        "classical_chinese")
+    settings = replace(
+        settings,
+        cards=tuple(
+            replace(
+                card,
+                enabled=card.direction_key == "context")
+            for card in settings.cards))
+    return pipeline_store.replace_active_language_settings(
+        pipeline,
+        settings,
+        (settings,),
+        active_language_key="classical_chinese")
+
+
 def one_word_plan():
     config = SourceGenerationConfig(
         source_key="fixture",
@@ -287,7 +306,7 @@ class SourceWorkflowTests(unittest.TestCase):
         self.assertEqual(len(client.responses.calls), 1)
         call = client.responses.calls[0]
         self.assertEqual(call["model"], source_workflow.SOURCE_MODEL)
-        self.assertEqual(call["reasoning"], {"effort": "none"})
+        self.assertEqual(call["reasoning"], {"effort": "low"})
         self.assertIn('"term":"甲"', call["input"])
         self.assertGreaterEqual(call["max_output_tokens"], 1_024)
         self.assertLessEqual(
@@ -369,11 +388,234 @@ class SourceWorkflowTests(unittest.TestCase):
             "legacy_reconstructed")
         self.assertEqual(
             inspection["request_contract"]["reasoning"],
-            {"effort": "none"})
+            {"effort": "low"})
         package_importer.assert_called_once()
         self.assertEqual(
             controller._workflow(first["job_id"])["state"],
             "imported")
+
+    def test_retry_refuses_obsolete_v4_to_v6_context_protocol_before_work(
+            self):
+        pipeline = context_source_pipeline()
+        plan = one_word_plan()
+        contract = build_source_request_contract(
+            pipeline,
+            chunks=(),
+            use_source_for_example_sentences=True,
+            protocol_version=8,
+            reasoning_effort="low")
+        contract["schema_version"] = 4
+        del contract["response_formats_by_chunk"]
+        contract["max_output_tokens_by_chunk"] = {
+            chunk.chunk_id: 8_192
+            for chunk in plan.chunks
+        }
+        job = self.backend.jobs.create(
+            plan,
+            request_metadata={
+                "pipeline": pipeline_store.pipeline_to_mapping(
+                    pipeline),
+            },
+            request_contract=contract)
+        chunk_id = self.backend.jobs.chunk_ids(job.job_id)[0]
+        self.backend.jobs._set_chunk_status(
+            job.job_id,
+            chunk_id,
+            status="invalid_response")
+        client_factory = MagicMock()
+        controller = self.controller(
+            openai_client_factory=client_factory)
+        row_id = self.backend._row_id(job.job_id, chunk_id)
+        original_status = self.backend.jobs.chunk_status(
+            job.job_id,
+            chunk_id)
+
+        with patch.object(
+                source_workflow.process_text,
+                "get_api_key") as get_api_key:
+            with self.assertRaisesRegex(
+                    ValueError,
+                    "obsolete v4-v7 source-context protocol"):
+                controller.retry({
+                    "job_ids": (row_id,),
+                    "paid_confirmed": True,
+                })
+
+        get_api_key.assert_not_called()
+        client_factory.assert_not_called()
+        self.assertEqual(
+            self.backend.jobs.chunk_status(job.job_id, chunk_id),
+            original_status)
+
+        contract = build_source_request_contract(
+            pipeline,
+            chunks=(),
+            use_source_for_example_sentences=True,
+            protocol_version=8,
+            reasoning_effort="low")
+        contract["schema_version"] = 6
+        del contract["response_formats_by_chunk"]
+        contract["max_output_tokens_by_chunk"] = {
+            chunk.chunk_id: 8_192
+            for chunk in plan.chunks
+        }
+        finalize_job = self.backend.jobs.create(
+            plan,
+            request_metadata={
+                "pipeline": pipeline_store.pipeline_to_mapping(
+                    pipeline),
+            },
+            request_contract=contract)
+        package_creator = MagicMock()
+        controller = self.controller(
+            package_creator=package_creator)
+        finalize_row_id = self.backend._row_id(
+            finalize_job.job_id,
+            source_workflow._FINALIZE_ROW_ID)
+
+        with patch.object(
+                source_workflow.process_text,
+                "get_api_key") as get_api_key:
+            with self.assertRaisesRegex(
+                    ValueError,
+                    "obsolete v4-v7 source-context protocol"):
+                controller.retry({
+                    "job_ids": (finalize_row_id,),
+                    "paid_confirmed": True,
+                })
+
+        get_api_key.assert_not_called()
+        package_creator.assert_not_called()
+
+    def test_contractless_context_job_reconstructs_and_reuses_legacy_v3(
+            self):
+        self.pipeline = context_source_pipeline()
+        self.install_plan(one_word_plan())
+        client = FakeOpenAIClient((
+            json.dumps({"cards": []}),
+            json.dumps({
+                "cards": [{
+                    "Classical Chinese": "甲",
+                    "Translation (English)": "first",
+                    "Sentences": (
+                        "<strong>甲</strong>一。|"
+                        "二<strong>甲</strong>。|"
+                        "三<strong>甲</strong>。|"
+                        "四<strong>甲</strong>。"),
+                }],
+            }, ensure_ascii=False),
+        ))
+
+        def create_package(_combined, **kwargs):
+            kwargs["output_path"].write_bytes(b"apkg")
+            return kwargs["output_path"], 1
+
+        package_creator = MagicMock(side_effect=create_package)
+        controller = self.controller(
+            openai_client_factory=lambda _key: client,
+            package_creator=package_creator,
+            package_importer=MagicMock(return_value=True))
+
+        with patch.object(
+                source_workflow.process_text,
+                "get_api_key",
+                return_value="test-key"):
+            first = controller.generate({
+                "pipeline": self.pipeline,
+                "paid_confirmed": True,
+            })
+
+            job_path = self.backend.jobs.snapshot(first["job_id"]).path
+            contract_path = job_path / "request_contract.json"
+            frozen_contract_bytes = contract_path.read_bytes()
+            contract = json.loads(
+                frozen_contract_bytes.decode("utf-8"))
+            self.assertEqual(contract["schema_version"], 3)
+            self.assertNotIn(
+                "require_sentence_translations",
+                contract)
+            self.assertNotIn(
+                "Sentence Translations (English)",
+                contract["composed_prompt"])
+            self.assertNotIn(
+                "Sentence Translations (English)",
+                json.dumps(
+                    contract["response_format"]["schema"],
+                    ensure_ascii=False))
+
+            failed_row = next(
+                row
+                for row in controller.job_rows()["jobs"]
+                if row["status"] == "invalid_response")
+            first_request_bytes = json.dumps(
+                client.responses.calls[0],
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            with patch.object(
+                    source_workflow,
+                    "build_source_request_contract",
+                    side_effect=AssertionError(
+                        "A retry rebuilt its frozen request.")):
+                controller.retry({
+                    "job_ids": (failed_row["job_id"],),
+                    "paid_confirmed": True,
+                })
+
+        second_request_bytes = json.dumps(
+            client.responses.calls[1],
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        self.assertEqual(first_request_bytes, second_request_bytes)
+        self.assertEqual(
+            frozen_contract_bytes,
+            contract_path.read_bytes())
+        package_creator.assert_called_once()
+        self.assertFalse(
+            package_creator.call_args.kwargs[
+                "require_sentence_translations"])
+
+    def test_embedded_manifest_contract_is_recovered_exactly(self):
+        pipeline = context_source_pipeline()
+        plan = one_word_plan()
+        embedded_contract = build_source_request_contract(
+            pipeline,
+            chunks=plan.chunks,
+            require_sentence_translations=False)
+        embedded_contract["composed_prompt"] += (
+            "\nEmbedded legacy contract marker.\n")
+        job = self.backend.jobs.create(
+            plan,
+            request_metadata={
+                "pipeline": pipeline_store.pipeline_to_mapping(
+                    pipeline),
+            },
+            request_contract=embedded_contract)
+        contract_path = job.path / "request_contract.json"
+        original_contract_bytes = contract_path.read_bytes()
+        original_contract = json.loads(
+            original_contract_bytes.decode("utf-8"))
+        contract_path.unlink()
+
+        with patch.object(
+                source_workflow,
+                "build_source_request_contract",
+                side_effect=AssertionError(
+                    "An embedded contract was rebuilt.")):
+            recovered, origin = self.controller()._request_contract_for_job(
+                job.job_id)
+
+        self.assertEqual(origin, "embedded_recovered")
+        self.assertEqual(recovered, original_contract)
+        self.assertEqual(
+            contract_path.read_bytes(),
+            original_contract_bytes)
+        self.assertIn(
+            "Embedded legacy contract marker",
+            recovered["composed_prompt"])
 
     def test_import_failure_is_recoverable_without_another_openai_call(self):
         self.install_plan(one_word_plan())
@@ -837,6 +1079,26 @@ class SourceWorkflowTests(unittest.TestCase):
                 unrelated.job_id,
                 unrelated_chunk)["status"],
             "invalid_response")
+
+    def test_historical_english_uses_local_deterministic_tokenizers(self):
+        middle = self.controller()._document_tokenizer(
+            "middle_english",
+            True)
+        old = self.controller()._document_tokenizer(
+            "old_english",
+            False)
+
+        self.assertIsInstance(
+            middle,
+            source_workflow.HistoricalEnglishTokenizer)
+        self.assertIsInstance(
+            old,
+            source_workflow.HistoricalEnglishTokenizer)
+        self.assertEqual(middle.language_key, "middle_english")
+        self.assertEqual(old.language_key, "old_english")
+        self.assertEqual(
+            middle.identity.backend,
+            "autoanki-unicode-historical-english")
 
     def test_codex_retrieval_combines_files_then_only_prepares_words(self):
         first = self.root / "one.txt"

@@ -1,0 +1,153 @@
+{
+  "additional_sense_count": 3,
+  "card_count": 4,
+  "context_count": 1,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cached_input_aud": 0.0,
+    "cached_input_tokens": 0,
+    "cached_input_usd": 0.0,
+    "execution_mode": "standard",
+    "input_aud": 0.0020849462365591397,
+    "input_tokens": 1939,
+    "input_usd": 0.00145425,
+    "model": "gpt-5.4-mini",
+    "output_aud": 0.005483870967741935,
+    "output_tokens": 850,
+    "output_usd": 0.003825,
+    "pricing": {
+      "cached_input_usd_per_million": 0.075,
+      "input_usd_per_million": 0.75,
+      "label": "standard pricing published 2026-07-24",
+      "model": "gpt-5.4-mini",
+      "output_usd_per_million": 4.5
+    },
+    "pricing_label": "standard pricing published 2026-07-24",
+    "total_aud": 0.0075688172043010754,
+    "total_tokens": 2789,
+    "total_usd": 0.00527925,
+    "uncached_input_aud": 0.0020849462365591397,
+    "uncached_input_tokens": 1939,
+    "uncached_input_usd": 0.00145425,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-25T13:43:22.916736+00:00",
+  "max_output_tokens": 8192,
+  "model": "gpt-5.4-mini",
+  "payload_estimated_tokens": 154,
+  "prompt_estimated_tokens": 1715,
+  "protocol": "v9",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "translation": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name."
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A physical route or track for travel from one place to another.",
+            "Nuance (English)": "Used for an actual way of passage.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; common inherited usage",
+            "Sentence Translations (English)": [
+              "He traveled along the mountain path and reached the outer walls at dusk.",
+              "At the fork ahead, he followed the right-hand road.",
+              "The cart broke down in the mud, so he abandoned it and walked on the path.",
+              "The people blocked the road, and travelers became scarce."
+            ],
+            "Sentences": [
+              "行於山間<strong>道</strong>，夕而至郭。",
+              "前有岐，循右<strong>道</strong>而進。",
+              "車敗於泥，遂棄車步<strong>道</strong>。",
+              "民塞其<strong>道</strong>，行者稀少。"
+            ],
+            "Translation (English)": "road; path"
+          },
+          {
+            "Dictionary Meaning (English)": "A way of doing something, especially a practical procedure, technique, or means for achieving a result.",
+            "Nuance (English)": "Focuses on the practical means or procedure, not on a doctrine or moral path.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; common inherited usage",
+            "Sentence Translations (English)": [
+              "There is a method for governing a state, and it does not lie in harsh punishments.",
+              "In learning calligraphy, one should grasp the method, not merely copy the form.",
+              "The means to remedy abuses is first to set the root right.",
+              "If a craftsman wants to do fine work, he must practice the method."
+            ],
+            "Sentences": [
+              "治國有<strong>道</strong>，不在繁刑。",
+              "學書貴得其<strong>道</strong>，不徒摹形。",
+              "救弊之<strong>道</strong>，先正其本。",
+              "工欲善事，必習其<strong>道</strong>。"
+            ],
+            "Translation (English)": "method; means"
+          },
+          {
+            "Dictionary Meaning (English)": "To speak, state, or express in words.",
+            "Nuance (English)": "A plain verbal act of saying or describing, often with an object or quoted content.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; common inherited usage",
+            "Sentence Translations (English)": [
+              "The master stated the matter, and all listened to him.",
+              "I do not dare to speak of the details.",
+              "The historian stated its faults plainly and did not conceal them.",
+              "When the guest came to ask, the host slowly described what he had heard."
+            ],
+            "Sentences": [
+              "子<strong>道</strong>其事，眾皆聽之。",
+              "吾不敢<strong>道</strong>其詳。",
+              "史官直<strong>道</strong>其失，不為諱。",
+              "客來問，主人徐<strong>道</strong>所聞。"
+            ],
+            "Translation (English)": "to say"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The ultimate, indefinable principle or source that underlies reality and cannot be fully expressed in words.",
+          "Nuance (English)": "In this context, it names what can be followed or spoken about only provisionally, not a concrete road or an ordinary method.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "dào",
+          "Register (English)": "Classical Chinese; received Laozi text as transmitted in the Wang Bi recension",
+          "Translation (English)": "Way"
+        },
+        "rank": 1
+      }
+    ]
+  },
+  "reasoning_effort": "none",
+  "response_id": "resp_03285e407009e008006a64bd7468088193b8822860ba73c198",
+  "response_status": "completed",
+  "schema_estimated_tokens": 519,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "term_result_count": 1,
+  "terms": [
+    {
+      "rank": 1,
+      "term": "道"
+    }
+  ],
+  "usage": {
+    "cached_input_tokens": 0,
+    "input_tokens": 1939,
+    "output_tokens": 850,
+    "reasoning_tokens": 0,
+    "total_tokens": 2789,
+    "uncached_input_tokens": 1939,
+    "visible_output_tokens": 850,
+    "web_search_calls": 0
+  },
+  "valid": true,
+  "validation_error": null,
+  "word_count": 1
+}

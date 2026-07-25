@@ -58,7 +58,7 @@ def language_pipeline(
 
 
 class PipelineStoreTests(unittest.TestCase):
-    def test_classical_chinese_eras_share_one_settings_category(self):
+    def test_historical_variants_share_their_model_settings_category(self):
         self.assertEqual(
             tuple(
                 language.name
@@ -73,12 +73,22 @@ class PipelineStoreTests(unittest.TestCase):
             ))
         for language_key in (
                 "classical_chinese",
+                "classical_chinese_han",
                 "classical_chinese_ming",
-                "classical_chinese_warring_states"):
+                "classical_chinese_warring_states",
+                "classical_chinese_wang_bi"):
             self.assertEqual(
                 pipeline_store.get_language(
                     language_key).model_language_key,
                 "classical_chinese")
+        for language_key in (
+                "english",
+                "middle_english",
+                "old_english"):
+            self.assertEqual(
+                pipeline_store.get_language(
+                    language_key).model_language_key,
+                "english")
 
     def test_missing_settings_return_stable_default_pipeline(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -279,6 +289,33 @@ class PipelineStoreTests(unittest.TestCase):
                 ValueError,
                 "Translation cannot target French"):
             pipeline_store.validate_pipelines((pipeline,))
+
+    def test_historical_english_may_translate_into_modern_english(self):
+        translation = (
+            pipeline_store.FieldSetting(
+                "translation",
+                "english"),
+        )
+        for language_key in ("middle_english", "old_english"):
+            with self.subTest(language_key=language_key):
+                pipeline = language_pipeline(
+                    language_key,
+                    shared_fields=translation)
+                self.assertEqual(
+                    pipeline_store.validate_pipelines((pipeline,)),
+                    (pipeline,))
+                self.assertTrue(
+                    pipeline_store.translation_target_allowed(
+                        language_key,
+                        "english"))
+
+        modern = language_pipeline(
+            "english",
+            shared_fields=translation)
+        with self.assertRaisesRegex(
+                ValueError,
+                "Translation cannot target English"):
+            pipeline_store.validate_pipelines((modern,))
 
     def test_non_translation_field_may_target_source_language(self):
         pipeline = language_pipeline(
@@ -527,9 +564,27 @@ class PromptComponentTests(unittest.TestCase):
             keys,
             {
                 "core",
+                "core_source_v9",
                 "ending",
                 "directions/context",
+                "directions/context_arrays",
+                "directions/context_arrays_v8",
+                "directions/context_arrays_v9",
+                "directions/context_classical_chinese",
+                "directions/context_classical_chinese_arrays",
+                "directions/sentence_translations",
+                "directions/sentence_translation_arrays",
+                "directions/sentence_translation_arrays_v9",
                 "source/batch",
+                "source/batch_v9",
+                "source/context_examples",
+                "source/context_examples_v5",
+                "source/context_examples_v6",
+                "source/context_examples_v7",
+                "source/context_examples_v8",
+                "source/context_examples_v9",
+                "source/final_checks_v8",
+                "source/final_checks_v9",
                 "source/web_search",
                 *{
                     f"fields/{field.key}"
@@ -612,6 +667,40 @@ class PromptComponentTests(unittest.TestCase):
             "do not repeat the translation field in different wording",
             normalized_text)
 
+    def test_context_does_not_suppress_other_common_meanings(self):
+        pipeline = language_pipeline(
+            "english",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+            ))
+        normalized_text = " ".join(
+            prompt_builder.build_prompt(
+                pipeline,
+                PROJECT_ROOT).split())
+
+        self.assertIn(
+            "every genuinely disjoint, commonly used lexical sense that a "
+            "learner is "
+            "reasonably likely to encounter",
+            normalized_text)
+        self.assertIn(
+            "even when the supplied context makes one particular sense "
+            "unambiguous",
+            normalized_text)
+        self.assertIn(
+            "Return the contextual sense first",
+            normalized_text)
+        self.assertIn(
+            "Do not create separate entries for rare",
+            normalized_text)
+        self.assertIn(
+            "not merely a different connotation, degree, register, "
+            "implication, typical context, or other nuance",
+            normalized_text)
+
     def test_context_adds_sentence_component_once(self):
         pipeline = language_pipeline(
             "latin",
@@ -619,6 +708,54 @@ class PromptComponentTests(unittest.TestCase):
         text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
 
         self.assertEqual(text.count("exactly four short"), 1)
+        self.assertIn(
+            "grammatically appropriate inflected form",
+            " ".join(text.split()))
+        self.assertIn(
+            "wrap EVERY AND ONLY occurrence",
+            " ".join(text.split()))
+        self.assertIn("<strong>", text)
+        self.assertIn(
+            "leave that other occurrence completely untagged",
+            " ".join(text.split()))
+        self.assertIn(
+            "VALID: She <strong>ran</strong> home",
+            " ".join(text.split()))
+        self.assertIn(
+            "INVALID: <strong>She ran home.</strong>",
+            " ".join(text.split()))
+        self.assertIn(
+            "ABSOLUTE OUTPUT REQUIREMENT—NOT OPTIONAL",
+            text)
+        self.assertIn(
+            'four complete, natural English translations in the '
+            '"Sentence Translations (English)" property',
+            " ".join(text.split()))
+        self.assertIn(
+            "translation 1 must translate sentence 1",
+            " ".join(text.split()))
+
+    def test_classical_chinese_context_has_explicit_emphasis_objects(self):
+        pipeline = language_pipeline(
+            "classical_chinese_wang_bi",
+            enabled=("context",))
+        text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
+
+        self.assertIn(
+            '"Sentences": "動善時。|知善時而動。|失善時則敗。|守其善時。"',
+            text)
+        self.assertIn(
+            "用兵貴<strong>善時</strong>",
+            text)
+        normalized_text = " ".join(text.split())
+        self.assertIn(
+            "Generate a distinct set of sentences for every separate sense "
+            "entry",
+            normalized_text)
+        self.assertIn(
+            "infer unambiguously which particular sense is being used "
+            "without seeing the definition",
+            normalized_text)
 
     def test_classical_chinese_era_prompts_add_historical_guidance(self):
         ming = language_pipeline(
@@ -669,6 +806,101 @@ class PromptComponentTests(unittest.TestCase):
             self.assertIn(
                 'do not use "archaic" when a narrower historical label '
                 "is known",
+                prompt)
+
+    def test_daodejing_prompts_keep_recensions_and_registers_distinct(self):
+        def rendered(language_key):
+            pipeline = language_pipeline(
+                language_key,
+                enabled=("word_to_meaning",),
+                shared_fields=(
+                    pipeline_store.FieldSetting(
+                        "dictionary_meaning",
+                        "english"),
+                    pipeline_store.FieldSetting(
+                        "register",
+                        "english"),
+                ))
+            return " ".join(
+                prompt_builder.build_prompt(
+                    pipeline,
+                    PROJECT_ROOT).split())
+
+        mawangdui = rendered("classical_chinese_han")
+        wang_bi = rendered("classical_chinese_wang_bi")
+
+        self.assertIn(
+            "early Western Han form of the Laozi",
+            mawangdui)
+        self.assertIn(
+            "Preserve manuscript and transcription forms such as 无, 亓",
+            mawangdui)
+        self.assertIn(
+            "Mawangdui silk-manuscript or early Western Han recension",
+            mawangdui)
+        self.assertIn(
+            "received Laozi text transmitted with Wang Bi",
+            wang_bi)
+        self.assertIn(
+            "do not import wording from the Mawangdui silk manuscripts",
+            wang_bi)
+
+    def test_historical_english_prompts_preserve_stage_and_orthography(self):
+        middle = language_pipeline(
+            "middle_english",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting("translation", "english"),
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+                pipeline_store.FieldSetting("register", "english"),
+            ))
+        old = language_pipeline(
+            "old_english",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting("translation", "english"),
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+                pipeline_store.FieldSetting("register", "english"),
+            ))
+
+        middle_prompt = " ".join(
+            prompt_builder.build_prompt(
+                middle,
+                PROJECT_ROOT).split())
+        old_prompt = " ".join(
+            prompt_builder.build_prompt(
+                old,
+                PROJECT_ROOT).split())
+
+        self.assertIn(
+            "Middle English (approximately 1100–1500)",
+            middle_prompt)
+        self.assertIn(
+            "late-fourteenth-century London/East Midlands usage",
+            middle_prompt)
+        self.assertIn(
+            "preserving yogh, thorn, ash, diacritics",
+            middle_prompt)
+        self.assertIn(
+            "Old English (approximately 450–1150)",
+            old_prompt)
+        self.assertIn(
+            "preserving thorn, eth, ash, wynn, yogh",
+            old_prompt)
+        self.assertIn(
+            "heroic verse such as Beowulf",
+            old_prompt)
+        for prompt in (middle_prompt, old_prompt):
+            self.assertIn(
+                "Copy the supplied source form exactly into the Word field",
+                prompt)
+            self.assertIn("reconstructed IPA form", prompt)
+            self.assertIn(
+                'For "Translation (English)"',
                 prompt)
 
     def test_component_editor_saves_atomically_and_rejects_escape(self):
@@ -739,8 +971,10 @@ class TemplateTests(unittest.TestCase):
 
     def test_classical_chinese_eras_share_the_same_three_models(self):
         for language_key in (
+                "classical_chinese_han",
                 "classical_chinese_ming",
-                "classical_chinese_warring_states"):
+                "classical_chinese_warring_states",
+                "classical_chinese_wang_bi"):
             pipeline = language_pipeline(
                 language_key,
                 enabled=(
@@ -753,6 +987,22 @@ class TemplateTests(unittest.TestCase):
                     "classical_chinese_context",
                     "classical_chinese_word_to_meaning",
                     "classical_chinese_meaning_to_word",
+                ))
+
+    def test_historical_english_variants_share_the_english_models(self):
+        for language_key in ("middle_english", "old_english"):
+            pipeline = language_pipeline(
+                language_key,
+                enabled=(
+                    "context",
+                    "word_to_meaning",
+                    "meaning_to_word"))
+            self.assertEqual(
+                pipeline_store.get_card_type_keys(pipeline),
+                (
+                    "english_context",
+                    "english_word_to_meaning",
+                    "english_meaning_to_word",
                 ))
 
     def test_models_use_stable_superset_fields_and_readable_css(self):
@@ -768,6 +1018,7 @@ class TemplateTests(unittest.TestCase):
                     "Part of Speech",
                     "Register",
                     "Nuance",
+                    "Sentence Translations (English)",
                 ])
             self.assertIn("font-size: 20px", card_type.model.css)
             self.assertIn("display: flex", card_type.model.css)
@@ -775,6 +1026,27 @@ class TemplateTests(unittest.TestCase):
             self.assertIn("justify-content: center", card_type.model.css)
             self.assertIn("min-height: 100vh", card_type.model.css)
             self.assertIn("font-weight: 700", card_type.model.css)
+
+    def test_context_cards_accept_one_undelimited_source_passage(self):
+        context_models = [
+            card_type.model
+            for card_type in templates.list_card_types()
+            if card_type.direction_key == "context"
+        ]
+
+        self.assertTrue(context_models)
+        for model in context_models:
+            front = model.templates[0]["qfmt"]
+            self.assertIn('raw.includes("|")', front)
+            self.assertIn("[raw.trim()]", front)
+            self.assertIn("candidateIndices", front)
+            self.assertIn(
+                "if (!candidateIndices.length) return",
+                front)
+            self.assertIn('const blockPrefix = "\\uE000S"', front)
+            self.assertIn('.split(escapeMarker + "1").join("|")', front)
+            self.assertIn("white-space: pre-wrap", model.css)
+            self.assertIn("overflow-wrap: anywhere", model.css)
 
     def test_every_model_can_be_packaged(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -794,6 +1066,7 @@ class TemplateTests(unittest.TestCase):
                         "part of speech",
                         "register",
                         "nuance",
+                        "one|two|three|four",
                     ]))
                 output = Path(directory) / f"{index}.apkg"
                 genanki.Package(deck).write_to_file(output)

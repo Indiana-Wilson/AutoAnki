@@ -88,6 +88,52 @@ Deduplication uses exact NFC-normalized Traditional surface form, and each word
 is ranked by its first occurrence. Orthographic variants consequently remain
 distinct—for example, `為` and `爲` are not silently merged.
 
+Locally supplied Middle English and Old English files use a separate,
+dependency-free Unicode orthographic tokenizer. A candidate begins with a
+Unicode letter, retains combining diacritics and historical letters such as
+thorn, eth, ash, wynn, and yogh, and may retain an internal apostrophe or true
+hyphen joining two letter runs. Pure numbers and standalone editorial
+Roman-numeral/page labels are not candidates. Every retained word span must be
+covered exactly and reproduce the canonical source offsets or the audit fails.
+Candidate identity uses NFC plus Unicode case-folding, so capitalization alone
+does not create a second type; the first observed surface spelling remains on
+the card. Period-aware sentence contexts are enabled only for the two
+historical-English source keys and protect common abbreviations and initials,
+leaving the established Chinese sentence boundaries unchanged.
+
+The implementation was exercised on complete primary-work body slices from
+two Project Gutenberg UTF-8 editions on 25 July 2026:
+
+- Chaucer's *Canterbury Tales*,
+  [ebook 22120](https://www.gutenberg.org/ebooks/22120) (Skeat edition),
+  raw-file SHA-256
+  `6dc8d8ae4b7cc4783bb0f6fb4b8b077f2768cdf00fd00c799f17722b70d928ff`.
+  This body file interleaves Skeat's selected text with page and line
+  numbers, headings, manuscript variants, critical notes, and rejected
+  passages. Its exact-signature cleaner retains the selected work, resolves
+  bracketed supplied readings, applies the volume's published corrections
+  and preferred readings, and removes that presentation apparatus. The
+  resulting canonical text has
+  SHA-256
+  `d2b791776b8d8a4922e8ef2a017d06e5acb0601a376e759b140a50a3cc41d434`
+  and produced 181,270 exact occurrences, 11,914 case-folded candidates,
+  and 7,071 sentence contexts.
+- Harrison and Sharp's Old English *Beowulf*,
+  [ebook 9701](https://www.gutenberg.org/ebooks/9701), raw-file SHA-256
+  `5190b80b0829da81b1b375a5494909dc751aa365de6a88a816b576c048c54839`.
+  The slice from `BĒOWULF. / I. THE PASSING OF SCYLD.` to the Finnsburg
+  appendix produced 17,603 exact occurrences, 5,673 candidates, and 885
+  sentence contexts.
+
+Both complete builds passed `audit_build`, including exact substring offsets,
+non-overlap, coverage of every orthographic word span, first-occurrence
+ranking, contexts, and chunks. The Canterbury extractor is deliberately
+limited to the audited ebook-22120 body signature and fails closed if its
+layout or primary-text boundaries change. Generic Prepare File processing
+cannot reliably decide which scholarly apparatus belongs to the primary text,
+so every other user-supplied edition should still be trimmed or sectioned
+deliberately before paid generation.
+
 CKIP runs can use CPU, NVIDIA CUDA, Intel XPU, or Apple MPS when the installed
 PyTorch build exposes that device. The default `auto` policy prefers CUDA,
 then XPU, then MPS, and otherwise uses CPU. The resolved device, PyTorch and
@@ -170,9 +216,10 @@ Traditional dictionary are MIT-licensed.
 `dist\AutoAnki.exe` does not contain the CKIP/Jieba/PyTorch stack, downloaded
 model weights, or the large Daodejing/Journey reference artifacts. Extending
 the PyInstaller specification and distributing/licensing those assets is a
-separate packaging task. The base executable can still use Manual Input and
-can generate from compatible processed artifacts provisioned separately, but
-it cannot prepare a new historical-Chinese file by itself.
+separate packaging task. The base executable can still use Manual Input,
+prepare Middle/Old English files with the built-in tokenizer, and generate
+from compatible processed artifacts provisioned separately, but it cannot
+prepare a new historical-Chinese file by itself.
 
 There is no silent character-tokenizer or modern-Chinese fallback. If the
 selected historical model, pinned dictionary, or exact required package
@@ -187,8 +234,10 @@ From the repository root:
 
 ```text
 .venv/bin/python src/corpus_cli.py list
-.venv/bin/python src/corpus_cli.py fetch --work daodejing_huijiao
-.venv/bin/python src/corpus_cli.py build --work daodejing_huijiao
+.venv/bin/python src/corpus_cli.py fetch --work daodejing_wang_bi
+.venv/bin/python src/corpus_cli.py build --work daodejing_wang_bi
+.venv/bin/python src/corpus_cli.py fetch --work daodejing_mawangdui
+.venv/bin/python src/corpus_cli.py build --work daodejing_mawangdui
 .venv/bin/python src/corpus_cli.py fetch --work journey_to_the_west
 .venv/bin/python src/corpus_cli.py build --work journey_to_the_west
 ```
@@ -202,8 +251,11 @@ The same processed builds appear under **Generate > From Source**. Use
 **Inspect Source** to page through first-seen candidates and their retained
 section/neighboring-sentence metadata. **Prepare File** accepts a local PDF,
 UTF-8 TXT, or Markdown file and publishes it into this same catalogue.
-Currently that local-file path supports only the Warring States and Ming
-historical-Chinese tokenizers.
+That local-file path supports Warring States, early-Han Mawangdui,
+Wang-Bi-recension, and Ming historical Chinese plus Middle and Old English.
+The historical-English tokenizer ships with the base application and is
+deterministic; the Chinese variants retain their optional pinned-model
+requirements.
 
 PDF extraction is text-only and page-aware; it does not perform OCR. A scanned
 PDF must be OCRed externally first. Embedded PDF text can have incorrect
@@ -308,25 +360,33 @@ from corpus preparation:
 2. inspect the ordered candidate vocabulary and retained contexts;
 3. select no context, the current sentence, current plus neighbouring
    sentences, or the complete span covered by each generation chunk;
-4. vary the words per request and see the prompt/schema/context/card-detail
-   cost estimate update;
-5. optionally omit exact visible field values from the union of the source
+4. select compact v9 or rollback-compatible legacy v8, no/low reasoning, and
+   Standard or Economy processing;
+5. vary the words per request and see the cache-aware
+   prompt/schema/context/card-detail cost estimate update;
+6. optionally omit exact visible field values from the union of the source
    language's saved Anki deck/note-type/field combinations; and
-6. explicitly authorize the estimated OpenAI requests.
+7. explicitly authorize the estimated OpenAI requests.
 
 Identical and overlapping sentence windows are shared within each request;
-words point to a context record instead of duplicating its text. One OpenAI
-request is made per generation chunk through a bounded, staggered worker pool.
-Responses and errors are retained per attempt, completed chunks are not
-repeated, and invalid model output requires a manually authorized retry. A
-fully validated run is imported as `Vocabulary from <source>` and that final
-deck is not moved, emptied, or deleted.
+words point to a context record instead of duplicating its text. Standard mode
+makes one OpenAI request per generation chunk through a bounded, staggered
+worker pool. Economy mode submits the frozen request bodies as one recoverable
+24-hour Batch at half the Standard token rates. Paid responses and exact
+provider-reported token usage are retained before local validation, completed
+chunks are not repeated, and invalid model output requires a manually
+authorized retry. A Standard compact-v9 retry can selectively regenerate
+safely identified failed ranks/contexts; otherwise it falls back to the
+complete chunk. A fully validated run is imported as
+`Vocabulary from <source>` and that final deck is not moved, emptied, or
+deleted.
 
 See [From Source generation](source_generation.md) for the complete UI, cost,
 rate-limit, recovery, Anki exclusion, local-file, and Codex retrieval
 contract. Its saved job contract freezes the composed prompt, strict schema,
-model, and `none` reasoning setting so a retry cannot change when an Advanced
-component is edited. Cost estimation, corpus preparation, and the automated
-test suite do not call the OpenAI card API. Codex Retrieve is a distinct,
-separately authorized network action, and card generation has its own paid
-confirmation.
+model, compact-v9/legacy-v8 protocol, no/low reasoning effort,
+Standard/Economy processing mode, and optional web-search access so a retry
+cannot change when an Advanced component is edited. Cost estimation, corpus
+preparation, and the automated test suite do not call the OpenAI card API.
+Codex Retrieve is a distinct, separately authorized network action, and card
+generation has its own paid confirmation.

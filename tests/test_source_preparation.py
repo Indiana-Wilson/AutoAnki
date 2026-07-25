@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from corpus_pipeline.models import TokenSpan, TokenizerIdentity
+from corpus_pipeline.service import CorpusService
 from corpus_pipeline.storage import read_build
 import source_preparation
 
@@ -54,6 +55,85 @@ class FlakyCountingTokenizer:
 
 
 class SourcePreparationTests(unittest.TestCase):
+    def test_skeat_corrections_cover_errata_and_transcription_repairs(self):
+        corrections = (
+            source_preparation._SKEAT_PUBLISHED_ERRATA_CORRECTIONS
+            + source_preparation._SKEAT_AUDITED_TRANSCRIPTION_CORRECTIONS)
+        separator = "\n<correction-boundary>\n"
+        uncorrected = separator.join(
+            transcription
+            for transcription, _ in corrections)
+        expected = separator.join(
+            correction
+            for _, correction in corrections)
+
+        self.assertEqual(
+            source_preparation._apply_skeat_corrections(uncorrected),
+            expected)
+
+    def test_skeat_canterbury_body_removes_only_scholarly_apparatus(self):
+        source = """\
+HERE BIGINNETH THE BOOK OF THE TALES OF CAUNTERBURY.
+
+  Whan that Aprille with his shoures sote                     5
+  [And yaf a certeyn ferme for the graunt;                   252 b
+  Noon of his bretheren cam ther in his haunt;]              252 c
+  And over his he’ed ther shynen two figures
+  Er we were bom, knew al our freletee;
+
+    HEADING. _From_ E.   1. E. hise; _rest_ his.
+
+  [2: T. 23-58.]
+
+    ‘Yis,’ quod this carpenter, ‘ful yore ago.’
+
+=Here endeth one part and here biginneth another
+editorial heading.=
+
+      ‘This explicitly rejected passage is not selected.’
+
+THE KNIGHTES TALE.
+
+§ 1. A yong man called Melibeus, mighty and riche. /5
+
+    1. E. Melibeus; Hn. Melibee.
+
+the day of dome that shulle be saved: _Qui cum patre, &c._ /1092
+
+=Here is ended the book of the Tales of Caunterbury, compiled by Geffrey
+Chaucer, of whos soule Iesu Crist have mercy. Amen.=
+
+       *       *       *       *       *
+"""
+
+        cleaned = source_preparation._clean_extracted_text(source)
+
+        self.assertEqual(
+            cleaned,
+            """\
+Whan that Aprille with his shoures sote
+And yaf a certeyn ferme for the graunt;
+Noon of his bretheren cam ther in his haunt;
+And over his heed ther shynen two figures
+Er we were born, knew al our freletee;
+
+‘Yis,’ quod this carpenter, ‘ful yore ago.’
+
+A yong man called Melibeus, mighty and riche.
+
+the day of dome that shulle be saved: Qui cum patre, &c.""")
+        for contamination in (
+                "HEADING",
+                "rejected",
+                "editorial",
+                "Melibee",
+                "Geffrey",
+                "252",
+                "[",
+                "_",
+                "="):
+            self.assertNotIn(contamination, cleaned)
+
     def test_utf8_source_is_processed_registered_and_reusable(self):
         events = []
         with tempfile.TemporaryDirectory() as directory:
@@ -87,6 +167,9 @@ class SourcePreparationTests(unittest.TestCase):
                 tuple(word.surface for word in loaded.unique_words),
                 ("道", "可", "名", "無", "天", "地", "之", "始"))
             self.assertEqual(listed, (prepared,))
+            self.assertTrue(
+                CorpusService(corpus_root).audit_saved(
+                    prepared.build_path))
             self.assertFalse(Path(record["build_path"]).is_absolute())
             self.assertEqual(
                 (
@@ -98,6 +181,55 @@ class SourcePreparationTests(unittest.TestCase):
                 source.read_bytes())
             self.assertEqual(events[-1].phase, "write")
             self.assertIn("8 unique", events[-1].message)
+
+    def test_canterbury_and_beowulf_excerpts_use_default_local_tokenizers(self):
+        fixtures = (
+            (
+                "canterbury_tales_middle_english_excerpt.txt",
+                "middle_english",
+                ("Whan", "Aprill", "shoures", "droghte"),
+            ),
+            (
+                "beowulf_old_english_excerpt.txt",
+                "old_english",
+                ("Hwæt", "Wē", "Gār-Dena", "ġēar-dagum", "þēod-cyninga"),
+            ),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            corpus_root = Path(directory) / "corpora"
+            for filename, language_key, expected in fixtures:
+                with self.subTest(language_key=language_key):
+                    source = PROJECT_ROOT / "tests" / "fixtures" / filename
+                    prepared = source_preparation.prepare_source_file(
+                        source,
+                        title=filename,
+                        language_key=language_key,
+                        corpus_root=corpus_root,
+                        refiner=None)
+                    build = read_build(prepared.build_path)
+                    surfaces = {
+                        word.surface
+                        for word in build.unique_words
+                    }
+                    self.assertTrue(set(expected) <= surfaces)
+                    self.assertEqual(
+                        prepared.language_key,
+                        language_key)
+                    self.assertEqual(
+                        build.tokenizer.backend,
+                        "autoanki-unicode-historical-english")
+
+    def test_supported_source_languages_include_historical_english(self):
+        self.assertEqual(
+            source_preparation.SUPPORTED_SOURCE_LANGUAGES,
+            (
+                "classical_chinese_han",
+                "classical_chinese_wang_bi",
+                "classical_chinese_warring_states",
+                "classical_chinese_ming",
+                "middle_english",
+                "old_english",
+            ))
 
     def test_document_identity_depends_on_title_and_source_hash(self):
         key_one = source_preparation._storage_key(

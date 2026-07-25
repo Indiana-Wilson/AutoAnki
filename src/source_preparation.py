@@ -49,25 +49,383 @@ from corpus_pipeline.storage import (
 )
 from corpus_pipeline.tokenizers import (
     CkipHanTokenizer,
+    HistoricalEnglishTokenizer,
     recommended_hardware_batch_size,
 )
 import runtime_paths
 
 
 CUSTOM_SOURCE_SCHEMA_VERSION = 1
-CUSTOM_SOURCE_CLEANER_VERSION = "local-document-extraction-v2"
+CUSTOM_SOURCE_CLEANER_VERSION = "local-document-extraction-v3"
 LOCAL_DOCUMENT_REVISION_TIMESTAMP = "1970-01-01T00:00:00+00:00"
 TOKENIZATION_CHECKPOINT_SCHEMA_VERSION = 1
 TOKENIZATION_CHECKPOINT_IMPLEMENTATION = "section-token-spans-v1"
 SUPPORTED_SOURCE_LANGUAGES = (
+    "classical_chinese_han",
+    "classical_chinese_wang_bi",
     "classical_chinese_warring_states",
     "classical_chinese_ming",
+    "middle_english",
+    "old_english",
 )
 _AUTOMATIC_REFINER = object()
 _STORAGE_KEY_CHARACTERS = re.compile(r"[^a-z0-9]+")
 _URL = re.compile(r"https?://\S+", re.IGNORECASE)
 _HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
 _MEDIAWIKI_DIRECTIVE = re.compile(r"__[A-Z]+__")
+_SKEAT_CANTERBURY_OPENING = (
+    "HERE BIGINNETH THE BOOK OF THE TALES OF CAUNTERBURY.")
+_SKEAT_CANTERBURY_CLOSING = (
+    "=Here is ended the book of the Tales of Caunterbury, compiled by "
+    "Geffrey")
+_SKEAT_PAGE_LINE = re.compile(r"^\[(?:\d+\s*:|T\.)")
+_SKEAT_INLINE_PAGE = re.compile(r"\[\d+(?::[^\]]*)?\]")
+_SKEAT_INLINE_REFERENCE = re.compile(
+    r"\s*\[(?:T\.|See\s+p\.)[^\]]*(?:\]|$)",
+    re.IGNORECASE)
+_SKEAT_TRAILING_LINE_NUMBER = re.compile(
+    r"[ \t]{2,}(?:"
+    r"\(\s*(?:\d+[a-z]?|no)\s*\)"
+    r"|\d+(?:\s*[a-z])?"
+    r")\s*$",
+    re.IGNORECASE)
+_SKEAT_SECTION_NUMBER = re.compile(r"^\s*§\s*\d+\.\s*")
+_SKEAT_PROSE_LINE_NUMBER = re.compile(r"/\d+")
+_SKEAT_ROMAN_ORDINAL = re.compile(
+    r"(?<!\w)[ivxlcdm]+º(?!\w)",
+    re.IGNORECASE)
+_SKEAT_ASCII_NUMBER = re.compile(r"(?<!\w)\d+[º°]?(?!\w)")
+_SKEAT_ALL_CAPS = re.compile(
+    r"^[\[\]()]*[A-Z][A-Z\s.’’‘“”\-—&,;:()\[\]0-9º]+[.\])]*$")
+_SKEAT_EDITORIAL_TEXT = re.compile(
+    r"^(?:"
+    r"\[?\s*(?:The|This|For)\b.*"
+    r"(?:follows|Prologue|Appendix|see\s+p\.)"
+    r"|\(?\s*(?:NERO\b|For\s+T\.|Numbered\s+in\s+continuation"
+    r"|The\s+Second\s+Fit)"
+    r"|T\.\s*\d"
+    r"|_?Explicit\b"
+    r"|_?(?:Iamque\s+domos|Ier\.\s*6|Radix\s+malorum\s+est\s+Cupiditas"
+    r"|Interpretado\s+nominis|Domine,?\s+dominus\s+noster)"
+    r"|GROUP\s+[A-I]\."
+    r"|THE\s+.+(?:TALE|PROLOGUE|EPILOGUE)\.?$"
+    r")",
+    re.IGNORECASE)
+_SKEAT_PUBLISHED_ERRATA_CORRECTIONS = (
+    (
+        "This maistow understonde and seen at eye.",
+        "This maistow understonde and seen at yë.",
+    ),
+    (
+        "Ne breed ne ale, til he cam to the celle",
+        "Ne breed ne ale, til he cam to the selle",
+    ),
+    (
+        "Thise noble wyves and thise loveres eek.",
+        "Thise noble wyves and thise loveres eke.",
+    ),
+    (
+        "Who-so that wol his large volume seek",
+        "Who-so that wol his large volume seke",
+    ),
+    (
+        "Thy selve neighebour wol thee despyse;",
+        "‘Thy selve neighebour wol thee despyse;’",
+    ),
+    (
+        "If thou be povre, thy brother hateth thee,\n"
+        "And alle thy freendes fleen fro thee, alas!",
+        "‘If thou be povre, thy brother hateth thee,\n"
+        "And alle thy freendes fleen fro thee, alas!’",
+    ),
+    (
+        "In al that lond no cristen durste route,",
+        "In al that lond no Cristen durste route,",
+    ),
+    (
+        "Alle cristen folk ben fled fro that contree",
+        "Alle Cristen folk ben fled fro that contree",
+    ),
+    (
+        "To Walis fled the cristianitee",
+        "To Walis fled the Cristianitee",
+    ),
+    (
+        "But yet nere cristen Britons so exyled",
+        "But yet nere Cristen Britons so exyled",
+    ),
+    (
+        "And royal spicerye;",
+        "And royal spicerye",
+    ),
+    (
+        "yevynge",
+        "yevinge",
+    ),
+    (
+        "I ne owe nat usen thy\nconseil",
+        "I ne ow nat usen thy\nconseil",
+    ),
+    (
+        "I se wel that the word of Salomon is sooth",
+        "I see wel that the word of Salomon is sooth",
+    ),
+    (
+        "Iurisdicctioun",
+        "Iurisdiccioun",
+    ),
+    (
+        "nothing certeyne;” for as lightly is oon hurt with a spere "
+        "as another.",
+        "nothing certeyne; for as lightly is oon hurt with a spere "
+        "as another.”",
+    ),
+    (
+        "Was wel my lorn",
+        "Was wel ny lorn",
+    ),
+    (
+        "So penible in the warre, and curteis eke,",
+        "So penible in the werre, and curteis eke,",
+    ),
+    (
+        "A povre widwe, somdel stope in age,",
+        "A povre widwe, somdel stape in age,",
+    ),
+    (
+        "The Friday for to chide, as diden ye?",
+        "The Friday for to chyde, as diden ye?",
+    ),
+    (
+        "commune opinoun",
+        "commune opinioun",
+    ),
+    (
+        "Thay shul be shryned",
+        "They shul be shryned",
+    ),
+    (
+        "But if I telle tales two or thre",
+        "But-if I telle tales two or thre",
+    ),
+    (
+        "All was this land fulfild of fayerye.",
+        "Al was this land fulfild of fayerye.",
+    ),
+    (
+        "Chese now,’ quod she",
+        "Chees now,’ quod she",
+    ),
+    (
+        "Now chese your-selven",
+        "Now chees your-selven",
+    ),
+    (
+        "But if it be to hevy or to hoot.",
+        "But-if it be to hevy or to hoot.",
+    ),
+    (
+        "Commending now the markis gouernaunce.—",
+        "Commending now the markis governaunce.—",
+    ),
+    (
+        "After thy good, and hath don many a day.",
+        "After thy good, and hath don many a day.’",
+    ),
+    (
+        "Ful lightly maystow been a cokewold.’",
+        "Ful lightly maystow been a cokewold.",
+    ),
+    (
+        "Saue o thing priketh in my conscience,",
+        "Save o thing priketh in my conscience,",
+    ),
+    (
+        "Lyk to the scorpion so deceivable,",
+        "Lyk to the scorpioun so deceivable,",
+    ),
+    (
+        "God bless us and his moder Seinte Marie!",
+        "God blesse us and his moder Seinte Marie!",
+    ),
+    (
+        "Pitous and Iust, and ever-more y-liche",
+        "And piëtous and Iust, alwey y-liche.",
+    ),
+    (
+        "Whan that this Tartre king, this Cambynskan,",
+        "Whan that this Tartre king, this Cambinskan,",
+    ),
+    (
+        "First wol I telle yow of Cambynskan,",
+        "First wol I telle yow of Cambinskan,",
+    ),
+    (
+        "Ye sle me with your sorwe, verraily;",
+        "Ye slee me with your sorwe, verraily;",
+    ),
+    (
+        "The cristen folk, which that aboute hir were,",
+        "The Cristen folk, which that aboute hir were,",
+    ),
+    (
+        "‘Sir,’ quod the preest, ‘it shall be doon, y-wis.’",
+        "‘Sir,’ quod the preest, ‘it shal be doon, y-wis.’",
+    ),
+    (
+        "Til he had torned him, coude he not blinne.",
+        "Til he had terved him, coude he not blinne.",
+    ),
+    (
+        "Him torne, I pray to god, for his falshede;",
+        "Him terve, I pray to god, for his falshede;",
+    ),
+    (
+        "wolde have hept hir fayn;",
+        "wolde have kept hir fayn;",
+    ),
+    (
+        "holier than Daniel,",
+        "holier than David,",
+    ),
+)
+_SKEAT_AUDITED_TRANSCRIPTION_CORRECTIONS = (
+    (
+        "And over his he’ed ther shynen two figures",
+        "And over his heed ther shynen two figures",
+    ),
+    (
+        "Er we were bom, knew al our freletee;",
+        "Er we were born, knew al our freletee;",
+    ),
+)
+
+
+def _looks_like_skeat_canterbury(text):
+    """Recognize the retained body of Project Gutenberg ebook 22120."""
+    stripped = text.strip()
+    return (
+        stripped.startswith(_SKEAT_CANTERBURY_OPENING)
+        and _SKEAT_CANTERBURY_CLOSING in stripped[-1000:]
+        and "HEADING. _From_ E." in stripped[:5000]
+        and "THE KNIGHTES TALE." in stripped)
+
+
+def _source_blocks(text):
+    blocks = []
+    current = []
+    for line in text.splitlines():
+        if line.strip():
+            current.append(line)
+        elif current:
+            blocks.append(tuple(current))
+            current = []
+    if current:
+        blocks.append(tuple(current))
+    return tuple(blocks)
+
+
+def _skeat_editorial_text(text):
+    stripped = text.strip()
+    if not stripped:
+        return True
+    if stripped.startswith(("=", "***", "[_")):
+        return True
+    comparison = re.sub(r"[_=]+", "", stripped)
+    comparison = " ".join(comparison.split())
+    return (
+        bool(_SKEAT_ALL_CAPS.fullmatch(comparison))
+        or bool(_SKEAT_EDITORIAL_TEXT.match(comparison)))
+
+
+def _keep_skeat_block(block):
+    """Separate selected text from Skeat's indented critical apparatus."""
+    minimum_indent = min(
+        len(line) - len(line.lstrip(" "))
+        for line in block)
+    if minimum_indent > 4:
+        return False
+    if minimum_indent == 4:
+        # The apparatus is indented four spaces throughout. The only
+        # selected-text blocks with that minimum indentation are isolated
+        # one-line speeches, all marked by an opening quotation mark.
+        return (
+            len(block) == 1
+            and block[0].lstrip().startswith(("‘", "“")))
+    return not _skeat_editorial_text(
+        " ".join(line.strip() for line in block))
+
+
+def _clean_skeat_line(line):
+    text = line.strip()
+    if (
+            not text
+            or _SKEAT_PAGE_LINE.match(text)
+            or _skeat_editorial_text(text)
+            or re.match(r"^\[\d+\]\s*=", text)
+            or re.fullmatch(r"p\.\s*\d+\.\)?", text, re.IGNORECASE)):
+        return ""
+
+    # Marginal speaker labels and all line/page references are Skeat's,
+    # while bracketed supplied readings such as "[that]" are retained as
+    # ordinary text without the editorial brackets.
+    text = re.sub(r"^_Auctor_\.\s*", "", text)
+    text = re.sub(r"\s*=.*?=\s*$", "", text)
+    text = _SKEAT_INLINE_REFERENCE.sub("", text)
+    text = _SKEAT_INLINE_PAGE.sub("", text)
+    text = _SKEAT_TRAILING_LINE_NUMBER.sub("", text)
+    text = _SKEAT_SECTION_NUMBER.sub("", text)
+    text = _SKEAT_PROSE_LINE_NUMBER.sub("", text)
+    text = re.sub(r"\s*/\s*", " ", text)
+    text = text.replace("_", "").replace("[", "").replace("]", "")
+    text = _SKEAT_ROMAN_ORDINAL.sub("", text)
+    text = _SKEAT_ASCII_NUMBER.sub("", text)
+    return re.sub(r"[ \t]{2,}", " ", text).strip()
+
+
+def _apply_skeat_corrections(text):
+    """Apply published preferred readings and audited transcription repairs."""
+    # Suggestions marked only "perhaps" (A 467, B 4510, D 2242) and the
+    # unresolved alternative at C 291 remain as printed.
+    for transcription, correction in (
+            _SKEAT_PUBLISHED_ERRATA_CORRECTIONS
+            + _SKEAT_AUDITED_TRANSCRIPTION_CORRECTIONS):
+        text = text.replace(transcription, correction)
+    return text
+
+
+def _clean_skeat_canterbury(text):
+    """Retain only Chaucer's selected text from Skeat's plaintext edition.
+
+    The Gutenberg plaintext encodes the main text, critical apparatus, page
+    and line numbers, marginal labels, and explicitly rejected/spurious
+    passages by indentation and stable presentation markers. This extraction
+    mirrors those structural distinctions without contacting Gutenberg.
+    """
+    cleaned_blocks = []
+    for block in _source_blocks(text):
+        if not _keep_skeat_block(block):
+            continue
+        cleaned_lines = tuple(
+            cleaned
+            for cleaned in map(_clean_skeat_line, block)
+            if cleaned)
+        if cleaned_lines:
+            cleaned_blocks.append("\n".join(cleaned_lines))
+    cleaned = "\n\n".join(cleaned_blocks).strip()
+    cleaned = _apply_skeat_corrections(cleaned)
+
+    if (
+            not cleaned.startswith(
+                "Whan that Aprille with his shoures sote")
+            or not cleaned.endswith(
+                "the day of dome that shulle be saved: "
+                "Qui cum patre, &c.")
+            or re.search(r"[\d_=\[\]§*/]", cleaned)):
+        raise CorpusValidationError(
+            "The Skeat Canterbury Tales layout no longer matches the "
+            "audited primary-text extraction rules.")
+    return cleaned
 
 
 @dataclass(frozen=True)
@@ -161,6 +519,8 @@ def _clean_extracted_text(text):
         .replace("}}", "")
         .replace("[[", "")
         .replace("]]", ""))
+    if _looks_like_skeat_canterbury(text):
+        return _clean_skeat_canterbury(text)
     lines = [line.rstrip() for line in text.splitlines()]
     text = "\n".join(lines).strip()
     return re.sub(r"\n{4,}", "\n\n\n", text)
@@ -234,17 +594,25 @@ def extract_source_sections(path):
 
 
 def default_document_tokenizer(language_key):
+    if language_key == "middle_english":
+        return HistoricalEnglishTokenizer.for_middle_english()
+    if language_key == "old_english":
+        return HistoricalEnglishTokenizer.for_old_english()
     options = {
         "device": "auto",
         "batch_size": recommended_hardware_batch_size(),
     }
-    if language_key == "classical_chinese_warring_states":
+    if language_key in {
+            "classical_chinese_han",
+            "classical_chinese_wang_bi",
+            "classical_chinese_warring_states"}:
         return CkipHanTokenizer.for_shanggu(**options)
     if language_key == "classical_chinese_ming":
         return CkipHanTokenizer.for_jindai(**options)
     raise ValueError(
-        "Local document preparation currently supports Classical Chinese "
-        "(Warring States) and Classical Chinese (Ming).")
+        "Local document preparation supports Classical Chinese "
+        "(Warring States, early Han, Wang Bi recension, or Ming), "
+        "Middle English, and Old English.")
 
 
 def _make_snapshot(
@@ -668,7 +1036,7 @@ def prepare_source_file(
     if not title:
         raise ValueError("A source title is required.")
     if language_key not in SUPPORTED_SOURCE_LANGUAGES:
-        raise ValueError("Select a supported historical Chinese language.")
+        raise ValueError("Select a supported historical language.")
     path = Path(path).resolve()
     data = path.read_bytes()
     original_hash = _sha256_bytes(data)
@@ -722,7 +1090,7 @@ def prepare_source_file(
         "tokenize",
         0,
         len(snapshot.sections),
-        "Loading the historical word-segmentation model.")
+        "Loading the selected historical-language tokenizer.")
     # Device-auto CKIP tokenizers do not expose their resolved runtime
     # identity until their public preparation hook loads the model. Resolve
     # it before deriving checkpoint keys so a cache-only rerun retains

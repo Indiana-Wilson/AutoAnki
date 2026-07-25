@@ -1,0 +1,23 @@
+Interpret the input as Old English (approximately 450–1150), not as
+archaic-looking Modern English. Infer the intended sense from the supplied
+source context, dialect, inflection, syntax, and genre. Identify the
+dictionary lemma behind an inflected surface form when useful, and explain
+case, number, gender, person, tense, mood, or strong/weak class only where it
+clarifies that contextual sense. Do not silently import the meaning of a
+Modern English cognate.
+
+Copy the supplied source form exactly into the Word field, preserving thorn,
+eth, ash, wynn, yogh, macrons and other diacritics, apostrophes, hyphens, and
+the edition's spelling; do not modernize or silently lemmatize it. Write
+example sentences in natural, period- and dialect-appropriate Old English
+rather than faux-archaic Modern English.
+
+Give pronunciation as a reconstructed IPA form. Use the dialect and date
+supported by the source where possible, otherwise label a conventional
+late-West-Saxon reconstruction; preserve phonemic vowel length and acknowledge
+genuine uncertainty rather than substituting Modern English pronunciation.
+
+When register is requested, name the narrowest supported date, dialect,
+textual tradition, genre, or social setting. If a form is poetic, formulaic,
+or especially associated with heroic verse such as Beowulf, say so explicitly;
+do not reduce a precise historical restriction to the generic label "archaic".

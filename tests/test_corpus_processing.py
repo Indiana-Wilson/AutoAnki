@@ -38,7 +38,11 @@ from corpus_pipeline.models import (
     TokenizerIdentity,
     UniqueWord,
 )
-from corpus_pipeline.processing import build_vocabulary, is_han_word
+from corpus_pipeline.processing import (
+    build_vocabulary,
+    historical_english_word_ranges,
+    is_han_word,
+)
 from corpus_pipeline.storage import (
     build_id,
     read_build,
@@ -56,6 +60,7 @@ from corpus_pipeline.tokenizers import (
     CharacterTokenizer,
     CkipHanTokenizer,
     CorpusTokenizerUnavailableError,
+    HistoricalEnglishTokenizer,
     split_model_units,
 )
 
@@ -127,7 +132,8 @@ def make_snapshot(
         *,
         raw_wikitext="== 第一章 ==\n道可道。",
         spec_key="fixture_work",
-        cleaner_version="fixture-cleaner-v1"):
+        cleaner_version="fixture-cleaner-v1",
+        source_language_key="classical_chinese"):
     page = make_page(raw_wikitext=raw_wikitext)
     sections = tuple(
         TextSection(
@@ -141,7 +147,7 @@ def make_snapshot(
     return CorpusSnapshot(
         spec_key=spec_key,
         edition="Fixture edition",
-        source_language_key="classical_chinese",
+        source_language_key=source_language_key,
         pages=(page,),
         sections=aligned,
         canonical_text=canonical_text,
@@ -289,6 +295,37 @@ class ContextAssemblyTests(unittest.TestCase):
                     21,
                     "名德。",
                 ),
+            ))
+        for context in contexts:
+            self.assertEqual(
+                snapshot.canonical_text[
+                    context.start_offset:context.end_offset],
+                context.text)
+
+    def test_historical_english_periods_split_without_splitting_abbreviations(
+            self):
+        snapshot = make_snapshot(
+            (
+                "Dr. A. J. Wyatt ed. Beowulf. "
+                "Hwæt! Wē Gār-Dena frūnon.",
+            ),
+            source_language_key="old_english")
+
+        contexts = build_contexts(
+            snapshot.canonical_text,
+            snapshot.sections,
+            source_language_key=snapshot.source_language_key)
+        sentences = tuple(
+            context.text
+            for context in contexts
+            if context.kind == "sentence")
+
+        self.assertEqual(
+            sentences,
+            (
+                "Dr. A. J. Wyatt ed. Beowulf.",
+                "Hwæt!",
+                "Wē Gār-Dena frūnon.",
             ))
         for context in contexts:
             self.assertEqual(
@@ -453,6 +490,55 @@ class TokenProcessingTests(unittest.TestCase):
             ),
             ("道", "道", 1, 2))
 
+    def test_historical_english_keeps_words_and_casefolds_identity(self):
+        snapshot = make_snapshot(
+            (
+                "Whan that Aprill came. whan þæt æþeling’s "
+                "word-cræft and ƿynn met ȝeong gōd.",
+            ),
+            source_language_key="middle_english")
+        build = build_vocabulary(
+            snapshot,
+            HistoricalEnglishTokenizer.for_middle_english(),
+            BuildConfig())
+
+        self.assertEqual(
+            tuple(word.surface for word in build.unique_words),
+            (
+                "Whan",
+                "that",
+                "Aprill",
+                "came",
+                "þæt",
+                "æþeling’s",
+                "word-cræft",
+                "and",
+                "ƿynn",
+                "met",
+                "ȝeong",
+                "gōd",
+            ))
+        self.assertEqual(build.unique_words[0].normalized, "whan")
+        self.assertEqual(build.unique_words[0].occurrence_count, 2)
+        self.assertEqual(
+            build.occurrences[4].surface,
+            "whan")
+        self.assertTrue(audit_build(build))
+
+    def test_historical_english_audit_requires_every_word_span(self):
+        snapshot = make_snapshot(
+            ("Hwæt þæt",),
+            source_language_key="old_english")
+        build = build_vocabulary(
+            snapshot,
+            FixedTokenizer((TokenSpan("Hwæt", 0, 4),)),
+            BuildConfig())
+
+        with self.assertRaisesRegex(
+                CorpusValidationError,
+                "Historical-English word span at 5:8"):
+            audit_build(build)
+
     def test_invalid_tokenizer_offsets_fail_closed(self):
         snapshot = make_snapshot(("道德",))
         invalid_span_sets = (
@@ -567,6 +653,44 @@ class TokenizerUtilityTests(unittest.TestCase):
                 units[1:],
                 strict=False):
             self.assertEqual(offset + len(source), next_unit[0])
+
+    def test_historical_english_tokenizer_supports_attested_orthography(self):
+        text = (
+            "I. 1 Hwæt! þæt æþeling’s word-cræft; "
+            "ƿynn, ȝeong, gōd, hēold. &c. xxiiiº capitulo.\nIV")
+        tokenizer = HistoricalEnglishTokenizer.for_old_english()
+
+        spans = tokenizer.tokenize(text)
+
+        self.assertEqual(
+            tuple(span.surface for span in spans),
+            (
+                "Hwæt",
+                "þæt",
+                "æþeling’s",
+                "word-cræft",
+                "ƿynn",
+                "ȝeong",
+                "gōd",
+                "hēold",
+                "capitulo",
+            ))
+        self.assertEqual(
+            tuple(
+                text[span.start_offset:span.end_offset]
+                for span in spans),
+            tuple(span.surface for span in spans))
+        self.assertEqual(
+            historical_english_word_ranges(text),
+            tuple(
+                (span.start_offset, span.end_offset)
+                for span in spans))
+        self.assertEqual(
+            dict(tokenizer.identity.options)["normalization"],
+            "NFC-casefold-v1")
+        self.assertEqual(
+            tokenizer.identity.model,
+            "old_english-orthographic-words")
 
     def test_model_units_isolate_sentences_and_unterminated_paragraphs(self):
         text = (

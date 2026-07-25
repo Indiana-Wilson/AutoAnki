@@ -1,0 +1,183 @@
+FINAL SENSE-COVERAGE CHECK—MANDATORY:
+
+Before emitting JSON, audit every supplied term against the broader language
+of the selected historical period, not only the title, author, genre, or
+retained passage. Do not submit a well-known polysemous term after finding only
+the contextual sense and whichever other sense happens to occur nearby.
+Explicitly check for disjoint common concrete, verbal or grammatical, and
+abstract or institutional uses. Include only categories that are genuinely
+lexical and common, but include every category that qualifies.
+
+For Classical Chinese 道, this check normally distinguishes the concrete noun
+"road/path", the practical or normative noun "method/course/teaching", the
+metaphysical noun "the Way", and the verb "speak/state" when those senses fall
+within the selected period. If 道 is requested, omitting the common road/path
+or practical method/course sense merely because the Laozi passage selects the
+metaphysical Way is invalid.
+
+The coverage categories are candidates to inspect, not permission to repeat
+the contextual sense. Never copy, paraphrase, or broaden "contextual_sense"
+into an additional entry. In the opening 道可道 passage, when the selected first
+道 is the abstract Way, return that meaning only in "contextual_sense"; put the
+common concrete road/path, practical method/course/teaching, and verbal
+speak/state senses in "additional_senses". Define the practical sense in terms
+of a human procedure, doctrine, normative course, or way of doing something;
+do not describe it as the ultimate cosmic reality, and do not reuse the
+contextual definition. The selected single-character 道 is a noun, not a noun
+phrase. On the verbal "speak/state" card, translate the whole
+example from its actual grammar. In 史<strong>道</strong>其故, 其故 is "the
+reason/circumstances", not "the former affair".
+
+CLASSICAL CHINESE OPENING-PASSAGE PARSE CHECK:
+
+In 道可道，非常道，名可名，非常名, parse each 非常 sequence as
+非 + 常道 or 非 + 常名: "is not the constant Way/name". Do not parse it as
+the later lexical word 非常, and do not treat 非 as a prefix on 常. When a
+rank's marked target is either of those 非 occurrences, "contextual_sense"
+must be the negative copula or negative predicate "is not". Put any genuinely
+different prefix-like, evaluative "wrong", or verbal "criticize" use only in
+"additional_senses". On every generated 非 example, include exactly one
+literal <strong>非</strong> and do not use the compound 是非 anywhere. For the
+"wrong" sense, prefer direct examples such as 知其<strong>非</strong>而改之 or
+彼言甚<strong>非</strong>; a sentence that contains only unmarked 是非 has no
+valid target usage.
+
+COMPLETE-TERM AND OPENING-VOCABULARY CHECK:
+
+Every rank is an exact complete requested term. Never define, pronounce,
+highlight, or exemplify only one character from a multi-character term. In
+particular, 常道 and 常名 are the complete terms for their ranks. Do not return
+an additional sense of bare 常 for either one. If the complete expression has
+no genuinely disjoint additional lexical sense, return an empty
+"additional_senses" array.
+
+For 常道, the contextual result MUST translate the complete phrase as
+"constant/enduring Way", pronounce it cháng dào, and classify the whole phrase
+as a noun phrase. Returning "constant/enduring", cháng, or adjective as the
+contextual result defines only 常 and is invalid. Apply the same whole-phrase
+rule to 常名: "constant/enduring name", cháng míng, noun phrase.
+
+For 名 in this opening, the marked first occurrence is the noun "name". The
+other 名 in 名可名 is the common verb "to name/designate", so that verbal sense
+MUST be an additional sense; common "reputation/fame" is separate again. On
+the "to name/designate" card, every example must use 名 as the naming verb,
+such as 名之曰道 or 因其形而名之. A construction such as 未有名 ("had no
+name") uses 名 as a noun and is invalid on that verbal card. Translate fame
+examples into idiomatic English: 其<strong>名</strong>遠聞 means "His
+reputation was known far and wide", never "His fame was widely heard".
+
+For 可, the marked occurrence is the modal "can/be able to". Also return the
+common disjoint evaluative or predicate senses "worthy/fit/acceptable" and
+"approve/consent to" in "additional_senses". Do not return an empty array for
+可, and do not collapse these judgments of worth or approval into capability.
+Every "worthy/fit/acceptable" example must be unambiguously evaluative, not a
+modal 可 immediately followed by another verb. Avoid ambiguous 可行, 可守,
+可取, 可任, and 可嘉 constructions on that card; prefer predicates such as
+此議誠<strong>可</strong>也 / "This proposal is indeed acceptable." Keep
+transitive approval examples such as 王<strong>可</strong>其議 on the separate
+"approve/consent" card.
+
+For 無 in 無名, the contextual sense is "without/lacking a name". Do not repeat
+that same absence meaning as both an attributive and a verbal additional card.
+For the exact 無 rank, "Translation (English)" MUST be "without; lacking" and
+"Part of Speech (English)" MUST be "negative existential verb / negator".
+Calling 無 itself an adjective because the whole phrase 無名 translates as
+"nameless" is invalid.
+A genuinely nominal philosophical "nonbeing/nothingness" sense may be separate.
+On a nonbeing card, use examples whose grammar and English translation align
+directly. Never translate 天下之大 as a concessive clause beginning "though";
+there is no concessive marker. Prefer unambiguous pairs such as
+有生於<strong>無</strong>。 / "Being arises from nonbeing."
+In an 以 X 觀 Y construction, X is the means and Y is the object: for example,
+以有觀<strong>無</strong> means "use being to contemplate nonbeing", never
+"observe being through nonbeing". Never put the highlighted 無 directly before
+為, where it can be read as the separate compound 無為 "non-action". Use
+知<strong>無</strong>之用。 / "Understand the usefulness of nonbeing.", not
+知<strong>無</strong>為用。
+
+For 天地, "heaven and earth", "the natural world", "the cosmos", "the world",
+"all under heaven", and "the universe" are equivalents or contextual
+extensions of the same binomial sense here, not separate cards. Return an empty
+"additional_senses" array for 天地; never create a synonym-only second card.
+
+For 之 in 天地之始, the contextual sense is the structural particle "of".
+Keep the common third-person object pronoun "him/her/it/them" and the verb
+"go to" separate if included. Do not label an object-pronoun sense as
+"this/these", and ensure every example and translation actually demonstrates
+the sense named by its card.
+
+For 始 in 天地之始, "contextual_sense" MUST be the noun "beginning/origin":
+set "Translation (English)" to "beginning; origin", describe a starting point
+or source, and set "Part of Speech (English)" to "noun". Never put the verbal
+"begin/start" sense in "contextual_sense". Put that disjoint verbal sense in
+"additional_senses".
+
+On the additional verbal "begin/start" card, every generated example must use
+始 to express actual inception, such as 百草始生. Do not highlight a noun meaning
+"the beginning/at the start", or the adverbial "only then/first", on that
+verbal card. The subject must be something that can naturally begin the named
+action: use
+百草<strong>始</strong>生 / "The plants begin to grow", never
+春<strong>始</strong>生 / "Spring begins to grow".
+Likewise, use 雞鳴而客<strong>始</strong>行 / "At cockcrow, the traveler began
+his journey", not 客<strong>始</strong>至 / "the guest began to arrive".
+
+If 之 has an additional motion verb "go to" sense, use natural examples with
+an explicit destination, such as 吾將之楚 or 子將何之. Do not invent awkward
+double-之 constructions. Motion-verb 之 directly governs its destination; use
+遂<strong>之</strong>郊, not the unidiomatic 遂<strong>之</strong>於郊. Each
+motion-verb example must contain no other 之 at all, including a structural
+particle or object pronoun: do not preface it with a clause such as 既告之.
+Never put 於 between motion-verb 之 and its destination: use
+王<strong>之</strong>東, never 王<strong>之</strong>於東.
+With an interrogative destination, Classical Chinese places the interrogative
+before 之: use 子欲何<strong>之</strong>？, never
+子欲<strong>之</strong>何方.
+
+EMPHASIS CHECK:
+
+Use only literal <strong> and </strong> tags. Never emit <em>, attributes, or
+any other HTML. Tags must enclose the complete requested term, including every
+character of 常道 and 常名. This exact-once v8 rule overrides the general
+repeated-occurrence examples earlier in the prompt: use the requested literal
+spelling exactly once in each generated example, inside exactly one <strong>
+span. Do not place a second occurrence elsewhere in the sentence, even if it
+has the same sense or could also be wrapped.
+
+For generated additional-sense examples, choose sentences in which every
+literal occurrence of the complete requested spelling expresses this card's
+sense. Avoid a second occurrence inside a compound or in another sense. For
+example, a 道 card must not use 大道, and a 非 card must not use 是非, elsewhere
+in the same sentence. This makes the check mechanical: after removing the one
+<strong>...</strong> span, the requested spelling must not remain anywhere in
+the sentence.
+
+For the concrete road/path sense of 道, use direct constructions such as
+循<strong>道</strong>而行 and avoid redundant phrases such as 大路之道. Translate
+every grammatical element actually present in the source example. Every road
+example must be a complete, concrete clause with an expressed or contextually
+clear mover or object. Use 車循此<strong>道</strong>而出 / "The cart came out
+along this road", never the subjectless and ambiguous 出於此<strong>道</strong>.
+
+On a 之 object-pronoun card, write a complete transitive construction whose
+English makes the same referent the verb's object. Use
+以實告<strong>之</strong> / "Tell him the truth", never the incoherent
+告而聽<strong>之</strong> / "Report it and listen to it".
+
+On a motion-verb 之 card, the destination must be a place noun, proper place
+name, or interrogative destination—not a bare adjective. Use
+吾欲<strong>之</strong>遠方 / "I wish to go to a distant place", never
+吾欲<strong>之</strong>遠.
+
+Translate ordinary temporal clauses into natural English rather than mirroring
+Chinese word order. 日既暮，民乃<strong>始</strong>歸 means "Once evening had
+fallen, the people began to return", never "When the day was already dusk".
+
+FINAL TRANSLATION-LANGUAGE CHECK—MANDATORY:
+
+Every item in a field named "Sentence Translations (English)" must be a
+complete, natural English translation of the source sentence at the same array
+position. Never copy or repeat the source-language sentence into this English
+array. Before returning, compare every sentence/translation pair and verify
+that the translation is actually written in English, translates the whole
+sentence, and contains neither source-language-only text nor HTML.

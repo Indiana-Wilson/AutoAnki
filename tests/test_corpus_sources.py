@@ -80,16 +80,27 @@ class FakeMediaWikiClient:
 
 class CatalogueTests(unittest.TestCase):
     def test_exact_corpus_sources_are_pinned_in_catalogue(self):
-        daodejing = catalogue.get_corpus_spec("daodejing_huijiao")
+        wang_bi = catalogue.get_corpus_spec("daodejing_wang_bi")
+        mawangdui = catalogue.get_corpus_spec("daodejing_mawangdui")
         journey = catalogue.get_corpus_spec("journey_to_the_west")
 
         self.assertEqual(
-            daodejing.content_titles,
-            ("老子 (匯校版)",))
-        self.assertIsNone(daodejing.index_title)
-        self.assertEqual(daodejing.expected_section_count, 81)
-        self.assertIsNone(daodejing.long_span_refiner)
-        self.assertFalse(daodejing.default_include_section_titles)
+            wang_bi.content_titles,
+            ("道德經 (王弼本)",))
+        self.assertEqual(
+            mawangdui.content_titles,
+            ("老子 (帛書校勘版)",))
+        self.assertEqual(
+            wang_bi.source_language_key,
+            "classical_chinese_wang_bi")
+        self.assertEqual(
+            mawangdui.source_language_key,
+            "classical_chinese_han")
+        for daodejing in (wang_bi, mawangdui):
+            self.assertIsNone(daodejing.index_title)
+            self.assertEqual(daodejing.expected_section_count, 81)
+            self.assertIsNone(daodejing.long_span_refiner)
+            self.assertFalse(daodejing.default_include_section_titles)
         self.assertEqual(journey.index_title, "西遊記")
         self.assertEqual(
             journey.long_span_refiner,
@@ -215,7 +226,7 @@ class CleanerTests(unittest.TestCase):
         with self.assertRaises(cleaners.WikitextCleaningError):
             cleaners.clean_wikitext("[[File:scan.jpg|正文]]")
 
-    def test_daodejing_splits_exactly_81_headings(self):
+    def test_wang_bi_daodejing_splits_exactly_81_headings(self):
         chapters = []
         numerals = (
             "一 二 三 四 五 六 七 八 九 十 十一 十二 十三 十四 十五 "
@@ -231,11 +242,11 @@ class CleanerTests(unittest.TestCase):
         ).split()
         for number, numeral in enumerate(numerals, start=1):
             body = (
-                "{{參|道，可道。|別本}}"
+                "道可道，非常道。{{*|王弼注文。}}"
                 if number == 1
                 else f"本章正文{number}。"
             )
-            chapters.append(f"=== {numeral}章 ===\n{body}\n")
+            chapters.append(f"=={numeral}章==\n{body}\n")
         raw = (
             "{{header|title=老子}}\n== 道經 ==\n"
             + "".join(chapters)
@@ -243,18 +254,48 @@ class CleanerTests(unittest.TestCase):
         )
 
         sections = cleaners.clean_daodejing(source_page(
-            "老子 (匯校版)",
+            "道德經 (王弼本)",
             raw,
             page_key="source",
         ))
 
         self.assertEqual(len(sections), 81)
-        self.assertEqual(sections[0].text, "道，可道。")
+        self.assertEqual(sections[0].text, "道可道，非常道。")
         self.assertEqual(sections[0].title, "第一章")
         self.assertEqual(
             sections[-1].section_id,
-            "daodejing_huijiao:chapter:081")
+            "daodejing_wang_bi:chapter:081")
         self.assertNotIn("===", sections[1].text)
+
+    def test_mawangdui_preserves_manuscript_order_and_spellings(self):
+        received_order = tuple(range(38, 82)) + tuple(range(1, 38))
+        chapters = []
+        for manuscript_number, received_number in enumerate(
+                received_order,
+                start=1):
+            numeral = self._integer_to_chinese(manuscript_number)
+            body = (
+                "道可道也 非恆道也\n亓道无名"
+                if received_number == 1
+                else f"帛書正文{manuscript_number}")
+            chapters.append(
+                f"===第{numeral}章 章題===\n"
+                f"（{received_number}）\n{body}\n")
+        sections = cleaners.clean_daodejing(source_page(
+            "老子 (帛書校勘版)",
+            "".join(chapters),
+            page_key="source"))
+
+        self.assertEqual(len(sections), 81)
+        self.assertEqual(
+            sections[0].title,
+            "第一章 章題（通行本第38章）")
+        chapter_one = sections[44]
+        self.assertEqual(
+            chapter_one.title,
+            "第四十五章 章題（通行本第1章）")
+        self.assertIn("道可道也 非恆道也", chapter_one.text)
+        self.assertIn("亓道无名", chapter_one.text)
 
     def test_daodejing_rejects_a_missing_chapter(self):
         raw = "".join(
@@ -263,41 +304,11 @@ class CleanerTests(unittest.TestCase):
         )
         with self.assertRaises(CorpusValidationError):
             cleaners.clean_daodejing(source_page(
-                "老子 (匯校版)",
+                "道德經 (王弼本)",
                 raw,
             ))
 
-    def test_source_specific_simplified_slips_are_corrected_only_in_cleaners(
-            self):
-        numerals = (
-            "一 二 三 四 五 六 七 八 九 十 十一 十二 十三 十四 十五 "
-            "十六 十七 十八 十九 二十 二十一 二十二 二十三 二十四 "
-            "二十五 二十六 二十七 二十八 二十九 三十 三十一 三十二 "
-            "三十三 三十四 三十五 三十六 三十七 三十八 三十九 四十 "
-            "四十一 四十二 四十三 四十四 四十五 四十六 四十七 四十八 "
-            "四十九 五十 五十一 五十二 五十三 五十四 五十五 五十六 "
-            "五十七 五十八 五十九 六十 六十一 六十二 六十三 六十四 "
-            "六十五 六十六 六十七 六十八 六十九 七十 七十一 七十二 "
-            "七十三 七十四 七十五 七十六 七十七 七十八 七十九 八十 "
-            "八十一"
-        ).split()
-        raw = "".join(
-            f"=== {numeral}章 ===\n"
-            + (
-                "如春登台，其事好还，九層之台；膻中登台。\n"
-                if index == 1
-                else "正文。\n"
-            )
-            for index, numeral in enumerate(numerals, start=1)
-        )
-        dao = cleaners.clean_daodejing(source_page(
-            "老子 (匯校版)",
-            raw,
-        ))
-        self.assertEqual(
-            dao[0].text,
-            "如春登臺，其事好還，九層之臺；膻中登台。")
-
+    def test_journey_source_specific_simplified_slips_are_corrected(self):
         journey_raw = (
             "{{header|title=西遊記|section=第一回<br>章題}}\n"
             "攛將上来。獅驼王。日晒花心。"
@@ -395,7 +406,7 @@ class CleanerTests(unittest.TestCase):
                 self._journey_index(omit=57))
 
     def test_hash_mismatch_is_rejected_before_cleaning(self):
-        page = source_page("老子 (匯校版)", "=== 一章 ===\n道。")
+        page = source_page("道德經 (王弼本)", "==一章==\n道。")
         tampered = SourcePage(
             **{
                 **page.__dict__,

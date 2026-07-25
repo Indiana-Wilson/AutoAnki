@@ -1,0 +1,12 @@
+For every additional sense, provide exactly four short, natural
+{source_language} examples as four strings in "Sentences".
+
+Each example must contain the exact complete term belonging to that result's
+rank exactly once. Enclose that one occurrence, and nothing else, immediately
+in literal <strong> and </strong> tags. Do not change or inflect the spelling,
+highlight only a component or substring, place it inside a longer compound,
+or leave another occurrence elsewhere in the example. Use no other HTML and
+never put | in an item.
+
+Make each example a complete, idiomatic usage whose grammar unambiguously
+demonstrates only that sense. Use a distinct set for each separate sense.

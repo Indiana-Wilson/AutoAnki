@@ -83,17 +83,32 @@ def _journey_chapter_titles():
     )
 
 
-DAODEJING = CorpusSpec(
-    key="daodejing_huijiao",
+DAODEJING_WANG_BI = CorpusSpec(
+    key="daodejing_wang_bi",
     title="道德經",
-    edition="老子 (匯校版)",
+    edition="王弼本",
     author="老子",
-    period="Warring States textual tradition",
-    source_language_key="classical_chinese_warring_states",
+    period="Received text preserved with Wang Bi's third-century commentary",
+    source_language_key="classical_chinese_wang_bi",
     index_title=None,
-    content_titles=("老子 (匯校版)",),
+    content_titles=("道德經 (王弼本)",),
     expected_section_count=81,
 )
+
+DAODEJING_MAWANGDUI = CorpusSpec(
+    key="daodejing_mawangdui",
+    title="道德經",
+    edition="馬王堆帛書校勘版",
+    author="老子",
+    period="Early Western Han silk-manuscript recension",
+    source_language_key="classical_chinese_han",
+    index_title=None,
+    content_titles=("老子 (帛書校勘版)",),
+    expected_section_count=81,
+)
+
+# Keep the original public constant as the conventional default edition.
+DAODEJING = DAODEJING_WANG_BI
 
 
 JOURNEY_TO_THE_WEST = CorpusSpec(
@@ -112,7 +127,8 @@ JOURNEY_TO_THE_WEST = CorpusSpec(
 
 
 _CORPORA = (
-    DAODEJING,
+    DAODEJING_WANG_BI,
+    DAODEJING_MAWANGDUI,
     JOURNEY_TO_THE_WEST,
 )
 _CORPORA_BY_KEY = {

@@ -62,6 +62,677 @@ SOURCE_CONTEXT_DESCRIPTIONS = {
     key: description
     for key, _label, description in SOURCE_CONTEXT_OPTIONS
 }
+SOURCE_PROTOCOL_OPTIONS = (
+    ("v9", "Compact v9 (recommended)"),
+    ("v8", "Legacy v8 rollback"),
+)
+SOURCE_PROTOCOL_KEYS_BY_LABEL = {
+    label: key
+    for key, label in SOURCE_PROTOCOL_OPTIONS
+}
+SOURCE_REASONING_OPTIONS = (
+    ("none", "None · lowest cost"),
+    ("low", "Low · extra deliberation"),
+)
+SOURCE_REASONING_KEYS_BY_LABEL = {
+    label: key
+    for key, label in SOURCE_REASONING_OPTIONS
+}
+SOURCE_EXECUTION_OPTIONS = (
+    ("standard", "Standard · immediate"),
+    ("economy", "Economy Batch · 50% token price"),
+)
+SOURCE_EXECUTION_KEYS_BY_LABEL = {
+    label: key
+    for key, label in SOURCE_EXECUTION_OPTIONS
+}
+
+SOURCE_JOB_HEADINGS = {
+    "job": "Job",
+    "source": "Source",
+    "chunk": "Chunk / stage",
+    "worker": "Worker",
+    "status": "Status",
+    "attempts": "Attempts",
+    "detail": "Latest detail",
+}
+SOURCE_JOB_COLUMNS = (
+    "source",
+    "chunk",
+    "worker",
+    "status",
+    "attempts",
+    "detail",
+)
+SOURCE_JOB_DETAIL_MIN_WIDTH = 260
+SOURCE_JOBS_TREE_VISIBLE_ROWS = 10
+SOURCE_JOB_INSPECTION_VISIBLE_LINES = 10
+SOURCE_VALIDATION_DIALOG_PREFERRED_WIDTH = 1900
+SOURCE_VALIDATION_DIALOG_PREFERRED_HEIGHT = 1320
+SOURCE_VALIDATION_DIALOG_MIN_WIDTH = 760
+SOURCE_VALIDATION_DIALOG_MIN_HEIGHT = 620
+SOURCE_VALIDATION_DIALOG_MARGIN = 60
+
+SOURCE_JOB_COLUMN_MIN_WIDTHS = {
+    "job": 120,
+    "source": 130,
+    "chunk": 90,
+    "worker": 110,
+    "status": 105,
+    "attempts": 80,
+    "detail": 150,
+}
+SOURCE_JOB_COLUMN_MAX_WIDTHS = {
+    "job": 300,
+    "source": 320,
+    "chunk": 170,
+    "worker": 230,
+    "status": 220,
+    "attempts": 115,
+}
+
+
+def _source_job_value(job, name, default=""):
+    if isinstance(job, dict):
+        return job.get(name, default)
+    return getattr(job, name, default)
+
+
+def source_job_parent_id(job, fallback=""):
+    """Return the deck-generation job owning one displayed stage."""
+    parent_id = _source_job_value(job, "parent_job_id", "")
+    if parent_id not in (None, ""):
+        return str(parent_id)
+    row_id = _source_job_value(
+        job,
+        "job_id",
+        _source_job_value(job, "id", fallback))
+    row_id = str(row_id)
+    if "::" in row_id:
+        return row_id.split("::", 1)[0]
+    return row_id
+
+
+def group_source_job_rows(jobs):
+    """Group saved request/finalization rows without losing job order.
+
+    The workflow adapter historically returned every request row followed by
+    every finalization row. Grouping at the display boundary keeps each Deck
+    row with the requests it finalizes, including for already-saved jobs.
+    """
+    grouped = {}
+    order = []
+    for index, job in enumerate(jobs):
+        parent_id = source_job_parent_id(job, fallback=index)
+        if parent_id not in grouped:
+            grouped[parent_id] = []
+            order.append(parent_id)
+        grouped[parent_id].append(job)
+
+    result = []
+    for parent_id in order:
+        rows = grouped[parent_id]
+        regular = []
+        finalization = []
+        for row in rows:
+            row_id = str(_source_job_value(row, "job_id", ""))
+            chunk = str(_source_job_value(
+                row,
+                "chunk_label",
+                _source_job_value(row, "chunk", "")))
+            target = (
+                finalization
+                if row_id.endswith("::finalize") or chunk == "Deck"
+                else regular)
+            target.append(row)
+        result.append((parent_id, tuple((*regular, *finalization))))
+    return tuple(result)
+
+
+def source_job_group_label(parent_id, ordinal):
+    """Create a short but recognizable label for a generation job."""
+    parent_id = str(parent_id)
+    stamp, separator, suffix = parent_id.partition("-")
+    if (
+            separator
+            and len(stamp) == 15
+            and stamp[8] == "T"
+            and stamp[:8].isdigit()
+            and stamp[9:].isdigit()):
+        timestamp = (
+            f"{stamp[4:6]}-{stamp[6:8]} "
+            f"{stamp[9:11]}:{stamp[11:13]}")
+        return f"{timestamp} · {suffix[:8]}"
+    if len(parent_id) > 22:
+        parent_id = f"{parent_id[:19]}…"
+    return f"{ordinal} · {parent_id}"
+
+
+def source_job_column_widths(rows, measure, available_width):
+    """Fit every job column into the viewport without a horizontal sprawl."""
+    fixed_columns = ("job", *SOURCE_JOB_COLUMNS[:-1])
+    widths = {}
+    for column in fixed_columns:
+        candidates = (
+            SOURCE_JOB_HEADINGS[column],
+            *(
+                str(row.get(column, ""))
+                for row in rows),
+        )
+        measured = max(measure(value) for value in candidates) + 24
+        widths[column] = min(
+            SOURCE_JOB_COLUMN_MAX_WIDTHS[column],
+            max(SOURCE_JOB_COLUMN_MIN_WIDTHS[column], measured))
+
+    target = max(1, int(available_width) - 4)
+    widths["detail"] = max(
+        SOURCE_JOB_COLUMN_MIN_WIDTHS["detail"],
+        SOURCE_JOB_DETAIL_MIN_WIDTH)
+    overflow = sum(widths.values()) - target
+    if overflow > 0:
+        # Shrink the descriptive columns first, retaining enough space for
+        # every heading. The selected row's unabridged detail remains in the
+        # reader directly below the table.
+        shrink_order = (
+            "source",
+            "job",
+            "worker",
+            "status",
+            "chunk",
+            "detail",
+            "attempts",
+        )
+        for column in shrink_order:
+            capacity = (
+                widths[column]
+                - SOURCE_JOB_COLUMN_MIN_WIDTHS[column])
+            reduction = min(overflow, max(0, capacity))
+            widths[column] -= reduction
+            overflow -= reduction
+            if overflow <= 0:
+                break
+    if overflow > 0:
+        # Extremely narrow displays are still usable: distribute the last
+        # reduction instead of allowing the Treeview to force the entire page
+        # wider than its notebook viewport.
+        columns = (*fixed_columns, "detail")
+        while overflow > 0:
+            changed = False
+            for column in columns:
+                if widths[column] > 40:
+                    widths[column] -= 1
+                    overflow -= 1
+                    changed = True
+                    if overflow <= 0:
+                        break
+            if not changed:
+                break
+    else:
+        widths["detail"] += -overflow
+    return widths
+
+
+def validation_problem_column_widths(measure, available_width):
+    """Return readable problem-list columns that exactly fit its viewport."""
+    available_width = max(1, int(available_width) - 4)
+    decision_preferred = max(
+        measure("Review state"),
+        measure("Can accept"),
+        measure("Accepted"),
+        measure("Locked")) + 28
+    decision = min(
+        decision_preferred,
+        max(1, int(available_width * 0.23)))
+    remaining = max(0, available_width - decision)
+    location = min(
+        max(1, int(available_width * 0.34)),
+        remaining)
+    problem = max(0, remaining - location)
+    return {
+        "decision": decision,
+        "location": location,
+        "problem": problem,
+    }
+
+
+def source_validation_dialog_geometry(screen_width, screen_height):
+    """Fit the problem reviewer inside the current display.
+
+    Tk can report fairly small work areas for remote desktops and scaled
+    displays.  A preferred or minimum size must therefore never be allowed to
+    exceed the display itself.
+    """
+    screen_width = max(1, int(screen_width))
+    screen_height = max(1, int(screen_height))
+    horizontal_margin = min(
+        SOURCE_VALIDATION_DIALOG_MARGIN,
+        max(0, (screen_width - 1) // 2))
+    vertical_margin = min(
+        SOURCE_VALIDATION_DIALOG_MARGIN,
+        max(0, (screen_height - 1) // 2))
+    width = min(
+        SOURCE_VALIDATION_DIALOG_PREFERRED_WIDTH,
+        max(1, screen_width - (2 * horizontal_margin)))
+    height = min(
+        SOURCE_VALIDATION_DIALOG_PREFERRED_HEIGHT,
+        max(1, screen_height - (2 * vertical_margin)))
+    return (
+        width,
+        height,
+        max((screen_width - width) // 2, 0),
+        max((screen_height - height) // 2, 0),
+    )
+
+
+def _source_inspection_json(value):
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=False,
+        indent=2,
+        default=str)
+
+
+def _source_inspection_label(name):
+    labels = {
+        "request_view": "REQUEST OVERVIEW AND ACTUAL BATCH INPUT",
+        "request": "SAVED INPUT FOR THIS REQUEST CHUNK",
+        "request_contract": "OPENAI REQUEST SETTINGS AND RESPONSE SCHEMA",
+        "request_contract_origin": "WHERE THOSE REQUEST SETTINGS CAME FROM",
+        "response_view": "LATEST RESPONSE AND VALIDATION RESULT",
+        "status": "CURRENT CHUNK STATUS",
+        "attempts": "SAVED RESPONSE ATTEMPTS (OLDEST FIRST)",
+        "validation": "HUMAN-REVIEWABLE VALIDATION RESULT",
+        "workflow": "PACKAGING / IMPORT RESULT",
+        "combined": "VALIDATED CARD BATCH USED FOR FINALIZATION",
+        "job_path": "SAVED JOB FOLDER",
+    }
+    return labels.get(name, name.replace("_", " ").upper())
+
+
+def format_source_inspection_fields(fields, empty_message):
+    """Format top-level inspection fields as clearly labelled sections."""
+    if not fields:
+        return empty_message
+    sections = []
+    for name, value in fields:
+        label = _source_inspection_label(name)
+        if isinstance(value, str):
+            body = value
+        else:
+            body = _source_inspection_json(value)
+        sections.append(f"{label}\n{'=' * len(label)}\n{body}")
+    return "\n\n".join(sections)
+
+
+def _problem_value_text(value):
+    if value is None:
+        return "Not specified"
+    if isinstance(value, str):
+        return value
+    return _source_inspection_json(value)
+
+
+def validation_report_summary(report):
+    """Explain whether and how one retained response can be resolved."""
+    if not isinstance(report, dict) or not report.get("available", True):
+        return (
+            "No retained model response is available for validation. "
+            "There is nothing that can be manually accepted."
+        )
+    problem_count = int(report.get("problem_count", 0))
+    accepted_count = int(report.get("accepted_problem_count", 0))
+    remaining_count = int(
+        report.get(
+            "remaining_problem_count",
+            max(0, problem_count - accepted_count)))
+    if not problem_count:
+        return (
+            "No validation problems were found. The retained response is "
+            "valid."
+        )
+    counts = (
+        f"{problem_count:,} problem"
+        f"{'' if problem_count == 1 else 's'} found"
+        f" · {accepted_count:,} manually accepted"
+        f" · {remaining_count:,} remaining."
+    )
+    if remaining_count == 0:
+        return (
+            counts
+            + " Every recorded issue has been reviewed and accepted; JSON "
+            "syntax and card structure still passed."
+        )
+    if not report.get("syntax_valid"):
+        return (
+            counts
+            + " The response is not valid JSON, so it cannot be manually "
+            "accepted. Retry it or repair the JSON."
+        )
+    if not report.get("structurally_valid"):
+        return (
+            counts
+            + " The JSON parses, but its card structure is unsafe. Structural "
+            "problems cannot be overridden; retry or repair the response."
+        )
+    if report.get("can_complete_with_manual_acceptance"):
+        return (
+            counts
+            + " JSON syntax and card structure are valid. Every remaining "
+            "item is a content-rule issue that may be accepted after review."
+        )
+    return (
+        counts
+        + " At least one remaining structural problem is locked and cannot "
+        "be overridden."
+    )
+
+
+def format_validation_problem_details(problem):
+    """Render one validation problem for a human reviewer."""
+    if not isinstance(problem, dict):
+        return str(problem)
+    if problem.get("accepted"):
+        decision = "Accepted manually"
+    elif problem.get("overrideable"):
+        decision = (
+            "Reviewable content issue — may be accepted if the card is "
+            "genuinely usable"
+        )
+    else:
+        decision = (
+            "Locked structural issue — cannot be manually accepted"
+        )
+    sections = (
+        ("STATUS", decision),
+        ("WHERE", problem.get("location") or "Response"),
+        ("WHAT IS WRONG", problem.get("title") or "Validation problem"),
+        ("WHY", problem.get("message") or "No explanation was provided."),
+        ("EXPECTED", _problem_value_text(problem.get("expected"))),
+        ("ACTUAL", _problem_value_text(problem.get("actual"))),
+        (
+            "SUGGESTED NEXT STEP",
+            problem.get("suggestion")
+            or "Retry the request or review the affected response section."),
+        ("EXACT JSON PATH", problem.get("path") or "$"),
+    )
+    return "\n\n".join(
+        f"{heading}\n{'=' * len(heading)}\n{body}"
+        for heading, body in sections)
+
+
+def latest_source_response_text(inspection):
+    """Return the retained raw text for the latest inspected attempt."""
+    if not isinstance(inspection, dict):
+        return None
+    response_view = inspection.get("response_view")
+    if isinstance(response_view, dict):
+        latest = response_view.get("latest_attempt")
+        if isinstance(latest, dict) and isinstance(
+                latest.get("raw_text"), str):
+            return latest["raw_text"]
+    status = inspection.get("status")
+    latest_number = None
+    if isinstance(status, dict):
+        latest_path = status.get("latest_attempt_path")
+        if isinstance(latest_path, str) and latest_path:
+            try:
+                latest_number = int(Path(latest_path).name)
+            except ValueError:
+                latest_number = None
+    attempts = inspection.get("attempts", ())
+    if isinstance(attempts, (tuple, list)):
+        ordered = tuple(
+            attempt
+            for attempt in attempts
+            if isinstance(attempt, dict)
+            and isinstance(attempt.get("raw_text"), str))
+        if latest_number is not None:
+            for attempt in ordered:
+                if attempt.get("attempt") == latest_number:
+                    return attempt["raw_text"]
+        if ordered:
+            return ordered[-1]["raw_text"]
+    return None
+
+
+def inspection_validation_report(inspection):
+    if not isinstance(inspection, dict):
+        return None
+    report = inspection.get("validation")
+    if isinstance(report, dict):
+        return report
+    response_view = inspection.get("response_view")
+    if isinstance(response_view, dict):
+        report = response_view.get("validation")
+        if isinstance(report, dict):
+            return report
+    return None
+
+
+def validation_problem_affected_section(inspection, problem):
+    """Show the exact affected card when the response is parseable."""
+    raw_text = latest_source_response_text(inspection)
+    if raw_text is None:
+        return "No retained response text is available."
+    try:
+        parsed = json.loads(raw_text)
+    except (json.JSONDecodeError, TypeError):
+        return raw_text
+    if (
+            isinstance(parsed, dict)
+            and (
+                "contextual_cards" in parsed
+                or "additional_sense_cards" in parsed)):
+        contextual_cards = parsed.get("contextual_cards")
+        additional_cards = parsed.get("additional_sense_cards")
+        cards = [
+            *(
+                contextual_cards
+                if isinstance(contextual_cards, list)
+                else ()),
+            *(
+                additional_cards
+                if isinstance(additional_cards, list)
+                else ()),
+        ]
+    elif (
+            isinstance(parsed, dict)
+            and isinstance(parsed.get("term_results"), dict)):
+        cards = []
+        term_results = parsed["term_results"]
+
+        def rank_order(item):
+            rank_text = item[0]
+            try:
+                return (0, int(rank_text))
+            except (TypeError, ValueError):
+                return (1, str(rank_text))
+
+        for rank, group in sorted(
+                term_results.items(),
+                key=rank_order):
+            if not isinstance(group, dict):
+                continue
+            contextual = group.get("contextual_sense")
+            if isinstance(contextual, dict):
+                cards.append({
+                    "rank": rank,
+                    "role": "contextual_sense",
+                    "sense": contextual,
+                })
+            additional = group.get("additional_senses")
+            if isinstance(additional, list):
+                cards.extend(
+                    {
+                        "rank": rank,
+                        "role": "additional_sense",
+                        "additional_sense_number": index + 1,
+                        "sense": sense,
+                    }
+                    for index, sense in enumerate(additional)
+                    if isinstance(sense, dict))
+    elif (
+            isinstance(parsed, dict)
+            and isinstance(parsed.get("term_results"), list)):
+        cards = []
+        for group in parsed["term_results"]:
+            if not isinstance(group, dict):
+                continue
+            rank = group.get("rank")
+            contextual = group.get("contextual_sense")
+            if isinstance(contextual, dict):
+                cards.append({
+                    "rank": rank,
+                    "role": "contextual_sense",
+                    "sense": contextual,
+                })
+            additional = group.get("additional_senses")
+            if isinstance(additional, list):
+                cards.extend(
+                    {
+                        "rank": rank,
+                        "role": "additional_sense",
+                        "additional_sense_number": index + 1,
+                        "sense": sense,
+                    }
+                    for index, sense in enumerate(additional)
+                    if isinstance(sense, dict))
+    else:
+        cards = (
+            parsed.get("cards")
+            if isinstance(parsed, dict)
+            else parsed)
+    card_index = (
+        problem.get("card_index")
+        if isinstance(problem, dict)
+        else None)
+    if (
+            isinstance(card_index, int)
+            and isinstance(cards, list)
+            and 0 <= card_index < len(cards)):
+        return _source_inspection_json(cards[card_index])
+    if (
+            isinstance(problem, dict)
+            and problem.get("scope") == "request"):
+        return (
+            "This problem concerns a requested source term rather than a "
+            "returned card.\n\n"
+            + _problem_value_text({
+                "term": problem.get("term"),
+                "expected": problem.get("expected"),
+                "actual": problem.get("actual"),
+            })
+        )
+    return _source_inspection_json(parsed)
+
+
+def source_job_inspection_texts(value):
+    """Split one inspected stage into explicit request and response text."""
+    if not isinstance(value, dict):
+        return (
+            "No separately saved request is available for this item.",
+            str(value),
+        )
+
+    is_finalization = "workflow" in value and "request" not in value
+    if is_finalization:
+        request_names = (
+            "request_contract",
+            "request_contract_origin",
+            "combined",
+            "job_path",
+        )
+        response_names = ("workflow",)
+    elif "request_view" in value or "response_view" in value:
+        request_names = (
+            "request_view",
+            "request_contract_origin",
+        )
+        response_names = (
+            "response_view",
+            "attempts",
+        )
+    else:
+        request_names = (
+            "request_view",
+            "request",
+            "request_contract",
+            "request_contract_origin",
+        )
+        response_names = (
+            "response_view",
+            "validation",
+            "status",
+            "attempts",
+            "response",
+            "result",
+            "output",
+            "validation_problems",
+            "problems",
+            "error",
+        )
+
+    request_fields = [
+        (name, value[name])
+        for name in request_names
+        if name in value]
+    response_fields = [
+        (name, value[name])
+        for name in response_names
+        if name in value]
+    assigned = {
+        name
+        for name, _field_value in (*request_fields, *response_fields)}
+    assigned.add("scope")
+    if "request_view" in value or "response_view" in value:
+        assigned.update({
+            "request",
+            "request_contract",
+            "status",
+            "validation",
+        })
+    for name, field_value in value.items():
+        if name not in assigned:
+            response_fields.append((name, field_value))
+
+    return (
+        format_source_inspection_fields(
+            request_fields,
+            (
+                "No separately saved request is available for this stage. "
+                "Use the Response tab for its saved result."
+            )),
+        format_source_inspection_fields(
+            response_fields,
+            "No response attempt or result has been saved yet."),
+    )
+
+
+def source_job_inspection_scope(record):
+    """Explain exactly how much of a generation run is being inspected."""
+    parent_id = str(record.get("parent_job_id", record.get("job_id", "")))
+    source = str(record.get("source", "")).strip()
+    chunk = str(record.get("chunk", "")).strip()
+    if chunk == "Deck" or str(record.get("job_id", "")).endswith(
+            "::finalize"):
+        subject = (
+            "one Deck packaging/import stage from one deck-generation job; "
+            "this is not an OpenAI request")
+    else:
+        subject = (
+            "one saved OpenAI request chunk from one deck-generation job; "
+            "this is not the whole job")
+    qualifiers = [
+        value
+        for value in (
+            source,
+            f"chunk {chunk}" if chunk and chunk != "Deck" else "",
+            parent_id,
+        )
+        if value]
+    suffix = f" ({' · '.join(qualifiers)})" if qualifiers else ""
+    return f"Showing {subject}{suffix}."
 
 
 @dataclass(frozen=True)
@@ -71,6 +742,7 @@ class SourceUiOption:
     key: str
     name: str
     word_count: int | None = None
+    token_occurrence_count: int | None = None
     section_count: int | None = None
     source_language_key: str = ""
     preset: bool = False
@@ -109,11 +781,18 @@ class ManualInputFilterResult:
 
 BUILT_IN_SOURCE_OPTIONS = (
     SourceUiOption(
-        key="daodejing_huijiao",
-        name="Daodejing",
-        word_count=922,
+        key="daodejing_wang_bi",
+        name="Daodejing [Wang Bi]",
+        word_count=944,
         section_count=81,
-        source_language_key="classical_chinese_warring_states",
+        source_language_key="classical_chinese_wang_bi",
+        preset=True),
+    SourceUiOption(
+        key="daodejing_mawangdui",
+        name="Daodejing [Mawangdui]",
+        word_count=991,
+        section_count=81,
+        source_language_key="classical_chinese_han",
         preset=True),
     SourceUiOption(
         key="journey_to_the_west",
@@ -125,8 +804,12 @@ BUILT_IN_SOURCE_OPTIONS = (
 )
 
 PREPARABLE_SOURCE_LANGUAGE_NAMES = (
+    "Classical Chinese (Early Han)",
+    "Classical Chinese (Wang Bi recension)",
     "Classical Chinese (Warring States)",
     "Classical Chinese (Ming)",
+    "Middle English",
+    "Old English",
 )
 
 
@@ -261,6 +944,22 @@ def parse_source_chunk_size(value, *, maximum=10000):
     return chunk_size
 
 
+def parse_source_prefix_token_limit(value, *, maximum=10_000_000):
+    """Validate a running-text prefix measured in token occurrences."""
+    text = str(value).strip()
+    if not text or not text.isdecimal():
+        raise ValueError(
+            "Source prefix length must be a positive whole number.")
+    token_limit = int(text)
+    if token_limit < 1:
+        raise ValueError("Source prefix length must be at least 1 word.")
+    if token_limit > maximum:
+        raise ValueError(
+            "Source prefix length cannot exceed "
+            f"{maximum:,} token occurrences.")
+    return token_limit
+
+
 def parse_request_stagger_ms(value, *, maximum=60000):
     """Validate an optional delay between starting paid requests."""
     text = str(value).strip()
@@ -288,6 +987,8 @@ def normalise_source_options(items):
                 name=str(
                     item.get("name", item.get("title", ""))).strip(),
                 word_count=item.get("word_count"),
+                token_occurrence_count=item.get(
+                    "token_occurrence_count"),
                 section_count=item.get("section_count"),
                 source_language_key=str(
                     item.get(
@@ -305,6 +1006,10 @@ def normalise_source_options(items):
                     "name",
                     getattr(item, "title", ""))).strip(),
                 word_count=getattr(item, "word_count", None),
+                token_occurrence_count=getattr(
+                    item,
+                    "token_occurrence_count",
+                    None),
                 section_count=getattr(item, "section_count", None),
                 source_language_key=str(
                     getattr(
@@ -320,6 +1025,13 @@ def normalise_source_options(items):
                     isinstance(option.word_count, bool)
                     or not isinstance(option.word_count, int)
                     or option.word_count < 0)):
+            continue
+        if (
+                option.token_occurrence_count is not None
+                and (
+                    isinstance(option.token_occurrence_count, bool)
+                    or not isinstance(option.token_occurrence_count, int)
+                    or option.token_occurrence_count < 0)):
             continue
         if (
                 option.section_count is not None
@@ -386,12 +1098,12 @@ def format_source_estimate(estimate):
         low = None if usd_low is None else float(usd_low) * aud_per_usd
         high = None if usd_high is None else float(usd_high) * aud_per_usd
         exact = None if usd_exact is None else float(usd_exact) * aud_per_usd
-    if low is not None or high is not None:
+    if exact is not None:
+        price = f"A${float(exact):,.2f} expected"
+    elif low is not None or high is not None:
         low = float(low if low is not None else high)
         high = float(high if high is not None else low)
         price = f"A${low:,.2f}–A${high:,.2f}"
-    elif exact is not None:
-        price = f"A${float(exact):,.2f}"
     else:
         price = "Estimate unavailable"
 
@@ -400,6 +1112,56 @@ def format_source_estimate(estimate):
     input_tokens = read("input_tokens")
     output_tokens = read("output_tokens")
     details = []
+    assumptions = read("assumptions", {})
+    request_protocol = read("request_protocol")
+    reasoning_effort = read("reasoning_effort")
+    execution_mode = read("execution_mode")
+    if isinstance(assumptions, dict):
+        request_protocol = (
+            request_protocol
+            or assumptions.get("request_protocol"))
+        reasoning_effort = (
+            reasoning_effort
+            or assumptions.get("reasoning_effort"))
+        execution_mode = (
+            execution_mode
+            or assumptions.get("execution_mode"))
+    mode_details = []
+    if request_protocol:
+        mode_details.append(
+            "compact v9"
+            if request_protocol == "v9"
+            else "legacy v8")
+    if reasoning_effort:
+        mode_details.append(
+            "no reasoning"
+            if reasoning_effort == "none"
+            else f"{reasoning_effort} reasoning")
+    if execution_mode:
+        mode_details.append(
+            "Economy Batch"
+            if execution_mode == "economy"
+            else "Standard processing")
+    if mode_details:
+        details.append(" / ".join(mode_details))
+    if low is not None or high is not None:
+        range_low = float(low if low is not None else high)
+        range_high = float(high if high is not None else low)
+        details.append(
+            f"modelled range A${range_low:,.2f}–A${range_high:,.2f}")
+    prefix_limit = read("source_prefix_token_limit")
+    prefix_token_count = read("source_prefix_token_count")
+    prefix_unique_count = read("prefix_unique_candidate_count")
+    if prefix_limit is not None:
+        prefix_detail = (
+            f"first {int(prefix_token_count):,} running-word occurrences"
+            if prefix_token_count is not None
+            else f"first {int(prefix_limit):,} running-word occurrences")
+        if prefix_unique_count is not None:
+            prefix_detail += (
+                f" → {int(prefix_unique_count):,} unique candidates before "
+                "learned-word exclusions")
+        details.append(prefix_detail)
     if candidate_count is not None:
         details.append(f"{int(candidate_count):,} new words")
     if request_count is not None:
@@ -408,6 +1170,13 @@ def format_source_estimate(estimate):
         details.append(f"{int(input_tokens):,} estimated input tokens")
     if output_tokens is not None:
         details.append(f"{int(output_tokens):,} estimated output tokens")
+    cached_input = read("estimated_cached_input_tokens")
+    if cached_input:
+        details.append(
+            f"{int(cached_input):,} input tokens expected at cache-read rate")
+    pricing_label = read("pricing_label")
+    if pricing_label:
+        details.append(str(pricing_label))
     largest_input = read("largest_request_input_tokens")
     largest_output = read("largest_request_output_tokens")
     if largest_input is not None and largest_output is not None:
@@ -415,9 +1184,8 @@ def format_source_estimate(estimate):
             "largest request ≈ "
             f"{int(largest_input):,} input / "
             f"{int(largest_output):,} output tokens")
-    if details:
+    if details and execution_mode != "economy":
         details.append("automatic transient retries are not included")
-    assumptions = read("assumptions", {})
     if (
             isinstance(assumptions, dict)
             and assumptions.get("web_search_enabled")):
@@ -560,6 +1328,11 @@ class RoundedScrollbar(tk.Canvas):
         super().__init__(
             parent,
             width=width,
+            # A bare Tk Canvas requests roughly 276 px of height. Vertical
+            # scrollbars are always stretched by their geometry manager, so
+            # that default only forces otherwise compact readers and tables
+            # to become needlessly tall.
+            height=1,
             background=background,
             borderwidth=0,
             highlightthickness=0,
@@ -735,20 +1508,32 @@ class ScrollableFrame(ttk.Frame):
             return "break"
         return None
 
-    def bind_mousewheel_tree(self):
-        """Route wheel events from every child control to this viewport."""
+    def bind_mousewheel_tree(self, *, preserve_scrollable_children=False):
+        """Route wheel events from child controls to this viewport.
+
+        A page containing its own large trees or text readers can preserve
+        those widgets' native scrolling while the surrounding chrome still
+        scrolls the outer page.
+        """
         stack = [self.canvas, self.content]
         while stack:
             widget = stack.pop()
-            widget.bind(
-                "<MouseWheel>",
-                self._wheel_scroll)
-            widget.bind(
-                "<Button-4>",
-                self._wheel_scroll)
-            widget.bind(
-                "<Button-5>",
-                self._wheel_scroll)
+            preserve_widget = (
+                preserve_scrollable_children
+                and widget not in {self.canvas, self.content}
+                and isinstance(
+                    widget,
+                    (tk.Text, tk.Listbox, ttk.Treeview)))
+            if not preserve_widget:
+                widget.bind(
+                    "<MouseWheel>",
+                    self._wheel_scroll)
+                widget.bind(
+                    "<Button-4>",
+                    self._wheel_scroll)
+                widget.bind(
+                    "<Button-5>",
+                    self._wheel_scroll)
             stack.extend(widget.winfo_children())
 
 
@@ -1323,13 +2108,41 @@ class PipelineEditor:
             callback or self.app.schedule_pipeline_save)
         self.variable_traces.append((variable, trace_id))
 
+    def _concrete_source_language_key(self, settings_language_key):
+        """Resolve a shared Card Setup tab to the active language variant."""
+        active_language = self.app.get_card_setup_generation_language()
+        if active_language.model_language_key == settings_language_key:
+            return active_language.key
+        return settings_language_key
+
     def _language_values(self, source_language_key, field_key):
         return tuple(
             language.name
             for language in pipeline_store.list_response_languages()
             if not (
                 field_key == "translation"
-                and language.key == source_language_key))
+                and not pipeline_store.translation_target_allowed(
+                    source_language_key,
+                    language.key)))
+
+    def _default_field_language_key(
+            self,
+            source_language_key,
+            field_key):
+        allowed = tuple(
+            language.key
+            for language in pipeline_store.list_response_languages()
+            if (
+                field_key != "translation"
+                or pipeline_store.translation_target_allowed(
+                    source_language_key,
+                    language.key)))
+        if "english" in allowed:
+            return "english"
+        if not allowed:
+            raise ValueError(
+                "No valid response language is available for this field.")
+        return allowed[0]
 
     def _language_key_from_name(self, language_name):
         for language in pipeline_store.list_response_languages():
@@ -1358,20 +2171,25 @@ class PipelineEditor:
 
         for row, field in enumerate(
                 pipeline_store.list_field_options()):
+            concrete_source_key = self._concrete_source_language_key(
+                language.key)
             target_values = self._language_values(
-                language.key,
+                concrete_source_key,
                 field.key)
             selected_target_key = selected_by_key.get(
                 field.key,
                 remembered_by_key.get(field.key))
-            if selected_target_key == language.key and (
-                    field.key == "translation"):
+            if (
+                    selected_target_key is not None
+                    and field.key == "translation"
+                    and not pipeline_store.translation_target_allowed(
+                        concrete_source_key,
+                        selected_target_key)):
                 selected_target_key = None
             if selected_target_key is None:
-                selected_target_key = (
-                    "english"
-                    if language.key != "english" or field.key != "translation"
-                    else "french")
+                selected_target_key = self._default_field_language_key(
+                    concrete_source_key,
+                    field.key)
             selected_target_name = pipeline_store.get_language(
                 selected_target_key).name
             enabled = tk.BooleanVar(
@@ -1897,6 +2715,54 @@ class PipelineEditor:
         for language in pipeline_store.list_settings_languages():
             self._update_visibility(language.key)
 
+    def refresh_generation_language(self):
+        """Refresh translation targets after the Generate variant changes."""
+        for language in pipeline_store.list_settings_languages():
+            settings_key = language.key
+            concrete_source_key = self._concrete_source_language_key(
+                settings_key)
+            groups = [
+                (
+                    self.shared_field_language_variables[settings_key],
+                    self.shared_field_language_boxes[settings_key],
+                ),
+            ]
+            groups.extend(
+                (
+                    self.per_card_field_language_variables[
+                        settings_key][direction.key],
+                    self.per_card_field_language_boxes[
+                        settings_key][direction.key],
+                )
+                for direction in pipeline_store.list_directions())
+            for variables, boxes in groups:
+                for field in pipeline_store.list_field_options():
+                    values = self._language_values(
+                        concrete_source_key,
+                        field.key)
+                    boxes[field.key].configure(values=values)
+                    if field.key != "translation":
+                        continue
+                    selected_name = variables[field.key].get()
+                    try:
+                        selected_key = self._language_key_from_name(
+                            selected_name)
+                    except ValueError:
+                        selected_key = None
+                    if (
+                            selected_key is not None
+                            and pipeline_store.translation_target_allowed(
+                                concrete_source_key,
+                                selected_key)):
+                        continue
+                    replacement_key = self._default_field_language_key(
+                        concrete_source_key,
+                        field.key)
+                    variables[field.key].set(
+                        pipeline_store.get_language(
+                            replacement_key).name)
+            self._update_field_box_states(settings_key)
+
     def _language_changed(self, _event=None):
         language = self.get_active_language()
         if language.key == self.last_active_language_key:
@@ -1912,7 +2778,7 @@ class PipelineEditor:
         return language
 
     def to_config(self):
-        active_language = self.app.get_generation_language()
+        active_language = self.app.get_card_setup_generation_language()
         all_settings = []
         for language in pipeline_store.list_settings_languages():
             shared_fields = self._fields_from_controls(
@@ -2029,6 +2895,7 @@ class AutoAnkiApp:
             source_jobs_loader=None,
             source_retry_callback=None,
             source_inspect_callback=None,
+            source_validation_accept_callback=None,
             source_anki_options_loader=None,
             source_preview_loader=None,
             manual_input_filter_callback=None,
@@ -2060,6 +2927,8 @@ class AutoAnkiApp:
         self.source_jobs_loader = source_jobs_loader
         self.source_retry_callback = source_retry_callback
         self.source_inspect_callback = source_inspect_callback
+        self.source_validation_accept_callback = (
+            source_validation_accept_callback)
         self.source_anki_options_loader = source_anki_options_loader
         self.source_preview_loader = source_preview_loader
         self.manual_input_filter_callback = manual_input_filter_callback
@@ -2478,6 +3347,26 @@ class AutoAnkiApp:
             foreground=self.TEXT_SECONDARY,
             font=("DejaVu Sans", 9))
         style.configure(
+            "ValidationError.TLabel",
+            background=self.PANEL_BACKGROUND,
+            foreground=self.ERROR,
+            font=("DejaVu Sans", 9, "bold"))
+        style.configure(
+            "ValidationSafe.TLabel",
+            background=self.PANEL_BACKGROUND,
+            foreground=self.ACCENT,
+            font=("DejaVu Sans", 9, "bold"))
+        style.configure(
+            "ValidationDialogError.TLabel",
+            background=self.WINDOW_BACKGROUND,
+            foreground=self.ERROR,
+            font=("DejaVu Sans", 9, "bold"))
+        style.configure(
+            "ValidationDialogSafe.TLabel",
+            background=self.WINDOW_BACKGROUND,
+            foreground=self.ACCENT,
+            font=("DejaVu Sans", 9, "bold"))
+        style.configure(
             "Status.TLabel",
             background=self.WINDOW_BACKGROUND,
             foreground=self.TEXT_SECONDARY,
@@ -2747,6 +3636,28 @@ class AutoAnkiApp:
             padding=(8, 7))
         style.map(
             "Jobs.Treeview.Heading",
+            background=[("active", "#DDEBE7")])
+        style.configure(
+            "ValidationProblems.Treeview",
+            background=self.PANEL_BACKGROUND,
+            fieldbackground=self.PANEL_BACKGROUND,
+            foreground=self.TEXT_PRIMARY,
+            rowheight=34,
+            borderwidth=0,
+            font=("DejaVu Sans", 9))
+        style.map(
+            "ValidationProblems.Treeview",
+            background=[("selected", "#D7E9E5")],
+            foreground=[("selected", self.TEXT_PRIMARY)])
+        style.configure(
+            "ValidationProblems.Treeview.Heading",
+            background=self.PALE,
+            foreground=self.TEXT_PRIMARY,
+            relief=tk.FLAT,
+            font=("DejaVu Sans", 9, "bold"),
+            padding=(8, 7))
+        style.map(
+            "ValidationProblems.Treeview.Heading",
             background=[("active", "#DDEBE7")])
         style.configure(
             "TNotebook",
@@ -3174,9 +4085,18 @@ class AutoAnkiApp:
         self.source_selected_label = tk.StringVar()
         self.source_language_label = tk.StringVar()
         self.source_chunk_size = tk.StringVar(value="30")
+        self.source_limit_to_prefix = tk.BooleanVar(value=False)
+        self.source_prefix_token_limit = tk.StringVar(value="100")
         self.source_concurrency = tk.StringVar(value="8")
         self.source_request_stagger_ms = tk.StringVar(value="100")
         self.source_allow_web_search = tk.BooleanVar(value=False)
+        self.source_use_source_examples = tk.BooleanVar(value=False)
+        self.source_request_protocol_label = tk.StringVar(
+            value=SOURCE_PROTOCOL_OPTIONS[0][1])
+        self.source_reasoning_label = tk.StringVar(
+            value=SOURCE_REASONING_OPTIONS[0][1])
+        self.source_execution_label = tk.StringVar(
+            value=SOURCE_EXECUTION_OPTIONS[0][1])
         self.source_context_label = tk.StringVar(
             value=SOURCE_CONTEXT_LABELS["sentence"])
         self.source_context_description = tk.StringVar()
@@ -3400,7 +4320,7 @@ class AutoAnkiApp:
             sticky="ew")
         self.source_language_selector.bind(
             "<<ComboboxSelected>>",
-            lambda _event: self._schedule_source_estimate(),
+            self._source_language_changed,
             add="+")
         self.source_language_selector.bind(
             "<FocusOut>",
@@ -3449,11 +4369,92 @@ class AutoAnkiApp:
                 sticky="w",
                 pady=(7, 14))
 
+        self.source_use_source_examples_check = ttk.Checkbutton(
+            config,
+            text="Use source for example sentences",
+            variable=self.source_use_source_examples,
+            command=self._source_example_setting_changed,
+            style="Panel.TCheckbutton")
+        self.source_use_source_examples_check.grid(
+            row=5,
+            column=0,
+            columnspan=3,
+            sticky="w")
+        ttk.Label(
+            config,
+            text=(
+                "For each word's contextual sense, use the exact selected "
+                "source passage as its sole example. Other common, disjoint "
+                "senses still receive four generated examples."
+            ),
+            style="Muted.TLabel",
+            wraplength=950).grid(
+                row=6,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(5, 14))
+
+        prefix_controls = ttk.Frame(
+            config,
+            style="Panel.TFrame")
+        prefix_controls.grid(
+            row=7,
+            column=0,
+            columnspan=3,
+            sticky="ew")
+        self.source_limit_to_prefix_check = ttk.Checkbutton(
+            prefix_controls,
+            text="Generate only from the first",
+            variable=self.source_limit_to_prefix,
+            command=self._source_prefix_setting_changed,
+            style="Panel.TCheckbutton")
+        self.source_limit_to_prefix_check.grid(
+            row=0,
+            column=0,
+            sticky="w")
+        self.source_prefix_token_entry = ttk.Entry(
+            prefix_controls,
+            textvariable=self.source_prefix_token_limit,
+            width=10,
+            style="App.TEntry")
+        self.source_prefix_token_entry.grid(
+            row=0,
+            column=1,
+            sticky="w",
+            padx=(8, 8))
+        self.source_prefix_token_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        ttk.Label(
+            prefix_controls,
+            text="token occurrences (running words) of the source",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=2,
+                sticky="w")
+        ttk.Label(
+            config,
+            text=(
+                "This is a true text prefix, including repeated words. "
+                "AutoAnki then deduplicates the vocabulary first encountered "
+                "inside that prefix, so 100 running words may produce fewer "
+                "than 100 cards."
+            ),
+            style="Muted.TLabel",
+            wraplength=950).grid(
+                row=8,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(5, 14))
+
         ttk.Label(
             config,
             text="WORDS PER OPENAI REQUEST",
             style="FieldLabel.TLabel").grid(
-                row=5,
+                row=9,
                 column=0,
                 sticky="w",
                 padx=(0, 12))
@@ -3463,7 +4464,7 @@ class AutoAnkiApp:
             width=14,
             style="App.TEntry")
         self.source_chunk_entry.grid(
-            row=5,
+            row=9,
             column=1,
             sticky="w")
         self.source_chunk_entry.bind(
@@ -3478,16 +4479,96 @@ class AutoAnkiApp:
             ),
             style="Muted.TLabel",
             wraplength=570).grid(
-                row=5,
+                row=9,
                 column=2,
                 sticky="w",
                 padx=(12, 0))
+
+        mode_controls = ttk.Frame(
+            config,
+            style="Panel.TFrame")
+        mode_controls.grid(
+            row=10,
+            column=0,
+            columnspan=3,
+            sticky="ew",
+            pady=(14, 0))
+        for column in range(3):
+            mode_controls.columnconfigure(column, weight=1)
+        for column, (heading, variable, values, callback) in enumerate((
+                (
+                    "REQUEST PROTOCOL",
+                    self.source_request_protocol_label,
+                    tuple(label for _key, label in SOURCE_PROTOCOL_OPTIONS),
+                    self._source_protocol_changed,
+                ),
+                (
+                    "REASONING",
+                    self.source_reasoning_label,
+                    tuple(label for _key, label in SOURCE_REASONING_OPTIONS),
+                    self._source_reasoning_changed,
+                ),
+                (
+                    "PROCESSING",
+                    self.source_execution_label,
+                    tuple(label for _key, label in SOURCE_EXECUTION_OPTIONS),
+                    self._source_execution_mode_changed,
+                ),
+        )):
+            ttk.Label(
+                mode_controls,
+                text=heading,
+                style="FieldLabel.TLabel").grid(
+                    row=0,
+                    column=column,
+                    sticky="w",
+                    padx=(0 if column == 0 else 16, 8))
+            selector = ttk.Combobox(
+                mode_controls,
+                textvariable=variable,
+                values=values,
+                state="readonly",
+                style="App.TCombobox",
+                width=29)
+            selector.grid(
+                row=1,
+                column=column,
+                sticky="ew",
+                padx=(0 if column == 0 else 16, 0),
+                pady=(4, 0))
+            selector.bind(
+                "<<ComboboxSelected>>",
+                callback,
+                add="+")
+            selector.bind(
+                "<FocusOut>",
+                self._clear_entry_selection,
+                add="+")
+            if heading == "REASONING":
+                self.source_reasoning_selector = selector
+
+        ttk.Label(
+            config,
+            text=(
+                "Compact v9 keeps strict JSON and performs exact rank and "
+                "content validation locally. Legacy v8 is retained as a "
+                "one-click rollback. Economy submits an asynchronous OpenAI "
+                "Batch at half token pricing; it can take up to 24 hours and "
+                "is collected from Jobs & Failures."
+            ),
+            style="Muted.TLabel",
+            wraplength=950).grid(
+                row=11,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(7, 0))
 
         rate_controls = ttk.Frame(
             config,
             style="Panel.TFrame")
         rate_controls.grid(
-            row=6,
+            row=12,
             column=0,
             columnspan=3,
             sticky="ew",
@@ -3513,6 +4594,7 @@ class AutoAnkiApp:
             "<FocusOut>",
             self._clear_entry_selection,
             add="+")
+        self.source_concurrency_entry = concurrency_entry
         ttk.Label(
             rate_controls,
             text="MINIMUM START STAGGER (MS)",
@@ -3534,7 +4616,8 @@ class AutoAnkiApp:
             "<FocusOut>",
             self._clear_entry_selection,
             add="+")
-        ttk.Label(
+        self.source_stagger_entry = stagger_entry
+        self.source_rate_notice_label = ttk.Label(
             config,
             text=(
                 "The default starts eight workers, with requests launched no "
@@ -3545,8 +4628,9 @@ class AutoAnkiApp:
                 "included in the estimate."
             ),
             style="Muted.TLabel",
-            wraplength=950).grid(
-                row=7,
+            wraplength=950)
+        self.source_rate_notice_label.grid(
+                row=13,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -3560,7 +4644,7 @@ class AutoAnkiApp:
             variable=self.source_allow_web_search,
             command=self._schedule_source_estimate,
             style="Panel.TCheckbutton").grid(
-                row=8,
+                row=14,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -3574,7 +4658,7 @@ class AutoAnkiApp:
             ),
             style="Muted.TLabel",
             wraplength=950).grid(
-                row=9,
+                row=15,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -3698,11 +4782,15 @@ class AutoAnkiApp:
         for variable in (
                 self.source_language_label,
                 self.source_chunk_size,
+                self.source_prefix_token_limit,
                 self.source_concurrency,
                 self.source_request_stagger_ms):
             variable.trace_add(
                 "write",
                 self._schedule_source_estimate)
+        self._sync_source_prefix_control()
+        self._source_protocol_changed()
+        self._source_execution_mode_changed()
         viewport.bind_mousewheel_tree()
 
     def _build_source_preview_page(self):
@@ -4173,7 +5261,9 @@ class AutoAnkiApp:
             form,
             text=(
                 "GPU support is opportunistic: preparation falls back to "
-                "the CPU rather than failing when CUDA is unavailable."
+                "the CPU rather than failing when CUDA is unavailable. "
+                "The GPU option applies to Classical Chinese; Middle and "
+                "Old English use the built-in CPU tokenizer."
             ),
             style="Muted.TLabel",
             wraplength=920).grid(
@@ -4441,15 +5531,17 @@ class AutoAnkiApp:
     def _build_source_jobs_page(self):
         page = self.source_jobs_page
         page.columnconfigure(0, weight=1)
-        page.rowconfigure(1, weight=3)
-        page.rowconfigure(3, weight=2)
+        page.rowconfigure(1, weight=5, minsize=360)
+        page.rowconfigure(3, weight=4, minsize=220)
         self._source_header(
             page,
             "REQUEST JOBS AND FAILURES",
             (
-                "Completed chunks are retained. Connection failures may be "
-                "recovered automatically by the backend; invalid responses "
-                "remain stopped until you inspect and explicitly retry them."
+                "Each expandable Job heading is one deck-generation run. "
+                "Inside it, OpenAI request chunks appear in order and the "
+                "Deck packaging/import stage appears last. Completed chunks "
+                "are retained; invalid responses remain stopped until you "
+                "inspect and explicitly retry them."
             ))
 
         table_surface = RoundedPanel(
@@ -4467,45 +5559,37 @@ class AutoAnkiApp:
         table = table_surface.interior
         table.columnconfigure(0, weight=1)
         table.rowconfigure(0, weight=1)
-        columns = (
-            "source",
-            "chunk",
-            "worker",
-            "status",
-            "attempts",
-            "detail",
-        )
+        columns = SOURCE_JOB_COLUMNS
         self.source_jobs_tree = ttk.Treeview(
             table,
             columns=columns,
-            show="headings",
+            show=("tree", "headings"),
             selectmode="extended",
+            height=SOURCE_JOBS_TREE_VISIBLE_ROWS,
             style="Jobs.Treeview")
-        headings = {
-            "source": "Source",
-            "chunk": "Chunk",
-            "worker": "Worker",
-            "status": "Status",
-            "attempts": "Attempts",
-            "detail": "Latest detail",
-        }
-        widths = {
-            "source": 230,
-            "chunk": 105,
-            "worker": 90,
-            "status": 125,
-            "attempts": 75,
-            "detail": 520,
-        }
+        self.source_jobs_tree.heading(
+            "#0",
+            text=SOURCE_JOB_HEADINGS["job"])
+        self.source_jobs_tree.column(
+            "#0",
+            width=180,
+            minwidth=90,
+            stretch=False)
         for column in columns:
             self.source_jobs_tree.heading(
                 column,
-                text=headings[column])
+                text=SOURCE_JOB_HEADINGS[column])
             self.source_jobs_tree.column(
                 column,
-                width=widths[column],
-                minwidth=60,
-                stretch=column in {"source", "detail"})
+                width=(
+                    SOURCE_JOB_DETAIL_MIN_WIDTH
+                    if column == "detail"
+                    else 100),
+                minwidth=(
+                    SOURCE_JOB_DETAIL_MIN_WIDTH
+                    if column == "detail"
+                    else 60),
+                stretch=column == "detail")
         jobs_scrollbar = RoundedScrollbar(
             table,
             command=self.source_jobs_tree.yview,
@@ -4525,13 +5609,114 @@ class AutoAnkiApp:
         self.source_jobs_tree.tag_configure(
             "failed",
             foreground=self.ERROR)
+        for failed_status in (
+                "cancelled",
+                "connection_failed",
+                "invalid",
+                "invalid_response"):
+            self.source_jobs_tree.tag_configure(
+                failed_status,
+                foreground=self.ERROR)
         self.source_jobs_tree.tag_configure(
             "running",
             foreground=self.WARNING)
         self.source_jobs_tree.tag_configure(
             "completed",
             foreground=self.ACCENT)
+        self.source_jobs_tree.tag_configure(
+            "succeeded",
+            foreground=self.ACCENT)
+        self.source_jobs_tree.tag_configure(
+            "validation_error",
+            foreground=self.ERROR,
+            font=("DejaVu Sans", 9, "bold"))
+        self.source_jobs_tree.tag_configure(
+            "job_group",
+            background=self.PALE,
+            foreground=self.TEXT_PRIMARY,
+            font=("DejaVu Sans", 9, "bold"))
+        self.source_jobs_tree.tag_configure(
+            "job_even",
+            background=self.PANEL_BACKGROUND)
+        self.source_jobs_tree.tag_configure(
+            "job_odd",
+            background="#F7F8F6")
+        self.source_jobs_tree.bind(
+            "<<TreeviewSelect>>",
+            self._source_job_selection_changed,
+            add="+")
+        self.source_jobs_tree.bind(
+            "<Configure>",
+            self._resize_source_job_columns,
+            add="+")
         self.source_job_by_tree_id = {}
+        self.source_job_display_rows = ()
+
+        latest_detail = ttk.Frame(table, style="Panel.TFrame")
+        latest_detail.grid(
+            row=1,
+            column=0,
+            columnspan=2,
+            sticky="ew",
+            pady=(8, 0))
+        latest_detail.columnconfigure(0, weight=1)
+        latest_detail.rowconfigure(1, weight=1)
+        self.source_latest_detail_heading = tk.StringVar(
+            value="FULL LATEST DETAIL")
+        self.source_latest_detail = tk.StringVar(
+            value=(
+                "Select one request chunk or Deck stage above to read its "
+                "complete latest detail here."
+            ))
+        ttk.Label(
+            latest_detail,
+            textvariable=self.source_latest_detail_heading,
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w")
+        self.source_latest_detail_text = tk.Text(
+            latest_detail,
+            height=3,
+            wrap=tk.WORD,
+            font=("DejaVu Sans", 9),
+            background=self.PANEL_BACKGROUND,
+            foreground=self.TEXT_SECONDARY,
+            selectbackground="#D7E9E5",
+            selectforeground=self.TEXT_PRIMARY,
+            relief=tk.FLAT,
+            borderwidth=0,
+            highlightthickness=0,
+            padx=0,
+            pady=3,
+            state=tk.DISABLED)
+        latest_detail_scrollbar = RoundedScrollbar(
+            latest_detail,
+            command=self.source_latest_detail_text.yview,
+            background=self.PANEL_BACKGROUND,
+            active=self.ACCENT)
+        self.source_latest_detail_text.configure(
+            yscrollcommand=latest_detail_scrollbar.set)
+        self.source_latest_detail_text.grid(
+            row=1,
+            column=0,
+            sticky="nsew",
+            pady=(3, 0))
+        latest_detail_scrollbar.grid(
+            row=1,
+            column=1,
+            sticky="ns",
+            padx=(6, 0),
+            pady=(3, 0))
+        self.source_latest_detail_text.configure(state=tk.NORMAL)
+        self.source_latest_detail_text.insert(
+            "1.0",
+            self.source_latest_detail.get())
+        self.source_latest_detail_text.configure(state=tk.DISABLED)
+        self.source_latest_detail_text.bind(
+            "<FocusOut>",
+            self._clear_text_selection,
+            add="+")
 
         actions = ttk.Frame(page, style="App.TFrame")
         actions.grid(
@@ -4539,66 +5724,80 @@ class AutoAnkiApp:
             column=0,
             sticky="ew",
             pady=(10, 0))
-        actions.columnconfigure(4, weight=1)
+        action_buttons = ttk.Frame(actions, style="App.TFrame")
+        action_buttons.grid(row=0, column=0, sticky="w")
         ttk.Button(
-            actions,
+            action_buttons,
             text="Refresh",
             command=self._refresh_source_jobs,
-            style="Secondary.TButton",
+            style="CompactSecondary.TButton",
             cursor="hand2").grid(
                 row=0,
                 column=0,
                 sticky="w")
         self.source_inspect_button = ttk.Button(
-            actions,
-            text="Inspect selected",
+            action_buttons,
+            text="Inspect selected stage",
             command=self._inspect_selected_source_job,
-            style="Secondary.TButton",
+            style="CompactSecondary.TButton",
             cursor="hand2")
         self.source_inspect_button.grid(
             row=0,
             column=1,
             sticky="w",
             padx=(8, 0))
+        self.source_view_problems_button = ttk.Button(
+            action_buttons,
+            text="View problems…",
+            command=self._open_selected_source_problems,
+            state=tk.DISABLED,
+            style="CompactSecondary.TButton",
+            cursor="hand2")
+        self.source_view_problems_button.grid(
+            row=0,
+            column=2,
+            sticky="w",
+            padx=(8, 0))
         self.source_retry_selected_button = ttk.Button(
-            actions,
-            text="Retry selected…",
+            action_buttons,
+            text="Resume / retry selected…",
             command=self._retry_selected_source_jobs,
             state=(
                 tk.NORMAL
                 if self.source_retry_callback is not None
                 else tk.DISABLED),
-            style="Secondary.TButton",
+            style="CompactSecondary.TButton",
             cursor="hand2")
         self.source_retry_selected_button.grid(
             row=0,
-            column=2,
+            column=3,
             sticky="w",
             padx=(8, 0))
         self.source_retry_all_button = ttk.Button(
-            actions,
-            text="Retry all failed…",
+            action_buttons,
+            text="Resume / retry all incomplete…",
             command=self._retry_all_source_jobs,
             state=(
                 tk.NORMAL
                 if self.source_retry_callback is not None
                 else tk.DISABLED),
-            style="Secondary.TButton",
+            style="CompactSecondary.TButton",
             cursor="hand2")
         self.source_retry_all_button.grid(
             row=0,
-            column=3,
+            column=4,
             sticky="w",
             padx=(8, 0))
         ttk.Label(
             actions,
             textvariable=self.source_action_status,
             style="Status.TLabel",
-            wraplength=470).grid(
-                row=0,
-                column=4,
-                sticky="e",
-                padx=(12, 0))
+            justify=tk.LEFT,
+            wraplength=1050).grid(
+                row=1,
+                column=0,
+                sticky="ew",
+                pady=(5, 0))
 
         inspect_surface = RoundedPanel(
             page,
@@ -4614,19 +5813,82 @@ class AutoAnkiApp:
             pady=(10, 0))
         inspect_panel = inspect_surface.interior
         inspect_panel.columnconfigure(0, weight=1)
-        inspect_panel.rowconfigure(1, weight=1)
+        inspect_panel.rowconfigure(2, weight=1)
         ttk.Label(
             inspect_panel,
-            text="INSPECTED REQUEST / RESPONSE",
+            text="INSPECT ONE SAVED STAGE",
             style="FieldLabel.TLabel").grid(
                 row=0,
                 column=0,
                 sticky="w",
                 padx=7,
-                pady=(4, 5))
-        self.source_job_inspection = tk.Text(
+                pady=(4, 3))
+        self.source_inspection_scope = tk.StringVar(
+            value=(
+                "Select one request chunk or Deck stage above. The two tabs "
+                "will show what went in and what came back."
+            ))
+        ttk.Label(
             inspect_panel,
-            height=8,
+            textvariable=self.source_inspection_scope,
+            style="Muted.TLabel",
+            wraplength=1100).grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=7,
+            pady=(0, 5))
+
+        self.source_job_inspection_notebook = ttk.Notebook(inspect_panel)
+        self.source_job_inspection_notebook.grid(
+            row=2,
+            column=0,
+            sticky="nsew")
+        request_tab = ttk.Frame(
+            self.source_job_inspection_notebook,
+            style="Panel.TFrame")
+        response_tab = ttk.Frame(
+            self.source_job_inspection_notebook,
+            style="Panel.TFrame")
+        self.source_job_inspection_notebook.add(
+            request_tab,
+            text="Request · what went in")
+        self.source_job_inspection_notebook.add(
+            response_tab,
+            text="Response · what came back")
+        self.source_job_request_inspection = self._build_source_job_text_tab(
+            request_tab,
+            (
+                "One saved chunk only: its vocabulary/context input and the "
+                "OpenAI response rules used for that request."
+            ))
+        self.source_job_response_inspection = self._build_source_job_text_tab(
+            response_tab,
+            (
+                "Every saved attempt for this chunk. “raw_text” is the model "
+                "reply; “error” records why AutoAnki rejected an attempt; "
+                "“validated” is an accepted result."
+            ))
+        # Preserve the old attribute for small integrations that customize the
+        # inspection widget. It now refers to the response tab.
+        self.source_job_inspection = self.source_job_response_inspection
+
+    def _build_source_job_text_tab(self, tab, explanation):
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(1, weight=1)
+        ttk.Label(
+            tab,
+            text=explanation,
+            style="Muted.TLabel",
+            wraplength=1050).grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=8,
+            pady=(7, 2))
+        text = tk.Text(
+            tab,
+            height=SOURCE_JOB_INSPECTION_VISIBLE_LINES,
             wrap=tk.WORD,
             font=("DejaVu Sans Mono", 9),
             background=self.PANEL_BACKGROUND,
@@ -4639,25 +5901,93 @@ class AutoAnkiApp:
             padx=8,
             pady=6,
             state=tk.DISABLED)
-        inspect_scrollbar = RoundedScrollbar(
-            inspect_panel,
-            command=self.source_job_inspection.yview,
+        scrollbar = RoundedScrollbar(
+            tab,
+            command=text.yview,
             background=self.PANEL_BACKGROUND,
             active=self.ACCENT)
-        self.source_job_inspection.configure(
-            yscrollcommand=inspect_scrollbar.set)
-        self.source_job_inspection.grid(
+        text.configure(yscrollcommand=scrollbar.set)
+        text.grid(
             row=1,
             column=0,
             sticky="nsew")
-        inspect_scrollbar.grid(
+        scrollbar.grid(
             row=1,
             column=1,
             sticky="ns")
-        self.source_job_inspection.bind(
+        text.bind(
             "<FocusOut>",
             self._clear_text_selection,
             add="+")
+        text.configure(state=tk.NORMAL)
+        text.insert(
+            "1.0",
+            "Select one stage above, then choose “Inspect selected stage”.")
+        text.configure(state=tk.DISABLED)
+        return text
+
+    def _set_source_latest_detail(
+            self,
+            text,
+            *,
+            validation_error=False):
+        self.source_latest_detail.set(text)
+        if not hasattr(self, "source_latest_detail_text"):
+            return
+        self._replace_readonly_text(
+            self.source_latest_detail_text,
+            text)
+        self.source_latest_detail_text.configure(
+            foreground=(
+                self.ERROR
+                if validation_error
+                else self.TEXT_SECONDARY))
+
+    def _resize_source_job_columns(self, event=None):
+        if not hasattr(self, "source_jobs_tree"):
+            return
+        available_width = (
+            event.width
+            if event is not None
+            else self.source_jobs_tree.winfo_width())
+        style = ttk.Style(self.root)
+        body_font = style.lookup(
+            "Jobs.Treeview",
+            "font") or ("DejaVu Sans", 9)
+        heading_font = style.lookup(
+            "Jobs.Treeview.Heading",
+            "font") or ("DejaVu Sans", 9, "bold")
+
+        def measure(value):
+            text = str(value)
+            return max(
+                int(self.root.tk.call(
+                    "font",
+                    "measure",
+                    body_font,
+                    text)),
+                int(self.root.tk.call(
+                    "font",
+                    "measure",
+                    heading_font,
+                    text)))
+
+        widths = source_job_column_widths(
+            self.source_job_display_rows,
+            measure,
+            max(1, available_width))
+        self.source_jobs_tree.column(
+            "#0",
+            width=widths["job"],
+            minwidth=40,
+            stretch=False)
+        for column in SOURCE_JOB_COLUMNS:
+            width = widths[column]
+            self.source_jobs_tree.column(
+                column,
+                width=width,
+                minwidth=40,
+                stretch=False)
 
     def _source_preview_request(self, offset=0):
         option = self._selected_source_option()
@@ -5011,6 +6341,10 @@ class AutoAnkiApp:
             if option.word_count is not None:
                 summary.append(
                     f"{option.word_count:,} unique candidate words")
+            if option.token_occurrence_count is not None:
+                summary.append(
+                    f"{option.token_occurrence_count:,} running-word "
+                    "occurrences")
             if option.section_count is not None:
                 summary.append(
                     f"{option.section_count:,} source sections")
@@ -5031,6 +6365,14 @@ class AutoAnkiApp:
                 "The source changed. Load a page to inspect it.")
         self.source_paid_authorized.set(False)
         self.source_zero_notice_shown = False
+        self._refresh_card_setup_generation_context()
+        self._sync_learned_filter_controls()
+        self._schedule_source_estimate()
+
+    def _source_language_changed(self, _event=None):
+        self.source_paid_authorized.set(False)
+        self.source_zero_notice_shown = False
+        self._refresh_card_setup_generation_context()
         self._sync_learned_filter_controls()
         self._schedule_source_estimate()
 
@@ -5039,12 +6381,122 @@ class AutoAnkiApp:
         self.source_paid_authorized.set(False)
         self._schedule_source_estimate()
 
+    def _source_protocol_changed(self, _event=None):
+        protocol = SOURCE_PROTOCOL_KEYS_BY_LABEL.get(
+            self.source_request_protocol_label.get())
+        if protocol == "v8":
+            self.source_reasoning_label.set(
+                dict(SOURCE_REASONING_OPTIONS)["low"])
+            if hasattr(self, "source_reasoning_selector"):
+                self.source_reasoning_selector.configure(
+                    state=tk.DISABLED)
+        else:
+            self.source_reasoning_label.set(
+                dict(SOURCE_REASONING_OPTIONS)["none"])
+            if hasattr(self, "source_reasoning_selector"):
+                self.source_reasoning_selector.configure(
+                    state="readonly")
+        self.source_paid_authorized.set(False)
+        self._schedule_source_estimate()
+
+    def _source_reasoning_changed(self, _event=None):
+        self.source_paid_authorized.set(False)
+        self._schedule_source_estimate()
+
+    def _source_execution_mode_changed(self, _event=None):
+        mode = SOURCE_EXECUTION_KEYS_BY_LABEL.get(
+            self.source_execution_label.get())
+        economy = mode == "economy"
+        entry_state = tk.DISABLED if economy else tk.NORMAL
+        if hasattr(self, "source_concurrency_entry"):
+            self.source_concurrency_entry.configure(state=entry_state)
+        if hasattr(self, "source_stagger_entry"):
+            self.source_stagger_entry.configure(state=entry_state)
+        if hasattr(self, "source_rate_notice_label"):
+            self.source_rate_notice_label.configure(
+                text=(
+                    "Economy sends one asynchronous Batch file. Parallel "
+                    "workers, staggering, and automatic live-request retries "
+                    "do not apply; resume the saved job later to collect its "
+                    "results without resubmitting completed work."
+                    if economy
+                    else (
+                        "The default starts eight workers, with requests "
+                        "launched no faster than the stagger permits. Account "
+                        "limits vary; the coordinator observes OpenAI "
+                        "rate-limit responses and backs off automatically. "
+                        "Connection/time-out, HTTP 429, and HTTP 5xx failures "
+                        "may retry without asking; retry costs are not "
+                        "included in the estimate."
+                    )))
+        if hasattr(self, "source_generate_button"):
+            self.source_generate_button.configure(
+                text=(
+                    "Submit Economy Batch"
+                    if economy
+                    else "Generate and import source deck"))
+        self.source_paid_authorized.set(False)
+        self._schedule_source_estimate()
+
+    def _source_example_setting_changed(self):
+        self.source_paid_authorized.set(False)
+        self._schedule_source_estimate()
+
+    def _source_prefix_setting_changed(self):
+        """Apply the prefix toggle and invalidate the paid estimate."""
+        self._sync_source_prefix_control()
+        self.source_paid_authorized.set(False)
+        self.source_zero_notice_shown = False
+        self._schedule_source_estimate()
+
+    def _sync_source_prefix_control(self):
+        """Enable prefix length entry only when the prefix option is active."""
+        variable = getattr(self, "source_limit_to_prefix", None)
+        entry = getattr(self, "source_prefix_token_entry", None)
+        if entry is None:
+            return
+        enabled = bool(
+            variable.get()
+            if variable is not None and hasattr(variable, "get")
+            else False)
+        entry.configure(state=tk.NORMAL if enabled else tk.DISABLED)
+
     def _update_source_context_description(self):
         key = SOURCE_CONTEXT_KEYS_BY_LABEL.get(
             self.source_context_label.get(),
             "sentence")
         self.source_context_description.set(
             SOURCE_CONTEXT_DESCRIPTIONS[key])
+        self._sync_source_example_control()
+
+    def _sync_source_example_control(self):
+        source_example_variable = getattr(
+            self,
+            "source_use_source_examples",
+            None)
+        source_example_check = getattr(
+            self,
+            "source_use_source_examples_check",
+            None)
+        context_key = SOURCE_CONTEXT_KEYS_BY_LABEL.get(
+            self.source_context_label.get(),
+            "sentence")
+        enabled = context_key != "none"
+        if enabled and getattr(self, "pipeline_rows", None):
+            try:
+                pipelines = self.get_pipeline_configs()
+            except (OSError, ValueError):
+                pipelines = ()
+            enabled = bool(
+                pipelines
+                and pipeline_store.requires_sentences(pipelines[0]))
+        if not enabled:
+            if source_example_variable is not None:
+                source_example_variable.set(False)
+            if source_example_check is not None:
+                source_example_check.configure(state=tk.DISABLED)
+        elif source_example_check is not None:
+            source_example_check.configure(state=tk.NORMAL)
 
     def _manual_filter_changed(self):
         language_key = self.get_generation_language().key
@@ -5641,15 +7093,88 @@ class AutoAnkiApp:
         option = self._selected_source_option()
         chunk_size = parse_source_chunk_size(
             self.source_chunk_size.get())
-        concurrency = parse_source_chunk_size(
-            self.source_concurrency.get(),
-            maximum=64)
-        request_stagger_ms = parse_request_stagger_ms(
-            self.source_request_stagger_ms.get())
+        execution_variable = getattr(
+            self,
+            "source_execution_label",
+            None)
+        execution_label = (
+            execution_variable.get()
+            if hasattr(execution_variable, "get")
+            else dict(SOURCE_EXECUTION_OPTIONS)["standard"])
+        execution_mode = SOURCE_EXECUTION_KEYS_BY_LABEL.get(
+            execution_label)
+        if execution_mode is None:
+            raise ValueError("Select Standard or Economy processing.")
+        if execution_mode == "economy":
+            concurrency = 1
+            request_stagger_ms = 0
+        else:
+            concurrency = parse_source_chunk_size(
+                self.source_concurrency.get(),
+                maximum=64)
+            request_stagger_ms = parse_request_stagger_ms(
+                self.source_request_stagger_ms.get())
         context_mode = SOURCE_CONTEXT_KEYS_BY_LABEL.get(
             self.source_context_label.get())
         if context_mode is None:
             raise ValueError("Select a source context option.")
+        use_source_examples_variable = getattr(
+            self,
+            "source_use_source_examples",
+            None)
+        use_source_examples = bool(
+            use_source_examples_variable.get()
+            if hasattr(use_source_examples_variable, "get")
+            else False)
+        if use_source_examples and context_mode == "none":
+            raise ValueError(
+                "Using source text for example sentences requires source "
+                "context.")
+        protocol_variable = getattr(
+            self,
+            "source_request_protocol_label",
+            None)
+        protocol_label = (
+            protocol_variable.get()
+            if hasattr(protocol_variable, "get")
+            else dict(SOURCE_PROTOCOL_OPTIONS)["v9"])
+        request_protocol = SOURCE_PROTOCOL_KEYS_BY_LABEL.get(
+            protocol_label)
+        if request_protocol is None:
+            raise ValueError("Select a source request protocol.")
+        reasoning_variable = getattr(
+            self,
+            "source_reasoning_label",
+            None)
+        reasoning_label = (
+            reasoning_variable.get()
+            if hasattr(reasoning_variable, "get")
+            else dict(SOURCE_REASONING_OPTIONS)["none"])
+        reasoning_effort = SOURCE_REASONING_KEYS_BY_LABEL.get(
+            reasoning_label)
+        if reasoning_effort is None:
+            raise ValueError("Select a source reasoning effort.")
+        if request_protocol == "v8":
+            reasoning_effort = "low"
+        source_prefix_token_limit = None
+        prefix_enabled_variable = getattr(
+            self,
+            "source_limit_to_prefix",
+            None)
+        prefix_enabled = bool(
+            prefix_enabled_variable.get()
+            if hasattr(prefix_enabled_variable, "get")
+            else False)
+        if prefix_enabled:
+            prefix_limit_variable = getattr(
+                self,
+                "source_prefix_token_limit",
+                None)
+            if not hasattr(prefix_limit_variable, "get"):
+                raise ValueError(
+                    "Enter the number of running source words to include.")
+            source_prefix_token_limit = parse_source_prefix_token_limit(
+                prefix_limit_variable.get())
         selected_language_key = option.source_language_key
         language_variable = getattr(self, "source_language_label", None)
         if language_variable is not None:
@@ -5687,10 +7212,14 @@ class AutoAnkiApp:
             "source_name": option.name,
             "source_language_key": selected_language_key,
             "chunk_size": chunk_size,
+            "source_prefix_token_limit": source_prefix_token_limit,
             "context_mode": context_mode,
             "concurrency": concurrency,
             "request_stagger_ms": request_stagger_ms,
             "max_transient_retries": 3,
+            "request_protocol": request_protocol,
+            "reasoning_effort": reasoning_effort,
+            "execution_mode": execution_mode,
             "allow_web_search": bool(
                 getattr(
                     self,
@@ -5700,6 +7229,7 @@ class AutoAnkiApp:
                     getattr(self, "source_allow_web_search", None),
                     "get")
                 else False),
+            "use_source_for_example_sentences": use_source_examples,
             "pipeline": pipelines[0] if pipelines else None,
             "pipelines": pipelines,
             "anki_exclusions": exclusions,
@@ -5801,6 +7331,18 @@ class AutoAnkiApp:
         else:
             self.source_estimate_result = value
             price, detail = format_source_estimate(value)
+            source_examples_enabled = bool(
+                self.source_use_source_examples.get())
+            detail += (
+                "\nExample-sentence mode: "
+                + (
+                    "EXACT SOURCE PASSAGE for each contextual sense; "
+                    "model-generated examples for additional senses."
+                    if source_examples_enabled
+                    else (
+                        "MODEL-GENERATED EXAMPLES for every sense; source "
+                        "passages are used only to identify meaning.")
+                ))
             self.source_estimate_price.set(price)
             self.source_estimate_detail.set(detail)
             if (
@@ -6027,6 +7569,8 @@ class AutoAnkiApp:
             "codex": "Codex is retrieving and preparing the source…",
             "retry": "Retrying the explicitly selected failed jobs…",
             "inspect": "Loading saved request and response details…",
+            "validation_accept": (
+                "Saving the human review and rechecking the response…"),
         }
         self.source_action_status.set(
             labels.get(action, "Starting source action…"))
@@ -6067,6 +7611,8 @@ class AutoAnkiApp:
                 state=retry_state)
             self.source_retry_all_button.configure(
                 state=retry_state)
+        self._update_source_problem_button_state()
+        self._update_validation_problem_button_states()
         self._update_source_generate_button_state()
 
     def _poll_source_action_result(self):
@@ -6101,6 +7647,48 @@ class AutoAnkiApp:
             self._show_source_job_inspection(value)
             self.source_action_status.set(
                 "Loaded the saved request and response.")
+            return
+        if action == "validation_accept":
+            self._refresh_source_jobs(show_errors=False)
+            message = (
+                value.get("message")
+                if isinstance(value, dict)
+                else None)
+            context = getattr(
+                self,
+                "source_validation_problem_context",
+                None)
+            if isinstance(context, dict):
+                record = context["record"]
+                try:
+                    inspection = self.source_inspect_callback({
+                        "job_id": record["job_id"]})
+                except Exception:
+                    inspection = dict(context["inspection"])
+                    if isinstance(value, dict) and isinstance(
+                            value.get("validation"), dict):
+                        inspection["validation"] = value["validation"]
+                self._show_source_job_inspection(
+                    inspection,
+                    record=record)
+                self._refresh_validation_problem_dialog(
+                    inspection,
+                    record=record)
+            self.source_action_status.set(
+                message or "Saved the manual validation decision.")
+            messagebox.showinfo(
+                "Validation review saved",
+                message or (
+                    "The selected validation decision was saved and the "
+                    "retained response was checked again."),
+                parent=(
+                    self.source_validation_problem_dialog
+                    if getattr(
+                        self,
+                        "source_validation_problem_dialog",
+                        None) is not None
+                    else self.root))
+            self._schedule_source_estimate()
             return
         if action in {"prepare", "codex"}:
             self._load_source_catalogue()
@@ -6167,51 +7755,184 @@ class AutoAnkiApp:
             self.source_action_status.set(
                 f"Could not load source jobs · {error}")
             return
+        previously_selected = {
+            record["job_id"]
+            for record in self._selected_source_jobs()}
         for item_id in self.source_jobs_tree.get_children():
             self.source_jobs_tree.delete(item_id)
         self.source_job_by_tree_id = {}
-        for index, job in enumerate(jobs):
-            def read(name, default=""):
-                if isinstance(job, dict):
-                    return job.get(name, default)
-                return getattr(job, name, default)
+        display_rows = []
+        groups = group_source_job_rows(jobs)
+        for group_index, (parent_job_id, group_rows) in enumerate(groups):
+            normalized_rows = []
+            for child_index, job in enumerate(group_rows):
+                job_id = str(_source_job_value(
+                    job,
+                    "job_id",
+                    _source_job_value(
+                        job,
+                        "id",
+                        f"{group_index}-{child_index}")))
+                source = str(_source_job_value(
+                    job,
+                    "source_name",
+                    _source_job_value(job, "source", "")))
+                chunk = str(_source_job_value(
+                    job,
+                    "chunk_label",
+                    _source_job_value(
+                        job,
+                        "chunk",
+                        _source_job_value(job, "chunk_index", ""))))
+                worker = str(_source_job_value(
+                    job,
+                    "worker",
+                    _source_job_value(job, "worker_id", "—")))
+                status = str(_source_job_value(job, "status", "unknown"))
+                attempts = str(_source_job_value(
+                    job,
+                    "attempts",
+                    _source_job_value(job, "attempt_count", 0)))
+                detail_value = _source_job_value(
+                    job,
+                    "detail",
+                    _source_job_value(
+                        job,
+                        "error",
+                        _source_job_value(job, "message", "")))
+                if isinstance(detail_value, (dict, list, tuple)):
+                    detail = _source_inspection_json(detail_value)
+                else:
+                    detail = str(detail_value)
+                detail_kind = str(_source_job_value(
+                    job,
+                    "detail_kind",
+                    ""))
+                has_validation_error = bool(_source_job_value(
+                    job,
+                    "has_validation_error",
+                    detail_kind == "validation_error"))
+                normalized_rows.append({
+                    "job_id": job_id,
+                    "parent_job_id": parent_job_id,
+                    "source": source,
+                    "chunk": chunk,
+                    "worker": worker,
+                    "status": status,
+                    "attempts": attempts,
+                    "detail": detail,
+                    "detail_kind": detail_kind,
+                    "has_validation_error": has_validation_error,
+                    "record": job,
+                })
 
-            job_id = str(read("job_id", read("id", index)))
-            source = str(read(
-                "source_name",
-                read("source", "")))
-            chunk = read(
-                "chunk_label",
-                read("chunk", read("chunk_index", "")))
-            worker = read(
-                "worker",
-                read("worker_id", "—"))
-            status = str(read("status", "unknown"))
-            attempts = read("attempts", read("attempt_count", 0))
-            detail = str(read(
-                "detail",
-                read("error", read("message", ""))))
-            tree_id = f"source_job_{index}"
+            group_label = source_job_group_label(
+                parent_job_id,
+                group_index + 1)
+            source = next(
+                (
+                    row["source"]
+                    for row in normalized_rows
+                    if row["source"]),
+                "—")
+            request_count = sum(
+                row["chunk"] != "Deck"
+                for row in normalized_rows)
+            statuses = {
+                row["status"].lower()
+                for row in normalized_rows}
+            if statuses & {
+                    "failed",
+                    "invalid",
+                    "invalid_response",
+                    "connection_failed",
+                    "cancelled"}:
+                group_status = "needs attention"
+            elif "running" in statuses:
+                group_status = "running"
+            elif statuses and statuses <= {"completed", "succeeded"}:
+                group_status = "completed"
+            elif "pending" in statuses:
+                group_status = "pending"
+            else:
+                group_status = "mixed"
+            group_status_tag = {
+                "needs attention": "failed",
+                "running": "running",
+                "completed": "completed",
+            }.get(group_status)
+            group_detail = (
+                f"{request_count:,} OpenAI request chunk"
+                f"{'' if request_count == 1 else 's'}; "
+                "the Deck packaging/import stage is listed last.")
+            group_tree_id = f"source_job_group_{group_index}"
+            group_display = {
+                "job": group_label,
+                "source": source,
+                "chunk": f"{len(normalized_rows):,} stages",
+                "worker": "—",
+                "status": group_status,
+                "attempts": "—",
+                "detail": group_detail,
+            }
+            display_rows.append(group_display)
             self.source_jobs_tree.insert(
                 "",
                 tk.END,
-                iid=tree_id,
+                iid=group_tree_id,
+                text=group_label,
+                open=True,
                 values=(
                     source,
-                    chunk,
-                    worker,
-                    status,
-                    attempts,
-                    detail,
+                    group_display["chunk"],
+                    "—",
+                    group_status,
+                    "—",
+                    group_detail,
                 ),
-                tags=(status.lower(),))
-            self.source_job_by_tree_id[tree_id] = {
-                "job_id": job_id,
-                "status": status,
-                "record": job,
-            }
+                tags=tuple(
+                    tag
+                    for tag in ("job_group", group_status_tag)
+                    if tag))
+            stripe = f"job_{'even' if group_index % 2 == 0 else 'odd'}"
+            for child_index, row in enumerate(normalized_rows):
+                tree_id = f"source_job_{group_index}_{child_index}"
+                display_rows.append({
+                    "job": "",
+                    **{
+                        column: row[column]
+                        for column in SOURCE_JOB_COLUMNS
+                    },
+                })
+                self.source_jobs_tree.insert(
+                    group_tree_id,
+                    tk.END,
+                    iid=tree_id,
+                    text="",
+                    values=tuple(
+                        row[column]
+                        for column in SOURCE_JOB_COLUMNS),
+                    tags=tuple(
+                        dict.fromkeys((
+                            row["status"].lower(),
+                            stripe,
+                            *(
+                                ("validation_error",)
+                                if row["has_validation_error"]
+                                else ()),
+                        ))))
+                self.source_job_by_tree_id[tree_id] = row
+                if row["job_id"] in previously_selected:
+                    self.source_jobs_tree.selection_add(tree_id)
+        self.source_job_display_rows = tuple(display_rows)
+        self._resize_source_job_columns()
+        self._source_job_selection_changed()
         self.source_action_status.set(
-            f"{len(jobs):,} saved source jobs loaded.")
+            (
+                f"{len(jobs):,} saved stages loaded across "
+                f"{len(groups):,} deck-generation "
+                f"{'job' if len(groups) == 1 else 'jobs'}."
+            ))
 
     def _selected_source_jobs(self):
         return tuple(
@@ -6219,17 +7940,72 @@ class AutoAnkiApp:
             for item_id in self.source_jobs_tree.selection()
             if item_id in self.source_job_by_tree_id)
 
+    def _source_job_selection_changed(self, _event=None):
+        selected_ids = tuple(self.source_jobs_tree.selection())
+        if len(selected_ids) != 1:
+            self.source_latest_detail_heading.set("FULL LATEST DETAIL")
+            self._set_source_latest_detail(
+                (
+                    "Select one request chunk or Deck stage above to read its "
+                    "complete latest detail here."
+                    if not selected_ids
+                    else (
+                        f"{len(selected_ids):,} rows are selected. Select one "
+                        "row to show its complete latest detail."
+                    )))
+            self._update_source_problem_button_state()
+            return
+        item_id = selected_ids[0]
+        record = self.source_job_by_tree_id.get(item_id)
+        if record is None:
+            values = self.source_jobs_tree.item(item_id, "values")
+            detail = values[-1] if values else ""
+            self.source_latest_detail_heading.set("JOB SUMMARY")
+        else:
+            detail = record["detail"]
+            stage = record["chunk"] or record["job_id"]
+            self.source_latest_detail_heading.set(
+                (
+                    f"VALIDATION ERROR · {stage}"
+                    if record.get("has_validation_error")
+                    else f"FULL LATEST DETAIL · {stage}"))
+        self._set_source_latest_detail(
+            detail or "No detail has been saved for this stage.",
+            validation_error=(
+                record is not None
+                and record.get("has_validation_error")))
+        self._update_source_problem_button_state()
+
+    def _update_source_problem_button_state(self):
+        if not hasattr(self, "source_view_problems_button"):
+            return
+        selected = self._selected_source_jobs()
+        available = (
+            len(selected) == 1
+            and selected[0]["chunk"] != "Deck"
+            and not selected[0]["job_id"].endswith("::finalize")
+            and self.source_inspect_callback is not None
+            and not self.source_action_in_progress)
+        self.source_view_problems_button.configure(
+            state=tk.NORMAL if available else tk.DISABLED)
+
     def _inspect_selected_source_job(self):
         selected = self._selected_source_jobs()
         if len(selected) != 1:
             messagebox.showinfo(
-                "Select one job",
-                "Select exactly one request to inspect.",
+                "Select one stage",
+                (
+                    "Select exactly one request chunk or Deck stage to "
+                    "inspect. A Job heading represents the whole run and "
+                    "cannot itself be inspected."
+                ),
                 parent=self.root)
             return
         record = selected[0]
         if self.source_inspect_callback is None:
-            self._show_source_job_inspection(record["record"])
+            self._show_source_job_inspection(
+                record["record"],
+                record=record)
             return
         try:
             value = self.source_inspect_callback({
@@ -6240,26 +8016,777 @@ class AutoAnkiApp:
                 str(error),
                 parent=self.root)
             return
-        self._show_source_job_inspection(value)
+        self._show_source_job_inspection(
+            value,
+            record=record)
         self.source_action_status.set(
             "Loaded the saved request and response.")
 
-    def _show_source_job_inspection(self, value):
+    @staticmethod
+    def _replace_readonly_text(widget, text):
+        widget.configure(state=tk.NORMAL)
+        widget.delete("1.0", tk.END)
+        widget.insert("1.0", text)
+        widget.yview_moveto(0.0)
+        widget.configure(state=tk.DISABLED)
+
+    def _show_source_job_inspection(self, value, *, record=None):
         if hasattr(value, "to_dict"):
             value = value.to_dict()
-        if isinstance(value, (dict, list, tuple)):
-            text = json.dumps(
-                value,
-                ensure_ascii=False,
-                sort_keys=True,
-                indent=2,
-                default=str)
+        self.source_last_inspection = value
+        self.source_last_inspection_record = record
+        request_text, response_text = source_job_inspection_texts(value)
+        self._replace_readonly_text(
+            self.source_job_request_inspection,
+            request_text)
+        self._replace_readonly_text(
+            self.source_job_response_inspection,
+            response_text)
+        backend_scope = (
+            value.get("scope")
+            if isinstance(value, dict)
+            else None)
+        if (
+                isinstance(backend_scope, dict)
+                and isinstance(backend_scope.get("summary"), str)):
+            self.source_inspection_scope.set(
+                backend_scope["summary"])
+        elif record is None:
+            self.source_inspection_scope.set(
+                (
+                    "Showing one saved stage. The Request tab contains its "
+                    "input; the Response tab contains saved attempts or its "
+                    "packaging/import result."
+                ))
         else:
-            text = str(value)
-        self.source_job_inspection.configure(state=tk.NORMAL)
-        self.source_job_inspection.delete("1.0", tk.END)
-        self.source_job_inspection.insert("1.0", text)
-        self.source_job_inspection.configure(state=tk.DISABLED)
+            self.source_inspection_scope.set(
+                source_job_inspection_scope(record))
+        self.source_job_inspection_notebook.select(
+            self.source_job_response_inspection.master)
+
+    def _open_selected_source_problems(self):
+        selected = self._selected_source_jobs()
+        if len(selected) != 1:
+            messagebox.showinfo(
+                "Select one request chunk",
+                (
+                    "Select exactly one OpenAI request chunk. Problems belong "
+                    "to individual responses, not to a whole Job heading or "
+                    "the Deck packaging/import stage."
+                ),
+                parent=self.root)
+            return
+        record = selected[0]
+        if (
+                record["chunk"] == "Deck"
+                or record["job_id"].endswith("::finalize")):
+            messagebox.showinfo(
+                "Select an OpenAI request chunk",
+                (
+                    "The Deck row summarizes packaging/import. Select an "
+                    "invalid numbered request chunk to review card problems."
+                ),
+                parent=self.root)
+            return
+        if self.source_inspect_callback is None:
+            messagebox.showerror(
+                "Validation review is not connected",
+                "This build cannot load retained response problems.",
+                parent=self.root)
+            return
+        try:
+            inspection = self.source_inspect_callback({
+                "job_id": record["job_id"]})
+        except Exception as error:
+            messagebox.showerror(
+                "Could not load validation problems",
+                str(error),
+                parent=self.root)
+            return
+        if hasattr(inspection, "to_dict"):
+            inspection = inspection.to_dict()
+        self._show_source_job_inspection(
+            inspection,
+            record=record)
+        report = inspection_validation_report(inspection)
+        if not isinstance(report, dict):
+            messagebox.showinfo(
+                "No validation report",
+                (
+                    "This saved stage has no structured validation report. "
+                    "Its raw attempt remains available in the Response tab."
+                ),
+                parent=self.root)
+            return
+        self._show_validation_problem_dialog(
+            record,
+            inspection)
+
+    def _show_validation_problem_dialog(self, record, inspection):
+        existing = getattr(
+            self,
+            "source_validation_problem_dialog",
+            None)
+        if existing is not None:
+            try:
+                existing.destroy()
+            except tk.TclError:
+                pass
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title(
+            f"Validation problems · {record['source']} · {record['chunk']}")
+        dialog.configure(background=self.WINDOW_BACKGROUND)
+        screen_width = dialog.winfo_screenwidth()
+        screen_height = dialog.winfo_screenheight()
+        (
+            dialog_width,
+            dialog_height,
+            dialog_x,
+            dialog_y,
+        ) = source_validation_dialog_geometry(
+            screen_width,
+            screen_height)
+        dialog.geometry(
+            f"{dialog_width}x{dialog_height}+{dialog_x}+{dialog_y}")
+        dialog.minsize(
+            min(SOURCE_VALIDATION_DIALOG_MIN_WIDTH, dialog_width),
+            min(SOURCE_VALIDATION_DIALOG_MIN_HEIGHT, dialog_height))
+        dialog.resizable(True, True)
+        dialog.transient(self.root)
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(2, weight=1)
+        dialog.protocol(
+            "WM_DELETE_WINDOW",
+            self._close_validation_problem_dialog)
+        self.source_validation_problem_dialog = dialog
+        self.source_validation_problem_context = {
+            "record": record,
+            "inspection": inspection,
+            "problems_by_item": {},
+        }
+        self.source_validation_problem_panes_sized = False
+
+        heading = ttk.Frame(
+            dialog,
+            padding=(18, 15, 18, 5),
+            style="App.TFrame")
+        heading.grid(row=0, column=0, sticky="ew")
+        heading.columnconfigure(0, weight=1)
+        ttk.Label(
+            heading,
+            text="REVIEW RESPONSE PROBLEMS",
+            style="HelpSection.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w")
+        self.source_validation_problem_scope_label = ttk.Label(
+            heading,
+            text=(
+                f"{record['source']} · request chunk {record['chunk']} · "
+                "click a problem to see the exact affected card or section"),
+            style="Status.TLabel",
+            wraplength=max(1, dialog_width - 52),
+            justify=tk.LEFT)
+        self.source_validation_problem_scope_label.grid(
+                row=1,
+                column=0,
+                sticky="ew",
+                pady=(3, 0))
+
+        self.source_validation_problem_summary = tk.StringVar()
+        self.source_validation_problem_summary_label = ttk.Label(
+            dialog,
+            textvariable=self.source_validation_problem_summary,
+            style="Status.TLabel",
+            wraplength=max(1, dialog_width - 52),
+            justify=tk.LEFT)
+        self.source_validation_problem_summary_label.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=18,
+            pady=(3, 9))
+
+        panes = ttk.Panedwindow(
+            dialog,
+            orient=tk.VERTICAL)
+        panes.grid(
+            row=2,
+            column=0,
+            sticky="nsew",
+            padx=18)
+        self.source_validation_problem_panes = panes
+
+        problem_panel = ttk.Frame(
+            panes,
+            padding=(0, 0, 0, 7),
+            style="App.TFrame")
+        problem_panel.columnconfigure(0, weight=1)
+        problem_panel.rowconfigure(1, weight=1)
+        ttk.Label(
+            problem_panel,
+            text="PROBLEMS",
+            style="HelpSection.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                pady=(0, 5))
+        columns = ("decision", "location", "problem")
+        self.source_validation_problem_tree = ttk.Treeview(
+            problem_panel,
+            columns=columns,
+            show="headings",
+            selectmode="extended",
+            height=6,
+            style="ValidationProblems.Treeview")
+        for column, heading_text, width in (
+                ("decision", "Review state", 190),
+                ("location", "Affected card / field", 500),
+                ("problem", "Why it is invalid", 800)):
+            self.source_validation_problem_tree.heading(
+                column,
+                text=heading_text)
+            self.source_validation_problem_tree.column(
+                column,
+                width=width,
+                minwidth=40,
+                stretch=False)
+        problem_scroll = RoundedScrollbar(
+            problem_panel,
+            command=self.source_validation_problem_tree.yview,
+            background=self.WINDOW_BACKGROUND,
+            active=self.ACCENT)
+        self.source_validation_problem_tree.configure(
+            yscrollcommand=problem_scroll.set)
+        self.source_validation_problem_tree.grid(
+            row=1,
+            column=0,
+            sticky="nsew")
+        problem_scroll.grid(
+            row=1,
+            column=1,
+            sticky="ns",
+            padx=(6, 0))
+        self.source_validation_problem_tree.tag_configure(
+            "locked",
+            foreground=self.ERROR)
+        self.source_validation_problem_tree.tag_configure(
+            "reviewable",
+            foreground=self.WARNING)
+        self.source_validation_problem_tree.tag_configure(
+            "accepted",
+            foreground=self.ACCENT)
+        self.source_validation_problem_tree.bind(
+            "<<TreeviewSelect>>",
+            self._validation_problem_selection_changed,
+            add="+")
+        self.source_validation_problem_tree.bind(
+            "<Configure>",
+            self._resize_validation_problem_columns,
+            add="+")
+        panes.add(problem_panel, weight=3)
+
+        detail_panel = ttk.Frame(
+            panes,
+            padding=(0, 7, 0, 7),
+            style="App.TFrame")
+        detail_panel.columnconfigure(0, weight=1)
+        detail_panel.rowconfigure(1, weight=1)
+        ttk.Label(
+            detail_panel,
+            text="WHY THE SELECTED ITEM IS INVALID",
+            style="HelpSection.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                pady=(0, 5))
+        detail_body = ttk.Frame(
+            detail_panel,
+            style="Panel.TFrame")
+        detail_body.grid(
+            row=1,
+            column=0,
+            sticky="nsew")
+        self.source_validation_problem_details = (
+            self._build_validation_problem_text(detail_body))
+        panes.add(detail_panel, weight=4)
+
+        affected_panel = ttk.Frame(
+            panes,
+            padding=(0, 7, 0, 0),
+            style="App.TFrame")
+        affected_panel.columnconfigure(0, weight=1)
+        affected_panel.rowconfigure(1, weight=1)
+        ttk.Label(
+            affected_panel,
+            text="AFFECTED CARD / RESPONSE SECTION",
+            style="HelpSection.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                pady=(0, 5))
+        affected_body = ttk.Frame(
+            affected_panel,
+            style="Panel.TFrame")
+        affected_body.grid(
+            row=1,
+            column=0,
+            sticky="nsew")
+        self.source_validation_affected_section = (
+            self._build_validation_problem_text(affected_body))
+        panes.add(affected_panel, weight=4)
+
+        controls = ttk.Frame(
+            dialog,
+            padding=(18, 10, 18, 16),
+            style="App.TFrame")
+        controls.grid(
+            row=3,
+            column=0,
+            sticky="ew")
+        controls.columnconfigure(1, weight=1)
+        ttk.Label(
+            controls,
+            text="OPTIONAL AUDIT NOTE",
+            style="Status.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(0, 8))
+        self.source_validation_reason = tk.StringVar()
+        reason_entry = ttk.Entry(
+            controls,
+            textvariable=self.source_validation_reason,
+            style="App.TEntry")
+        reason_entry.grid(
+            row=0,
+            column=1,
+            columnspan=3,
+            sticky="ew")
+        reason_entry.bind(
+            "<FocusOut>",
+            self._clear_entry_selection,
+            add="+")
+        button_bar = ttk.Frame(
+            controls,
+            style="App.TFrame")
+        button_bar.grid(
+            row=1,
+            column=0,
+            columnspan=2,
+            sticky="ew",
+            pady=(10, 0))
+        button_bar.columnconfigure(0, weight=1)
+        self.source_validation_accept_selected_button = ttk.Button(
+            button_bar,
+            text="Accept selected…",
+            command=self._accept_selected_validation_problems,
+            state=tk.DISABLED,
+            style="CompactSecondary.TButton",
+            cursor="hand2")
+        self.source_validation_accept_selected_button.grid(
+            row=0,
+            column=1,
+            sticky="e")
+        self.source_validation_accept_all_button = ttk.Button(
+            button_bar,
+            text="Accept all…",
+            command=self._accept_all_validation_problems,
+            state=tk.DISABLED,
+            style="CompactSecondary.TButton",
+            cursor="hand2")
+        self.source_validation_accept_all_button.grid(
+            row=0,
+            column=2,
+            sticky="e",
+            padx=(8, 0))
+        ttk.Button(
+            button_bar,
+            text="Close",
+            command=self._close_validation_problem_dialog,
+            style="CompactSecondary.TButton",
+            cursor="hand2").grid(
+                row=0,
+                column=3,
+                sticky="e",
+                padx=(8, 0))
+
+        self._refresh_validation_problem_dialog(
+            inspection,
+            record=record)
+        dialog.after_idle(
+            self._size_validation_problem_panes)
+        dialog.bind(
+            "<Configure>",
+            self._validation_problem_dialog_resized,
+            add="+")
+        dialog.grab_set()
+        dialog.focus_set()
+
+    def _size_validation_problem_panes(self):
+        if getattr(
+                self,
+                "source_validation_problem_panes_sized",
+                False):
+            return
+        panes = getattr(
+            self,
+            "source_validation_problem_panes",
+            None)
+        if panes is None:
+            return
+        try:
+            height = panes.winfo_height()
+            if height <= 100:
+                dialog = getattr(
+                    self,
+                    "source_validation_problem_dialog",
+                    None)
+                if dialog is not None:
+                    dialog.after(
+                        40,
+                        self._size_validation_problem_panes)
+                return
+            panes.sashpos(0, int(height * 0.36))
+            panes.sashpos(1, int(height * 0.68))
+            self.source_validation_problem_panes_sized = True
+        except tk.TclError:
+            pass
+
+    def _validation_problem_dialog_resized(self, event=None):
+        dialog = getattr(
+            self,
+            "source_validation_problem_dialog",
+            None)
+        if (
+                dialog is None
+                or (
+                    event is not None
+                    and event.widget is not dialog)):
+            return
+        try:
+            wraplength = max(1, dialog.winfo_width() - 52)
+            self.source_validation_problem_scope_label.configure(
+                wraplength=wraplength)
+            self.source_validation_problem_summary_label.configure(
+                wraplength=wraplength)
+            self._resize_validation_problem_columns()
+        except (AttributeError, tk.TclError):
+            pass
+
+    def _resize_validation_problem_columns(self, event=None):
+        tree = getattr(
+            self,
+            "source_validation_problem_tree",
+            None)
+        if tree is None:
+            return
+        available_width = (
+            event.width
+            if event is not None
+            else tree.winfo_width())
+        try:
+            style = ttk.Style(self.root)
+            body_font = style.lookup(
+                "ValidationProblems.Treeview",
+                "font") or ("DejaVu Sans", 9)
+            heading_font = style.lookup(
+                "ValidationProblems.Treeview.Heading",
+                "font") or ("DejaVu Sans", 9, "bold")
+
+            def measure(value):
+                text = str(value)
+                return max(
+                    int(self.root.tk.call(
+                        "font",
+                        "measure",
+                        body_font,
+                        text)),
+                    int(self.root.tk.call(
+                        "font",
+                        "measure",
+                        heading_font,
+                        text)))
+
+            widths = validation_problem_column_widths(
+                measure,
+                max(1, available_width))
+            for column, width in widths.items():
+                tree.column(
+                    column,
+                    width=width,
+                    minwidth=40,
+                    stretch=False)
+        except tk.TclError:
+            pass
+
+    def _build_validation_problem_text(self, parent):
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(0, weight=1)
+        text = tk.Text(
+            parent,
+            height=6,
+            wrap=tk.WORD,
+            font=("DejaVu Sans Mono", 9),
+            background=self.PANEL_BACKGROUND,
+            foreground=self.TEXT_PRIMARY,
+            selectbackground="#D7E9E5",
+            selectforeground=self.TEXT_PRIMARY,
+            relief=tk.FLAT,
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=8,
+            state=tk.DISABLED)
+        scrollbar = RoundedScrollbar(
+            parent,
+            command=text.yview,
+            background=self.PANEL_BACKGROUND,
+            active=self.ACCENT)
+        text.configure(yscrollcommand=scrollbar.set)
+        text.grid(
+            row=0,
+            column=0,
+            sticky="nsew")
+        scrollbar.grid(
+            row=0,
+            column=1,
+            sticky="ns",
+            padx=(5, 0))
+        return text
+
+    def _close_validation_problem_dialog(self):
+        dialog = getattr(
+            self,
+            "source_validation_problem_dialog",
+            None)
+        self.source_validation_problem_dialog = None
+        self.source_validation_problem_context = None
+        if dialog is not None:
+            try:
+                dialog.grab_release()
+                dialog.destroy()
+            except tk.TclError:
+                pass
+
+    def _refresh_validation_problem_dialog(
+            self,
+            inspection,
+            *,
+            record=None):
+        context = getattr(
+            self,
+            "source_validation_problem_context",
+            None)
+        if not isinstance(context, dict):
+            return
+        if record is not None:
+            context["record"] = record
+        context["inspection"] = inspection
+        report = inspection_validation_report(inspection) or {}
+        context["report"] = report
+        self.source_validation_problem_summary.set(
+            validation_report_summary(report))
+        self.source_validation_problem_summary_label.configure(
+            style=(
+                "ValidationDialogSafe.TLabel"
+                if not report.get("remaining_problem_count", 0)
+                else "ValidationDialogError.TLabel"))
+
+        tree = self.source_validation_problem_tree
+        for item_id in tree.get_children():
+            tree.delete(item_id)
+        context["problems_by_item"] = {}
+        for index, problem in enumerate(report.get("problems", ())):
+            if problem.get("accepted"):
+                decision = "Accepted"
+                tag = "accepted"
+            elif problem.get("overrideable"):
+                decision = "Can accept"
+                tag = "reviewable"
+            else:
+                decision = "Locked"
+                tag = "locked"
+            item_id = f"problem_{index}"
+            tree.insert(
+                "",
+                tk.END,
+                iid=item_id,
+                values=(
+                    decision,
+                    problem.get("location") or "Response",
+                    problem.get("title") or problem.get("message") or "Invalid",
+                ),
+                tags=(tag,))
+            context["problems_by_item"][item_id] = problem
+        self._resize_validation_problem_columns()
+
+        first = next(iter(context["problems_by_item"]), None)
+        if first is None:
+            self._replace_readonly_text(
+                self.source_validation_problem_details,
+                (
+                    "This retained response has no current validation "
+                    "problems."
+                ))
+            self._replace_readonly_text(
+                self.source_validation_affected_section,
+                latest_source_response_text(inspection)
+                or "No retained response text is available.")
+        else:
+            tree.selection_set(first)
+            tree.focus(first)
+            tree.see(first)
+            self._validation_problem_selection_changed()
+        self._update_validation_problem_button_states()
+
+    def _validation_problem_selection_changed(self, _event=None):
+        context = getattr(
+            self,
+            "source_validation_problem_context",
+            None)
+        if not isinstance(context, dict):
+            return
+        selected = tuple(
+            context["problems_by_item"][item_id]
+            for item_id in self.source_validation_problem_tree.selection()
+            if item_id in context["problems_by_item"])
+        if not selected:
+            details = "Select one problem to see why it failed validation."
+            affected = (
+                "Select one problem to see its affected card or response "
+                "section.")
+        else:
+            problem = selected[0]
+            details = format_validation_problem_details(problem)
+            affected = validation_problem_affected_section(
+                context["inspection"],
+                problem)
+        self._replace_readonly_text(
+            self.source_validation_problem_details,
+            details)
+        self._replace_readonly_text(
+            self.source_validation_affected_section,
+            affected)
+        self._update_validation_problem_button_states()
+
+    def _reviewable_validation_problems(self, *, selected_only):
+        context = getattr(
+            self,
+            "source_validation_problem_context",
+            None)
+        if not isinstance(context, dict):
+            return ()
+        if selected_only:
+            problem_items = (
+                context["problems_by_item"].get(item_id)
+                for item_id in self.source_validation_problem_tree.selection())
+        else:
+            problem_items = context["problems_by_item"].values()
+        return tuple(
+            problem
+            for problem in problem_items
+            if (
+                isinstance(problem, dict)
+                and problem.get("overrideable")
+                and not problem.get("accepted")))
+
+    def _update_validation_problem_button_states(self):
+        dialog = getattr(
+            self,
+            "source_validation_problem_dialog",
+            None)
+        selected_button = getattr(
+            self,
+            "source_validation_accept_selected_button",
+            None)
+        all_button = getattr(
+            self,
+            "source_validation_accept_all_button",
+            None)
+        if dialog is None or selected_button is None or all_button is None:
+            return
+        try:
+            if not dialog.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        callback_available = (
+            self.source_validation_accept_callback is not None
+            and not self.source_action_in_progress)
+        selected = self._reviewable_validation_problems(
+            selected_only=True)
+        all_reviewable = self._reviewable_validation_problems(
+            selected_only=False)
+        selected_button.configure(
+            state=(
+                tk.NORMAL
+                if callback_available and selected
+                else tk.DISABLED))
+        all_button.configure(
+            state=(
+                tk.NORMAL
+                if callback_available and all_reviewable
+                else tk.DISABLED))
+
+    def _accept_selected_validation_problems(self):
+        self._accept_validation_problems(
+            self._reviewable_validation_problems(
+                selected_only=True))
+
+    def _accept_all_validation_problems(self):
+        self._accept_validation_problems(
+            self._reviewable_validation_problems(
+                selected_only=False))
+
+    def _accept_validation_problems(self, problems):
+        problems = tuple(problems)
+        if not problems:
+            return
+        context = getattr(
+            self,
+            "source_validation_problem_context",
+            None)
+        if not isinstance(context, dict):
+            return
+        remaining = int(
+            context.get("report", {}).get(
+                "remaining_problem_count",
+                len(problems)))
+        completes_chunk = len(problems) >= remaining
+        consequence = (
+            "Because this resolves every remaining issue, the chunk will be "
+            "included and deck packaging/import may start immediately."
+            if completes_chunk
+            else (
+                "Other issues will remain invalid and must still be reviewed "
+                "or retried."
+            ))
+        if not messagebox.askyesno(
+                "Accept reviewed content issue(s)?",
+                (
+                    f"Accept {len(problems):,} selected content validation "
+                    f"issue{'' if len(problems) == 1 else 's'}?\n\n"
+                    "This records a human override; it does not edit the "
+                    "model response. JSON syntax, card shape, required fields, "
+                    "and field types will still be enforced.\n\n"
+                    f"{consequence}"
+                ),
+                parent=self.source_validation_problem_dialog):
+            return
+        reason = self.source_validation_reason.get().strip() or None
+        record = context["record"]
+        self._dispatch_source_action(
+            "validation_accept",
+            self.source_validation_accept_callback,
+            {
+                "job_id": record["job_id"],
+                "problem_ids": tuple(
+                    problem["problem_id"]
+                    for problem in problems),
+                "reason": reason,
+            })
 
     @staticmethod
     def _source_job_is_retryable(record):
@@ -6305,13 +8832,30 @@ class AutoAnkiApp:
         self._confirm_and_retry_source_jobs(failed)
 
     def _confirm_and_retry_source_jobs(self, records):
+        collect_only = all(
+            record.get("execution_mode") == "economy"
+            and record["status"].lower() == "pending"
+            and "Economy Batch" in record.get("detail", "")
+            for record in records)
+        title = (
+            "Collect Economy Batch?"
+            if collect_only
+            else "Authorize paid retries?")
+        message = (
+            (
+                f"Check and collect {len(records):,} selected Economy Batch "
+                "request(s)? This does not resubmit them. If OpenAI is still "
+                "processing the batch, the rows will remain pending."
+            )
+            if collect_only
+            else (
+                f"Resume or retry {len(records):,} request(s)? Failed "
+                "requests may incur additional OpenAI charges. Completed "
+                "requests will not be repeated."
+            ))
         if not messagebox.askyesno(
-                "Authorize paid retries?",
-                (
-                    f"Resume or retry {len(records):,} request(s)? These "
-                    "requests may incur additional OpenAI charges. Completed "
-                    "requests will not be repeated."
-                ),
+                title,
+                message,
                 parent=self.root):
             return
         self._dispatch_source_action(
@@ -6325,11 +8869,20 @@ class AutoAnkiApp:
             })
 
     def _generate_mode_changed(self, _event=None):
+        self._refresh_card_setup_generation_context()
         if (
                 hasattr(self, "generate_notebook")
                 and self.generate_notebook.select()
                 == str(self.from_source_tab)):
             self._schedule_source_estimate()
+
+    def _refresh_card_setup_generation_context(self):
+        editors = tuple(getattr(self, "pipeline_rows", ()))
+        for editor in editors:
+            editor.refresh_generation_language()
+        if editors:
+            self.schedule_pipeline_save()
+            self._update_pipeline_status()
 
     def _source_page_changed(self, _event=None):
         selected = self.source_notebook.select()
@@ -7164,6 +9717,7 @@ class AutoAnkiApp:
             400,
             self._autosave_pipeline_rows)
         if hasattr(self, "source_estimate_price"):
+            self._sync_source_example_control()
             self._schedule_source_estimate()
 
     def _autosave_pipeline_rows(self):
@@ -7230,8 +9784,24 @@ class AutoAnkiApp:
                 return language
         raise ValueError("Select an input language on the Generate tab.")
 
+    def get_card_setup_generation_language(self):
+        """Use the prepared source's language while From Source is active."""
+        if (
+                hasattr(self, "generate_notebook")
+                and hasattr(self, "from_source_tab")
+                and self.generate_notebook.select()
+                == str(self.from_source_tab)
+                and hasattr(self, "source_language_label")):
+            selected_name = self.source_language_label.get().strip()
+            for language in pipeline_store.list_languages():
+                if language.name == selected_name:
+                    return language
+        return self.get_generation_language()
+
     def _generation_language_changed(self, _event=None):
         language = self.get_generation_language()
+        for editor in getattr(self, "pipeline_rows", ()):
+            editor.refresh_generation_language()
         self._sync_learned_filter_controls()
         self.schedule_pipeline_save()
         self._update_pipeline_status()

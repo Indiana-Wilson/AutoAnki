@@ -2,12 +2,28 @@ Define the following English words. For each word, provide exactly four
 idiomatic example sentences separated by the pipe character, |, a concise
 meaning, and its IPA pronunciation.
 
+For those same four examples, provide four complete English translations in
+the "Sentence Translations (English)" property, separated by | in exactly the
+same order. Because these examples are already Modern English, repeat each
+whole sentence without its <strong> tags. Never use | inside one translation.
+
 In the input, there might be sections that are in brackets. This is context to 
 help you understand the meaning of the unbracketed word.
 
-Wrap the requested word in <strong>word</strong> in every sentence. If a word
-has multiple relevant meanings, create a separate card entry for each meaning
-and make its examples unambiguous. Anything in brackets is context for choosing
-the intended meaning. Skip nonexistent words; correct an obvious typo.
+Include the requested word, or a grammatically appropriate inflected form, at
+least once in every sentence. In every sentence, wrap EVERY occurrence that
+expresses that card's particular sense in literal <strong> and </strong> tags,
+including relevant repeated and inflected occurrences. If the same spelling
+has a different meaning elsewhere in the sentence, do NOT embolden that
+occurrence. Every sentence must contain a nonempty <strong>...</strong> span.
+Use no other HTML or formatting. Create
+a fully separate card entry for every genuinely disjoint, commonly used
+lexical sense that a learner is reasonably likely to encounter. Do this even
+when bracketed context clearly selects one sense; return that contextual sense
+first. Do not split different nuances, connotations, degrees, registers, or
+typical contexts of the same underlying meaning. Give every separate sense its
+own distinct set of example sentences, without reusing sentences between
+senses, and make the intended sense unambiguously inferable from each sentence
+alone. Skip nonexistent words; correct an obvious typo.
 
 Here are the words:

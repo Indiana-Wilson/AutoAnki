@@ -34,7 +34,10 @@ def create_source_package(
         source_key,
         pipeline,
         output_path,
-        guid_seed=None):
+        guid_seed=None,
+        allow_accepted_content_problems=False,
+        use_source_for_example_sentences=False,
+        require_sentence_translations=True):
     """Validate combined structured output and write a stable `.apkg`."""
     if isinstance(combined_response, (str, bytes)):
         response_text = (
@@ -57,6 +60,11 @@ def create_source_package(
         output_path=output_path,
         pipeline=pipeline,
         due_start=1,
+        allow_accepted_content_problems=(
+            allow_accepted_content_problems),
+        enforce_sentence_count=(
+            not use_source_for_example_sentences),
+        require_sentence_translations=require_sentence_translations,
         guid_seed=(
             guid_seed
             or f"source:{source_key}:{pipeline.pipeline_id}"))

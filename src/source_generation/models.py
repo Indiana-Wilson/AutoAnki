@@ -9,6 +9,9 @@ from corpus_pipeline.models import CorpusVocabularyView
 
 
 SOURCE_GENERATION_SCHEMA_VERSION = 1
+OCCURRENCE_LOCATOR_WINDOW_CHARS = 24
+OCCURRENCE_TARGET_OPEN = "⟪TARGET⟫"
+OCCURRENCE_TARGET_CLOSE = "⟪/TARGET⟫"
 
 
 class ContextMode(str, Enum):
@@ -100,11 +103,15 @@ class SourceGenerationConfig:
 
     source_key: str
     chunk_size: int = 30
+    source_prefix_token_limit: int | None = None
     context_mode: ContextMode = ContextMode.SENTENCE
     run_path: str | None = None
     concurrency: int = 8
     request_stagger_ms: int = 100
     max_transient_retries: int = 3
+    request_protocol: str = "v9"
+    reasoning_effort: str = "none"
+    execution_mode: str = "standard"
     excluded_words: tuple[str, ...] = ()
     exclude_anki: AnkiExclusionSpec | None = None
     anki_exclusions: tuple[AnkiExclusionSpec, ...] = ()
@@ -117,6 +124,14 @@ class SourceGenerationConfig:
                 or not isinstance(self.chunk_size, int)
                 or self.chunk_size < 1):
             raise ValueError("Generation chunk size must be a positive integer.")
+        if (
+                self.source_prefix_token_limit is not None
+                and (
+                    isinstance(self.source_prefix_token_limit, bool)
+                    or not isinstance(self.source_prefix_token_limit, int)
+                    or self.source_prefix_token_limit < 1)):
+            raise ValueError(
+                "Source prefix length must be a positive integer.")
         if (
                 isinstance(self.concurrency, bool)
                 or not isinstance(self.concurrency, int)
@@ -134,6 +149,28 @@ class SourceGenerationConfig:
                 or not 0 <= self.max_transient_retries <= 20):
             raise ValueError(
                 "Transient retry count must be between 0 and 20.")
+        if (
+                not isinstance(self.request_protocol, str)
+                or self.request_protocol not in {"v8", "v9"}):
+            raise ValueError(
+                'Source request protocol must be either "v8" or "v9".')
+        if (
+                not isinstance(self.reasoning_effort, str)
+                or self.reasoning_effort not in {"none", "low"}):
+            raise ValueError(
+                'Source reasoning effort must be either "none" or "low".')
+        if (
+                not isinstance(self.execution_mode, str)
+                or self.execution_mode not in {"standard", "economy"}):
+            raise ValueError(
+                'Source execution mode must be either "standard" or '
+                '"economy".')
+        if (
+                self.request_protocol == "v8"
+                and self.reasoning_effort != "low"):
+            raise ValueError(
+                'Source request protocol "v8" requires reasoning effort '
+                '"low" to preserve its frozen behavior.')
         if not isinstance(self.context_mode, ContextMode):
             object.__setattr__(
                 self,
@@ -185,6 +222,11 @@ class SourceGenerationConfig:
             plural_exclusions = ()
         if not isinstance(plural_exclusions, (tuple, list)):
             raise TypeError("Anki exclusions must be a list.")
+        request_protocol = value.get("request_protocol")
+        if request_protocol is None and value.get("protocol_version") is not None:
+            request_protocol = f'v{value["protocol_version"]}'
+        if request_protocol is None:
+            request_protocol = "v9"
         return cls(
             source_key=source_key,
             run_path=(
@@ -192,6 +234,8 @@ class SourceGenerationConfig:
                 if value.get("run_path") is not None
                 else None),
             chunk_size=value.get("chunk_size", 30),
+            source_prefix_token_limit=value.get(
+                "source_prefix_token_limit"),
             context_mode=ContextMode.parse(
                 value.get("context_mode", ContextMode.SENTENCE.value)),
             concurrency=value.get("concurrency", 8),
@@ -199,6 +243,13 @@ class SourceGenerationConfig:
             max_transient_retries=value.get(
                 "max_transient_retries",
                 3),
+            request_protocol=request_protocol,
+            reasoning_effort=value.get(
+                "reasoning_effort",
+                "none"),
+            execution_mode=value.get(
+                "execution_mode",
+                value.get("processing_mode", "standard")),
             excluded_words=tuple(value.get("excluded_words", ())),
             exclude_anki=AnkiExclusionSpec.from_mapping(
                 exclusion_value),
@@ -222,6 +273,7 @@ class LoadedSource:
     build_id: str
     run_path: Path
     build: CorpusVocabularyView
+    token_occurrence_count: int | None = None
 
     def to_dict(self):
         return {
@@ -232,6 +284,7 @@ class LoadedSource:
             "build_id": self.build_id,
             "run_path": str(self.run_path),
             "word_count": len(self.build.unique_words),
+            "token_occurrence_count": self.token_occurrence_count,
             "section_count": len(self.build.snapshot.sections),
             "source_language_key": (
                 self.build.snapshot.source_language_key),
@@ -256,6 +309,55 @@ class ContextUnit:
 
 
 @dataclass(frozen=True)
+class OccurrenceLocator:
+    """Persisted prompt guidance identifying one repeated source spelling."""
+
+    before: str
+    target: str
+    after: str
+    literal_match_ordinal: int
+    marked_excerpt: str
+
+    def __post_init__(self):
+        if not all(
+                isinstance(value, str)
+                for value in (
+                    self.before,
+                    self.target,
+                    self.after,
+                    self.marked_excerpt)):
+            raise TypeError("Source occurrence locator text must be strings.")
+        if not self.target:
+            raise ValueError("A source occurrence locator target is required.")
+        if (
+                isinstance(self.literal_match_ordinal, bool)
+                or not isinstance(self.literal_match_ordinal, int)
+                or self.literal_match_ordinal < 1):
+            raise ValueError(
+                "A source occurrence locator ordinal must be positive.")
+        expected_excerpt = (
+            self.before
+            + OCCURRENCE_TARGET_OPEN
+            + self.target
+            + OCCURRENCE_TARGET_CLOSE
+            + self.after)
+        if self.marked_excerpt != expected_excerpt:
+            raise ValueError(
+                "A source occurrence marked excerpt is inconsistent.")
+
+    @classmethod
+    def from_mapping(cls, value):
+        if value is None or isinstance(value, cls):
+            return value
+        if not isinstance(value, dict):
+            raise TypeError("A source occurrence locator must be an object.")
+        return cls(**value)
+
+    def to_dict(self):
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class GenerationWord:
     """A ranked source word pointing to, but not repeating, its context."""
 
@@ -265,6 +367,24 @@ class GenerationWord:
     section_id: str
     sentence_id: str
     context_id: str | None
+    # New plans retain the audited first occurrence. Defaults keep legacy
+    # chunks loadable and, importantly, keep their retried request bytes
+    # unchanged because request_payload omits absent spans.
+    start_offset: int | None = None
+    end_offset: int | None = None
+    occurrence_locator: OccurrenceLocator | None = None
+
+    def __post_init__(self):
+        if (
+                self.occurrence_locator is not None
+                and not isinstance(
+                    self.occurrence_locator,
+                    OccurrenceLocator)):
+            object.__setattr__(
+                self,
+                "occurrence_locator",
+                OccurrenceLocator.from_mapping(
+                    self.occurrence_locator))
 
     def to_dict(self):
         return asdict(self)
@@ -295,15 +415,36 @@ class GenerationChunk:
 
     def request_payload(self):
         """Return the compact object appended to the generation prompt."""
+        contexts_by_id = {
+            context.context_id: context
+            for context in self.contexts
+        }
+
+        def word_payload(word):
+            value = {
+                "rank": word.rank,
+                "term": word.surface,
+                "context_id": word.context_id,
+            }
+            context = contexts_by_id.get(word.context_id)
+            if (
+                    context is not None
+                    and word.start_offset is not None
+                    and word.end_offset is not None):
+                value["occurrence_span"] = [
+                    word.start_offset - context.start_offset,
+                    word.end_offset - context.start_offset,
+                ]
+                if word.occurrence_locator is not None:
+                    value["occurrence_locator"] = (
+                        word.occurrence_locator.to_dict())
+            return value
+
         return {
             "chunk_id": self.chunk_id,
             "rank_range": [self.start_rank, self.end_rank],
             "words": [
-                {
-                    "rank": word.rank,
-                    "term": word.surface,
-                    "context_id": word.context_id,
-                }
+                word_payload(word)
                 for word in self.words
             ],
             "contexts": [
@@ -351,6 +492,8 @@ class GenerationPlan:
     original_word_count: int
     excluded_word_count: int
     chunks: tuple[GenerationChunk, ...]
+    source_prefix_token_count: int | None = None
+    prefix_unique_word_count: int | None = None
 
     @property
     def word_count(self):
@@ -369,6 +512,8 @@ class GenerationPlan:
             "excluded_word_count": self.excluded_word_count,
             "word_count": self.word_count,
             "chunk_count": len(self.chunks),
+            "source_prefix_token_count": self.source_prefix_token_count,
+            "prefix_unique_word_count": self.prefix_unique_word_count,
         }
         if include_chunks:
             result["chunks"] = [
@@ -441,6 +586,7 @@ class Pricing:
     input_usd_per_million: float
     output_usd_per_million: float
     label: str = "standard"
+    cached_input_usd_per_million: float | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -458,8 +604,12 @@ class CostEstimate:
     payload_tokens: int
     schema_tokens: int
     estimated_input_tokens: int
+    estimated_cached_input_tokens: int
+    estimated_uncached_input_tokens: int
     estimated_output_tokens: int
     estimated_input_usd: float
+    estimated_cached_input_usd: float
+    estimated_uncached_input_usd: float
     estimated_output_usd: float
     estimated_total_usd: float
     low_total_usd: float
@@ -478,6 +628,14 @@ class CostEstimate:
     @property
     def output_tokens(self):
         return self.estimated_output_tokens
+
+    @property
+    def cached_input_tokens(self):
+        return self.estimated_cached_input_tokens
+
+    @property
+    def uncached_input_tokens(self):
+        return self.estimated_uncached_input_tokens
 
     @property
     def estimated_cost_usd(self):
@@ -508,6 +666,8 @@ class CostEstimate:
         result.update({
             "candidate_count": self.candidate_count,
             "input_tokens": self.input_tokens,
+            "cached_input_tokens": self.cached_input_tokens,
+            "uncached_input_tokens": self.uncached_input_tokens,
             "output_tokens": self.output_tokens,
             "estimated_cost_usd": self.estimated_cost_usd,
             "estimated_cost_low_usd": self.estimated_cost_low_usd,

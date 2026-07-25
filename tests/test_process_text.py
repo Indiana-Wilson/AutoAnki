@@ -60,7 +60,14 @@ def configured_pipeline(
 def valid_default_card():
     return {
         "Word": "astrolabe",
-        "Sentences": "One|Two|Three|Four",
+        "Sentences": (
+            "One <strong>astrolabe</strong>.|"
+            "Two <strong>astrolabes</strong>.|"
+            "This <strong>astrolabe</strong>.|"
+            "That <strong>astrolabe</strong>."),
+        "Sentence Translations (English)": (
+            "One astrolabe.|Two astrolabes.|"
+            "This astrolabe.|That astrolabe."),
         "Dictionary Meaning (English)": (
             "An instrument formerly used to determine celestial positions."),
         "Pronunciation (English)": "/ˈæstrəleɪb/",
@@ -177,6 +184,44 @@ class FetchResponseTests(unittest.TestCase):
             self.assertEqual(
                 log_path.read_text(encoding="utf-8"),
                 "\n<break>\n" + result)
+
+    def test_default_request_uses_the_composed_current_prompt_and_schema(self):
+        client = MagicMock()
+        response = client.responses.create.return_value
+        response.status = "completed"
+        response.output = []
+        response.output_text = '{"cards": []}'
+        default_pipeline = pipeline_store.default_pipeline()
+        response_format = {"type": "json_schema", "strict": True}
+
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                    patch.object(
+                        process_text.pipeline_store,
+                        "default_pipeline",
+                        return_value=default_pipeline),
+                    patch.object(
+                        process_text.prompt_builder,
+                        "build_prompt",
+                        return_value="composed prompt: ") as build_prompt,
+                    patch.object(
+                        process_text,
+                        "build_response_format",
+                        return_value=response_format) as build_format):
+                process_text.fetch_response(
+                    "word",
+                    client=client,
+                    response_path=Path(directory) / "response.json",
+                    response_log_path=Path(directory) / "response.log")
+
+        build_prompt.assert_called_once_with(default_pipeline)
+        build_format.assert_called_once_with(default_pipeline)
+        self.assertEqual(
+            client.responses.create.call_args.kwargs["input"],
+            "composed prompt: word")
+        self.assertEqual(
+            client.responses.create.call_args.kwargs["text"],
+            {"format": response_format})
 
     def test_refusal_does_not_write_outputs(self):
         client = MagicMock()
@@ -316,8 +361,32 @@ class ResponseSchemaTests(unittest.TestCase):
             [
                 "Latin",
                 "Sentences",
+                "Sentence Translations (English)",
                 "Dictionary Meaning (Latin)",
             ])
+
+    def test_long_source_example_schema_name_is_bounded_for_the_api(self):
+        pipeline = configured_pipeline(
+            "classical_chinese_wang_bi",
+            enabled=("context",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+            ))
+
+        first = process_text.build_response_format(
+            pipeline,
+            optional_fields=("Sentences",))
+        second = process_text.build_response_format(
+            pipeline,
+            optional_fields=("Sentences",))
+
+        self.assertLessEqual(len(first["name"]), 64)
+        self.assertEqual(first["name"], second["name"])
+        self.assertTrue(
+            first["name"].startswith(
+                "autoanki_classical_chinese_wang_bi_"))
 
     def test_per_card_fields_are_deduplicated_by_field_and_language(self):
         translation = pipeline_store.FieldSetting(
@@ -347,7 +416,318 @@ class ResponseSchemaTests(unittest.TestCase):
             ))
 
 
+class SentenceTranslationTemplateTests(unittest.TestCase):
+    def test_translation_field_is_appended_and_rendered_first_on_context_back(
+            self):
+        model = templates.get_direction_card_type(
+            "french",
+            "context").model
+        field_names = [
+            field["name"]
+            for field in model.fields
+        ]
+        answer = model.templates[0]["afmt"]
+
+        self.assertEqual(
+            field_names[-1],
+            "Sentence Translations (English)")
+        self.assertLess(
+            answer.index('id="sentence-translation"'),
+            answer.index('class="definition-stack"'))
+        self.assertNotIn("sentences.indexOf(chosen)", answer)
+        self.assertIn(
+            'const key = "autoanki-sentence-index-"',
+            answer)
+        self.assertIn("translations[chosenIndex]", answer)
+
+    def test_context_template_preserves_duplicate_and_blank_positions(self):
+        model = templates.get_direction_card_type(
+            "french",
+            "context").model
+        question = model.templates[0]["qfmt"]
+        answer = model.templates[0]["afmt"]
+
+        self.assertIn('raw.split("|").map(s => s.trim())', question)
+        self.assertIn("candidateIndices.includes(chosenIndex)", question)
+        self.assertIn(
+            "sessionStorage.setItem(key, String(chosenIndex))",
+            question)
+        self.assertNotIn(".filter(Boolean)", question)
+        self.assertIn("translations[chosenIndex]", answer)
+
+
+class SourceContextEncodingTests(unittest.TestCase):
+    def test_source_context_pipe_and_private_marker_round_trip(self):
+        marker = templates.SOURCE_CONTEXT_ESCAPE_MARKER
+        original = (
+            "<strong>甲</strong> says A|B, then uses "
+            + marker
+            + " literally.")
+
+        encoded = process_text.encode_source_context_block(original)
+
+        self.assertTrue(encoded.startswith(
+            templates.SOURCE_CONTEXT_BLOCK_PREFIX))
+        self.assertNotIn(
+            "|",
+            encoded[len(templates.SOURCE_CONTEXT_BLOCK_PREFIX):])
+        payload = encoded[len(templates.SOURCE_CONTEXT_BLOCK_PREFIX):]
+        decoded = (
+            payload
+            .replace(marker + "1", "|")
+            .replace(marker + "0", marker))
+        self.assertEqual(decoded, original)
+
+
+class SentenceEmphasisTests(unittest.TestCase):
+    def test_every_repeated_term_occurrence_is_emphasized(self):
+        result = process_text.emphasize_term_in_sentences(
+            "The way is the way, and WAY remains way.|"
+            "A way may become another way.",
+            "way",
+            "english")
+
+        self.assertEqual(
+            result,
+            "The <strong>way</strong> is the <strong>way</strong>, and "
+            "<strong>WAY</strong> remains <strong>way</strong>.|"
+            "A <strong>way</strong> may become another "
+            "<strong>way</strong>.")
+
+    def test_word_matching_does_not_emphasize_inside_larger_words(self):
+        result = process_text.emphasize_term_in_sentences(
+            "Art differs from partial artifice.",
+            "art",
+            "english")
+
+        self.assertEqual(
+            result,
+            "<strong>Art</strong> differs from partial artifice.")
+
+    def test_cjk_matching_emphasizes_each_substring_occurrence(self):
+        result = process_text.emphasize_term_in_sentences(
+            "道可道，非常道。",
+            "道",
+            "classical_chinese")
+
+        self.assertEqual(
+            result,
+            "<strong>道</strong>可<strong>道</strong>，非常"
+            "<strong>道</strong>。")
+
+    def test_source_occurrence_emphasis_does_not_mark_other_senses(self):
+        result = process_text.emphasize_source_occurrence(
+            "道可道，非常道。",
+            "道",
+            "classical_chinese",
+            start_offset=0,
+            end_offset=1)
+
+        self.assertEqual(
+            result,
+            "<strong>道</strong>可道，非常道。")
+
+    def test_source_occurrence_offsets_must_match_the_term(self):
+        with self.assertRaisesRegex(ValueError, "do not match"):
+            process_text.emphasize_source_occurrence(
+                "道可道，非常道。",
+                "道",
+                "classical_chinese",
+                start_offset=1,
+                end_offset=2)
+
+    def test_model_markup_is_removed_and_other_html_is_escaped(self):
+        once = process_text.emphasize_term_in_sentences(
+            "<em><strong>way</strong></em> & way",
+            "way",
+            "english")
+        twice = process_text.emphasize_term_in_sentences(
+            once,
+            "way",
+            "english")
+
+        expected = (
+            "&lt;em&gt;<strong>way</strong>&lt;/em&gt; &amp; "
+            "<strong>way</strong>")
+        self.assertEqual(once, expected)
+        self.assertEqual(twice, expected)
+
+    def test_model_selected_inflection_is_preserved_and_other_html_escaped(
+            self):
+        result = process_text.sanitize_emphasized_sentences(
+            "<em>She <strong class=\"x\">ran</strong></em> & run.")
+
+        self.assertEqual(
+            result,
+            "&lt;em&gt;She <strong>ran</strong>&lt;/em&gt; &amp; run.")
+
+    def test_sentence_translation_html_is_escaped_without_losing_alignment(
+            self):
+        result = process_text.sanitize_sentence_translations(
+            "She ran & rested.|<em>He stayed.</em>")
+
+        self.assertEqual(
+            result,
+            "She ran &amp; rested.|&lt;em&gt;He stayed.&lt;/em&gt;")
+
+    def test_validation_identifies_sentences_without_model_emphasis(self):
+        card = valid_default_card()
+        card["Sentences"] = (
+            "One <strong>astrolabe</strong>.|"
+            "Two astrolabes.|"
+            "This <strong>astrolabe</strong>.|"
+            "That astrolabe.")
+
+        report = process_text.inspect_generated_response(
+            json.dumps({"cards": [card]}))
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"] == "missing_sentence_emphasis")
+        self.assertEqual(
+            problem["actual"]["sentences_without_emphasis"],
+            [2, 4])
+
+    def test_generated_non_sentence_html_is_non_overrideable(self):
+        cases = {
+            "Word": "<strong>astrolabe</strong>",
+            "Dictionary Meaning (English)": (
+                "<script>alert('unsafe')</script> instrument"),
+            "Pronunciation (English)": "<em>/ˈæstrəleɪb/</em>",
+        }
+
+        for field_name, value in cases.items():
+            with self.subTest(field_name=field_name):
+                card = valid_default_card()
+                card[field_name] = value
+
+                report = process_text.inspect_generated_response(
+                    json.dumps({"cards": [card]}))
+
+                problem = next(
+                    problem
+                    for problem in report["problems"]
+                    if problem["code"] == "generated_field_contains_html")
+                self.assertEqual(problem["field_name"], field_name)
+                self.assertFalse(problem["overrideable"])
+                self.assertFalse(report["can_manually_accept"])
+
+    def test_sentences_reject_every_tag_except_literal_strong(self):
+        cases = (
+            (
+                "<em>One <strong>astrolabe</strong>.</em>",
+                ["<em>", "</em>"],
+            ),
+            (
+                'One <strong class="sense">astrolabe</strong>.',
+                ['<strong class="sense">'],
+            ),
+        )
+
+        for first_sentence, expected_tags in cases:
+            with self.subTest(first_sentence=first_sentence):
+                card = valid_default_card()
+                card["Sentences"] = (
+                    first_sentence
+                    + "|Two <strong>astrolabes</strong>."
+                    + "|This <strong>astrolabe</strong>."
+                    + "|That <strong>astrolabe</strong>.")
+
+                report = process_text.inspect_generated_response(
+                    json.dumps({"cards": [card]}))
+
+                problem = next(
+                    problem
+                    for problem in report["problems"]
+                    if (
+                        problem["code"]
+                        == "sentence_contains_unsupported_html"))
+                self.assertEqual(
+                    problem["actual"]["unsupported_tags"],
+                    expected_tags)
+                self.assertFalse(problem["overrideable"])
+                self.assertFalse(report["can_manually_accept"])
+
+    def test_literal_strong_is_the_only_allowed_sentence_markup(self):
+        report = process_text.inspect_generated_response(
+            json.dumps({"cards": [valid_default_card()]}))
+
+        self.assertNotIn(
+            "sentence_contains_unsupported_html",
+            {
+                problem["code"]
+                for problem in report["problems"]
+            })
+
+    def test_classical_chinese_validation_rejects_neighbouring_bold_text(
+            self):
+        pipeline = configured_pipeline(
+            "classical_chinese_wang_bi",
+            enabled=("context",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+            ))
+        card = {
+            "Classical Chinese": "始",
+            "Sentences": (
+                "天地<strong>之</strong><strong>始</strong>。|"
+                "萬物有<strong>始</strong>。|"
+                "慎終如<strong>始</strong>。|"
+                "知<strong>始</strong>者明。"),
+            "Sentence Translations (English)": (
+                "The beginning of heaven and earth.|"
+                "All things have a beginning.|"
+                "Be as careful at the end as at the beginning.|"
+                "One who knows beginnings is discerning."),
+            "Dictionary Meaning (English)": "beginning or origin",
+        }
+
+        report = process_text.inspect_generated_response(
+            json.dumps({"cards": [card]}, ensure_ascii=False),
+            pipeline)
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"] == "unexpected_emphasized_form")
+        self.assertEqual(
+            problem["actual"],
+            [{"sentence": 1, "emphasized": "之"}])
+
+
 class ProcessJsonTests(unittest.TestCase):
+    def test_packaging_preserves_model_selected_occurrences(self):
+        card = valid_default_card()
+        card["Word"] = "run"
+        card["Sentences"] = (
+            "She <strong>runs</strong> daily.|"
+            "Yesterday she <strong>ran</strong>.|"
+            "They <strong>run</strong> a shop, then run home.|"
+            "He has <strong>run</strong> before.")
+        deck = MagicMock()
+        package = MagicMock()
+
+        with (
+                patch.object(process_text.genanki, "Note") as note_class,
+                patch.object(
+                    process_text.genanki,
+                    "Package",
+                    return_value=package)):
+            process_text.process_json_text(
+                json.dumps({"cards": [card]}),
+                deck=deck,
+                output_path="/tmp/emphasis.apkg")
+
+        self.assertEqual(
+            note_class.call_args.kwargs["fields"][1],
+            "She <strong>runs</strong> daily.|"
+            "Yesterday she <strong>ran</strong>.|"
+            "They <strong>run</strong> a shop, then run home.|"
+            "He has <strong>run</strong> before.")
+
     def test_classical_chinese_era_uses_existing_classical_chinese_model(self):
         pipeline = configured_pipeline(
             "classical_chinese_ming",
@@ -447,7 +827,14 @@ class ProcessJsonTests(unittest.TestCase):
             })
         response = {
             "French": "épanouir",
-            "Sentences": "Une|Deux|Trois|Quatre",
+            "Sentences": (
+                "Une <strong>s'épanouit</strong>.|"
+                "Deux <strong>s'épanouissent</strong>.|"
+                "Elle <strong>s'épanouira</strong>.|"
+                "Il <strong>s'est épanoui</strong>."),
+            "Sentence Translations (English)": (
+                "One flourishes.|Two flourish.|"
+                "She will flourish.|He flourished."),
             "Translation (English)": "to flourish",
             "Nuance (French)": "évoque un développement positif",
             "Dictionary Meaning (Japanese)": "十分に発達すること",
@@ -473,25 +860,27 @@ class ProcessJsonTests(unittest.TestCase):
             context_fields,
             [
                 "épanouir",
-                "Une|Deux|Trois|Quatre",
+                response["Sentences"],
                 "to flourish",
                 "",
                 "",
                 "",
                 "",
                 "évoque un développement positif",
+                response["Sentence Translations (English)"],
             ])
         self.assertEqual(
             word_fields,
             [
                 "épanouir",
-                "Une|Deux|Trois|Quatre",
+                response["Sentences"],
                 "",
                 "十分に発達すること",
                 "",
                 "",
                 "",
                 "",
+                response["Sentence Translations (English)"],
             ])
 
     def test_unselected_json_field_is_rejected_before_export(self):
@@ -617,6 +1006,103 @@ class ProcessJsonTests(unittest.TestCase):
         package.assert_not_called()
         deck.add_note.assert_not_called()
 
+    def test_sentence_translations_must_match_example_positions(self):
+        card = valid_default_card()
+        card["Sentence Translations (English)"] = (
+            "First.|Second.|Third.")
+
+        report = process_text.inspect_generated_response(
+            json.dumps({"cards": [card]}))
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"] == "sentence_translation_count_mismatch")
+        self.assertEqual(
+            problem["expected"]["translation_count"],
+            4)
+        self.assertEqual(
+            problem["actual"]["translation_count"],
+            3)
+
+    def test_sentence_translation_html_is_non_overrideable(self):
+        card = valid_default_card()
+        card["Sentence Translations (English)"] = (
+            "One <strong>astrolabe</strong>.|Two astrolabes.|"
+            "This astrolabe.|That astrolabe.")
+
+        report = process_text.inspect_generated_response(
+            json.dumps({"cards": [card]}))
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"] == "sentence_translation_contains_html")
+        self.assertFalse(problem["overrideable"])
+        self.assertFalse(report["can_manually_accept"])
+
+    def test_translation_cannot_duplicate_dictionary_explanation(self):
+        pipeline = configured_pipeline(
+            "french",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "english"),
+                pipeline_store.FieldSetting(
+                    "dictionary_meaning",
+                    "english"),
+            ))
+        raw = json.dumps({"cards": [{
+            "French": "table",
+            "Translation (English)": " A PIECE OF FURNITURE ",
+            "Dictionary Meaning (English)": "a piece of furniture",
+        }]})
+
+        report = process_text.inspect_generated_response(raw, pipeline)
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"]
+            == "translation_duplicates_dictionary_meaning")
+        self.assertTrue(problem["overrideable"])
+        self.assertFalse(report["valid"])
+
+    def test_optional_sentence_schema_and_inspection_allow_omission(self):
+        pipeline = configured_pipeline(
+            "french",
+            enabled=("context",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "english"),
+            ))
+        card = {
+            "French": "banque",
+            "Sentence Translations (English)": (
+                "This source context means a financial institution."),
+            "Translation (English)": "financial institution",
+        }
+
+        response_format = process_text.build_response_format(
+            pipeline,
+            optional_fields=("Sentences",))
+        report = process_text.inspect_generated_response(
+            json.dumps({"cards": [card]}),
+            pipeline,
+            optional_fields=("Sentences",))
+
+        alternatives = response_format["schema"]["properties"][
+            "cards"]["items"]["anyOf"]
+        self.assertNotIn("Sentences", alternatives[0]["properties"])
+        self.assertIn(
+            "Sentence Translations (English)",
+            alternatives[0]["required"])
+        self.assertIn("Sentences", alternatives[1]["required"])
+        self.assertTrue(report["valid"])
+        self.assertEqual(report["canonical_response"]["cards"], [card])
+
     def test_invalid_root_shapes_are_rejected(self):
         for data in (
                 {"cards": [], "extra": True},
@@ -652,6 +1138,7 @@ class ProcessJsonTests(unittest.TestCase):
             enabled=("word_to_meaning",))
         card = valid_default_card()
         del card["Sentences"]
+        del card["Sentence Translations (English)"]
         deck = MagicMock()
         package = MagicMock()
         with (
@@ -778,6 +1265,48 @@ class GenerateDeckTests(unittest.TestCase):
             output_path=Path("custom.apkg"),
             pipeline=pipeline,
             guid_seed=None)
+
+    def test_generate_deck_honours_an_explicit_prompt_path(self):
+        pipeline = configured_pipeline(
+            "french",
+            enabled=("word_to_meaning",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "translation",
+                    "english"),
+            ))
+        with tempfile.TemporaryDirectory() as directory:
+            prompt_path = Path(directory) / "custom_prompt"
+            prompt_path.write_text(
+                "Use this exact legacy-compatible prompt: ",
+                encoding="utf-8")
+            with (
+                    patch.object(
+                        process_text,
+                        "fetch_response",
+                        return_value='{"cards": []}') as fetch,
+                    patch.object(
+                        process_text.prompt_builder,
+                        "build_prompt") as build_prompt,
+                    patch.object(
+                        process_text.templates,
+                        "create_deck",
+                        return_value=MagicMock()),
+                    patch.object(
+                        process_text,
+                        "process_json_text")):
+                process_text.generate_deck(
+                    "mot",
+                    client="fake-client",
+                    prompt_path=prompt_path,
+                    output_path=Path(directory) / "deck.apkg",
+                    pipeline=pipeline)
+
+        build_prompt.assert_not_called()
+        self.assertEqual(
+            fetch.call_args.kwargs["prompt_path"],
+            prompt_path)
+        self.assertIsNone(fetch.call_args.kwargs["prompt_text"])
 
     def test_create_deck_returns_new_empty_deck(self):
         first = templates.create_deck()
@@ -1162,8 +1691,31 @@ class GuiLogicTests(unittest.TestCase):
         self.assertEqual(
             gui.PREPARABLE_SOURCE_LANGUAGE_NAMES,
             (
+                "Classical Chinese (Early Han)",
+                "Classical Chinese (Wang Bi recension)",
                 "Classical Chinese (Warring States)",
                 "Classical Chinese (Ming)",
+                "Middle English",
+                "Old English",
+            ))
+
+    def test_built_in_daodejing_sources_show_bracketed_editions(self):
+        daodejings = tuple(
+            option
+            for option in gui.BUILT_IN_SOURCE_OPTIONS
+            if option.key.startswith("daodejing_"))
+
+        self.assertEqual(
+            tuple(option.name for option in daodejings),
+            (
+                "Daodejing [Wang Bi]",
+                "Daodejing [Mawangdui]",
+            ))
+        self.assertEqual(
+            tuple(option.source_language_key for option in daodejings),
+            (
+                "classical_chinese_wang_bi",
+                "classical_chinese_han",
             ))
 
     def test_scheduling_estimate_immediately_invalidates_inflight_result(self):
@@ -1332,6 +1884,8 @@ class GuiLogicTests(unittest.TestCase):
                 return_value="Classical Chinese (Ming)"))
         app.source_allow_web_search = MagicMock(
             get=MagicMock(return_value=True))
+        app.source_use_source_examples = MagicMock(
+            get=MagicMock(return_value=True))
         pipeline = configured_pipeline("classical_chinese_ming")
         app.get_pipeline_configs = MagicMock(
             return_value=(pipeline,))
@@ -1357,6 +1911,8 @@ class GuiLogicTests(unittest.TestCase):
             request["context_mode"],
             "sentence_neighbors")
         self.assertTrue(request["allow_web_search"])
+        self.assertTrue(
+            request["use_source_for_example_sentences"])
         self.assertEqual(
             request["pipeline"].language_key,
             "classical_chinese_ming")
@@ -1451,7 +2007,7 @@ class GuiLogicTests(unittest.TestCase):
             len(longest_label))
         self.assertEqual(
             longest_label,
-            "Classical Chinese (Warring States)")
+            "Classical Chinese (Wang Bi recension)")
 
     def test_generate_language_dropdown_resolves_explicit_selection(self):
         app = object.__new__(gui.AutoAnkiApp)
@@ -1459,6 +2015,34 @@ class GuiLogicTests(unittest.TestCase):
             get=MagicMock(return_value="Japanese"))
 
         language = app.get_generation_language()
+
+        self.assertEqual(language.key, "japanese")
+
+    def test_card_setup_uses_prepared_source_language_in_source_mode(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.generate_notebook = MagicMock()
+        app.generate_notebook.select.return_value = "source-tab"
+        app.from_source_tab = "source-tab"
+        app.source_language_label = MagicMock(
+            get=MagicMock(return_value="Middle English"))
+        app.generation_language = MagicMock(
+            get=MagicMock(return_value="English"))
+
+        language = app.get_card_setup_generation_language()
+
+        self.assertEqual(language.key, "middle_english")
+
+    def test_card_setup_uses_manual_language_outside_source_mode(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.generate_notebook = MagicMock()
+        app.generate_notebook.select.return_value = "manual-tab"
+        app.from_source_tab = "source-tab"
+        app.source_language_label = MagicMock(
+            get=MagicMock(return_value="Middle English"))
+        app.generation_language = MagicMock(
+            get=MagicMock(return_value="Japanese"))
+
+        language = app.get_card_setup_generation_language()
 
         self.assertEqual(language.key, "japanese")
 
@@ -1497,6 +2081,23 @@ class GuiLogicTests(unittest.TestCase):
         self.assertEqual(
             len(dictionary),
             len(pipeline_store.list_response_languages()))
+
+    def test_historical_english_can_translate_into_modern_english(self):
+        editor = object.__new__(gui.PipelineEditor)
+
+        middle_english = editor._language_values(
+            "middle_english",
+            "translation")
+        old_english = editor._language_values(
+            "old_english",
+            "translation")
+        modern_english = editor._language_values(
+            "english",
+            "translation")
+
+        self.assertIn("English", middle_english)
+        self.assertIn("English", old_english)
+        self.assertNotIn("English", modern_english)
 
     def test_visibility_uses_scrollable_layout_for_large_controls(self):
         editor = object.__new__(gui.PipelineEditor)

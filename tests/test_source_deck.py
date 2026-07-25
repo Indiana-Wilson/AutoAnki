@@ -37,6 +37,11 @@ class SourceDeckTests(unittest.TestCase):
                         "Arts <strong>flourish</strong> in peace.|"
                         "Trade can <strong>flourish</strong>.|"
                         "May learning <strong>flourish</strong>."),
+                    "Sentence Translations (English)": (
+                        "Plants flourish here.|"
+                        "Arts flourish in peace.|"
+                        "Trade can flourish.|"
+                        "May learning flourish."),
                     "Dictionary Meaning (English)": (
                         "To grow or develop successfully."),
                     "Pronunciation (English)": "IPA: /ˈflʌrɪʃ/",
@@ -45,9 +50,14 @@ class SourceDeckTests(unittest.TestCase):
                     "Word": "fulfil",
                     "Sentences": (
                         "They <strong>fulfil</strong> the promise.|"
-                        "The result <strong>fulfils</strong> the need.|"
+                        "They <strong>fulfil</strong> the need.|"
                         "We <strong>fulfil</strong> our duties.|"
                         "This will <strong>fulfil</strong> the goal."),
+                    "Sentence Translations (English)": (
+                        "They fulfil the promise.|"
+                        "They fulfil the need.|"
+                        "We fulfil our duties.|"
+                        "This will fulfil the goal."),
                     "Dictionary Meaning (English)": (
                         "To carry out or bring to completion."),
                     "Pronunciation (English)": "IPA: /fʊlˈfɪl/",
@@ -79,6 +89,65 @@ class SourceDeckTests(unittest.TestCase):
             finally:
                 database.close()
             self.assertEqual(due_positions, (1, 2))
+
+    def test_source_example_can_be_one_undelimited_text_block(self):
+        pipeline = pipeline_store.default_pipeline()
+        response = {
+            "cards": [{
+                "Word": "flourish",
+                "Sentences": (
+                    "The gardens <strong>flourish</strong> after rain. "
+                    "Art and trade <strong>flourish</strong> here too."),
+                "Sentence Translations (English)": (
+                    "The gardens flourish after rain. "
+                    "Art and trade flourish here too."),
+                "Dictionary Meaning (English)": (
+                    "To grow or develop successfully."),
+                "Pronunciation (English)": "IPA: /ˈflʌrɪʃ/",
+            }],
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "source-context.apkg"
+            package_path, count = source_deck.create_source_package(
+                response,
+                source_title="A Work",
+                source_key="work-key",
+                pipeline=pipeline,
+                output_path=output,
+                use_source_for_example_sentences=True)
+
+        self.assertEqual(package_path, output)
+        self.assertEqual(count, 1)
+
+    def test_legacy_source_response_can_be_packaged_without_translations(self):
+        pipeline = pipeline_store.default_pipeline()
+        response = {
+            "cards": [{
+                "Word": "flourish",
+                "Sentences": (
+                    "Plants <strong>flourish</strong> here.|"
+                    "Arts <strong>flourish</strong> in peace.|"
+                    "Trade can <strong>flourish</strong>.|"
+                    "May learning <strong>flourish</strong>."),
+                "Dictionary Meaning (English)": (
+                    "To grow or develop successfully."),
+                "Pronunciation (English)": "IPA: /ˈflʌrɪʃ/",
+            }],
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "legacy-source.apkg"
+            package_path, count = source_deck.create_source_package(
+                response,
+                source_title="A Work",
+                source_key="legacy-work-key",
+                pipeline=pipeline,
+                output_path=output,
+                require_sentence_translations=False)
+
+        self.assertEqual(package_path, output)
+        self.assertEqual(count, 1)
 
     def test_import_uses_standalone_workflow(self):
         importer = MagicMock(return_value=True)

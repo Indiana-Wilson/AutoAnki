@@ -28,15 +28,25 @@ src/templates.py: Contains fifteen registered genanki card types: three
 directions for each of English, Classical Chinese, French, Japanese, and
 Latin. Each model has stable fields for Translation, Dictionary Meaning,
 Pronunciation, Part of Speech, Register, and Nuance. Empty local model fields
-are hidden by the card template.
+are hidden by the card template. Context models also retain an English
+translation for every example sentence and show the translation matching the
+randomly selected front example above the definitions on the back.
 
-Classical Chinese also has Ming and Warring States input variants. These
-variants add period-specific sense, nuance, and register instructions to the
-prompt, but deliberately reuse the same three Classical Chinese Anki models
-and IDs and the same single Classical Chinese Card Setup tab. They do not
-create additional note types or settings tabs. Historical register output is
-instructed to name the narrowest supported era, textual tradition, or genre
-instead of using "archaic" when a more precise label is available.
+Classical Chinese also has Ming, Warring States, early-Han Mawangdui, and
+Wang-Bi-recension input variants. These variants add period- or
+recension-specific sense, nuance, orthography, and register instructions to
+the prompt, but deliberately reuse the same three Classical Chinese Anki
+models and IDs and the same single Classical Chinese Card Setup tab. They do
+not create additional note types or settings tabs. Historical register output
+is instructed to name the narrowest supported era, textual tradition, or
+genre instead of using "archaic" when a more precise label is available.
+
+The English Card Setup tab also handles Middle English and Old English input
+variants. They reuse the three stable English models and saved English card
+preferences, while adding stage-specific prompts for contextual meaning,
+inflection, dialect, reconstructed IPA, and exact historical orthography.
+Modern English is a valid Translation target for these two variants even
+though English-to-English Translation remains invalid for Modern English.
 
 output/: Stores generated responses and packages at output/response.json and
 output/output.apkg.
@@ -67,25 +77,52 @@ From Source uses the prepared source's matching Card setup language,
 directions, fields, and response languages. It can send no context, the current
 sentence, current plus neighbouring sentences, or one complete text span per
 request chunk. Identical and overlapping contexts are shared within a request
-rather than copied for every word. Changing the words per request immediately
-updates a local cost estimate that accounts for prompt/schema repetition and
-selected card detail. The configured `gpt-5.4-mini` price and token-limit
-assumptions are dated 24 July 2026 and are not fetched live; see the detailed
-source-generation documentation before treating an estimate as current.
+rather than copied for every word. An optional prefix limit selects terms whose
+first occurrence falls within the first N running source tokens, before
+deduplication and learned-word exclusion. Changing that cutoff or the words per
+request immediately updates a local, cache-aware cost estimate based on the
+exact compact payload and strict schema, shared prompt-prefix repetition,
+expected response shape, and selected card detail. The headline is the
+modelled central estimate; a wider low/high range remains visible. The
+configured `gpt-5.4-mini` price and token-limit assumptions are dated 24 July
+2026 and are not fetched live; see the detailed source-generation
+documentation before treating an estimate as current.
 
-Generation makes one OpenAI request per chunk through a bounded, staggered
-worker pool. Only transient connection/time-out, HTTP 429, and HTTP 5xx
-failures receive bounded automatic backoff. Invalid/refused/incomplete JSON is
-retained for inspection and requires an explicitly authorized individual or
-bulk retry. Successful chunks are never repeated. A complete result is
-imported as `Vocabulary from <source>`; unlike Manual Input's temporary deck,
-this final source deck is not moved, emptied, or deleted.
+New jobs default to the compact fixed-schema v9 protocol with no reasoning.
+Legacy grouped v8 remains selectable as an explicit rollback and retains its
+required low-reasoning behavior. Standard processing makes one OpenAI
+Responses request per chunk through a bounded, staggered worker pool. Economy
+processing instead submits the frozen requests as a recoverable 24-hour Batch
+at half the Standard token rates; synchronous concurrency, staggering, and
+automatic transient retries do not apply to that mode.
+
+For Standard requests, only transient connection/time-out, HTTP 429, and HTTP
+5xx failures receive bounded automatic backoff. Invalid/refused/incomplete
+JSON is retained for inspection and requires an explicitly authorized
+individual or bulk retry. When every compact-v9 problem maps safely to known
+ranks or source contexts, that retry requests only the failed identities,
+merges them into the retained response, and validates the complete result;
+unscoped failures still use a full-chunk retry. Jobs are visually grouped,
+each Deck row appears last inside its own job, and inspection separates one
+chunk's request from its response.
+**View problems** identifies the exact card, field, reason, expected/actual
+value, and JSON path for each validation failure. Structurally safe content
+issues can be accepted individually with a persisted audit; malformed or
+structurally unsafe data cannot be overridden. Successful chunks are never
+repeated. A complete result is imported as `Vocabulary from <source>`; unlike
+Manual Input's temporary deck, this final source deck is not moved, emptied,
+or deleted.
 
 Each authorized source job saves an immutable request contract containing its
-model, fully composed prompt, strict JSON schema, and `none` reasoning setting.
-Retries reuse it even if an Advanced prompt component changes later. Request
-chunks use cross-process advisory leases, preventing two AutoAnki processes
-from issuing the same saved chunk concurrently. Retry-selected actions remain
+model, fully composed prompt, strict JSON schema, request protocol, reasoning
+effort, Standard/Economy processing mode, and optional web-search access.
+Retries reuse it even if an Advanced prompt component changes later. Every
+paid response is persisted before local validation with its exact raw output,
+provider ID/status, and provider-reported input, cached-input, output,
+reasoning, total-token, and web-search usage. The Jobs page prices that
+retained usage using the frozen Standard or Economy profile. Request chunks
+use cross-process advisory leases, preventing two AutoAnki processes from
+issuing the same saved chunk concurrently. Retry-selected actions remain
 limited to the chosen failed rows.
 
 Each input language retains its own optional list of learned-word sources.
@@ -102,13 +139,15 @@ generation forces a fresh, ready-collection read immediately before its paid
 plan is saved.
 
 Prepare File is local/OpenAI-free, retains the original and extracted text,
-and currently supports Warring States and Ming Classical Chinese. PDF support
-extracts embedded text with `pypdf`; it does not perform OCR or reliably repair
-multi-column ordering, headers/footers, or broken character maps. The optional
-CKIP/PyTorch/Jieba dependencies are installed separately with
+and supports Warring States, early-Han Mawangdui, Wang-Bi-recension, and Ming
+Classical Chinese plus Middle and Old English. Historical English uses a
+built-in deterministic Unicode tokenizer; historical Chinese uses the
+optional CKIP/PyTorch/Jieba dependencies installed separately with
 `requirements-corpus.txt` (CPU) or `requirements-corpus-gpu.txt` (NVIDIA
-CUDA). The base Windows executable does not bundle those large packages,
-downloaded model weights, or the reference corpora.
+CUDA). PDF support extracts embedded text with `pypdf`; it does not perform
+OCR or reliably repair multi-column ordering, headers/footers, or broken
+character maps. The base Windows executable does not bundle the large Chinese
+packages, downloaded model weights, or the reference corpora.
 
 Local tokenization saves a validated checkpoint after each section. A rerun
 can reuse completed sections, while corrupt, stale, source/model/device/

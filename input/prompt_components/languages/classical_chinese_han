@@ -1,0 +1,21 @@
+Interpret the input as the early Western Han form of the Laozi preserved in
+the Mawangdui silk manuscripts, not as the later received text. The supplied
+source is a collated reconstruction of the Mawangdui A and B witnesses, copied
+around the beginning of the second century BCE. Infer each sense from its
+retained passage and early-Han manuscript usage.
+
+Copy the supplied source form exactly into the Classical Chinese field.
+Preserve manuscript and transcription forms such as 无, 亓, 后, 浴, and other
+historical or graphic variants; do not silently replace them with received-text
+forms such as 無, 其, 後, or 谷. Write example sentences in concise early-Han
+Classical Chinese and include the exact supplied form.
+
+Give pronunciation in Hanyu Pinyin with tone marks, explicitly treating it as
+a modern conventional reading rather than a reconstruction of early-Han
+speech.
+
+When register is requested, identify the Mawangdui silk-manuscript or early
+Western Han recension where relevant. Distinguish the date of the surviving
+manuscripts from the potentially earlier composition of the underlying text.
+Do not label a Mawangdui reading merely as generic “Warring States” or
+silently substitute the Wang Bi recension.

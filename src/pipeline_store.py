@@ -58,6 +58,16 @@ LANGUAGES = (
         term_field="Word",
         model_language_key="english"),
     LanguageOption(
+        key="middle_english",
+        name="Middle English",
+        term_field="Word",
+        model_language_key="english"),
+    LanguageOption(
+        key="old_english",
+        name="Old English",
+        term_field="Word",
+        model_language_key="english"),
+    LanguageOption(
         key="classical_chinese",
         name="Classical Chinese",
         term_field="Classical Chinese",
@@ -70,6 +80,16 @@ LANGUAGES = (
     LanguageOption(
         key="classical_chinese_warring_states",
         name="Classical Chinese (Warring States)",
+        term_field="Classical Chinese",
+        model_language_key="classical_chinese"),
+    LanguageOption(
+        key="classical_chinese_han",
+        name="Classical Chinese (Early Han)",
+        term_field="Classical Chinese",
+        model_language_key="classical_chinese"),
+    LanguageOption(
+        key="classical_chinese_wang_bi",
+        name="Classical Chinese (Wang Bi recension)",
         term_field="Classical Chinese",
         model_language_key="classical_chinese"),
     LanguageOption(
@@ -171,6 +191,26 @@ def list_settings_languages():
 def list_response_languages():
     """Languages offered for generated field content."""
     return list_settings_languages()
+
+
+def translation_target_allowed(
+        source_language_key,
+        target_language_key):
+    """Return whether a target is a translation of, not into, the source.
+
+    Middle and Old English deliberately share Modern English's Anki models
+    and Card Setup preferences.  Modern English is nevertheless a valid
+    translation target for either historical stage.  Other model-sharing
+    variants (the Classical Chinese periods) remain the same source language
+    and therefore do not gain a same-language translation target.
+    """
+    source = get_language(source_language_key)
+    target = get_language(target_language_key)
+    if (
+            source.key in {"middle_english", "old_english"}
+            and target.key == "english"):
+        return True
+    return source.model_language_key != target.model_language_key
 
 
 def list_directions():
@@ -413,7 +453,11 @@ def requires_sentences(pipeline):
         for card in get_enabled_cards(pipeline))
 
 
-def _validate_fields(fields, source_language_key):
+def _validate_fields(
+        fields,
+        source_language_key,
+        *,
+        validate_translation_target=True):
     fields = tuple(fields)
     field_keys = [field.field_key for field in fields]
     if len(field_keys) != len(set(field_keys)):
@@ -423,8 +467,12 @@ def _validate_fields(fields, source_language_key):
         get_field_option(field.field_key)
         get_language(field.target_language_key)
         if (
+                validate_translation_target
+                and
                 field.field_key == "translation"
-                and field.target_language_key == source_language_key):
+                and not translation_target_allowed(
+                    source_language_key,
+                    field.target_language_key)):
             source_name = get_language(source_language_key).name
             raise ValueError(
                 f"Translation cannot target {source_name} when the source "
@@ -432,8 +480,20 @@ def _validate_fields(fields, source_language_key):
     return fields
 
 
-def _validate_language_settings(settings):
+def _validate_language_settings(
+        settings,
+        *,
+        source_language_key=None,
+        validate_translation_target=True):
     get_language(settings.language_key)
+    source_language_key = (
+        source_language_key
+        or settings.language_key)
+    if (
+            get_language(source_language_key).model_language_key
+            != settings.language_key):
+        raise ValueError(
+            "Language settings do not match the generation language.")
     if not isinstance(settings.separate_target_decks, bool):
         raise ValueError(
             "Separate-target-decks must be true or false.")
@@ -442,16 +502,19 @@ def _validate_language_settings(settings):
             "Shared field settings must be true or false.")
     shared_fields = _validate_fields(
         settings.shared_fields,
-        settings.language_key)
+        source_language_key,
+        validate_translation_target=validate_translation_target)
     _validate_fields(
         settings.shared_field_languages,
-        settings.language_key)
+        source_language_key,
+        validate_translation_target=validate_translation_target)
     shared_field_languages = complete_field_languages(
             settings.language_key,
             settings.shared_field_languages)
     _validate_fields(
         shared_field_languages,
-        settings.language_key)
+        source_language_key,
+        validate_translation_target=validate_translation_target)
     if len(shared_field_languages) != len(FIELD_OPTIONS):
         raise ValueError(
             "Every definition field must remember one response language.")
@@ -472,16 +535,19 @@ def _validate_language_settings(settings):
             raise ValueError("Card enabled settings must be true or false.")
         fields = _validate_fields(
             card.fields,
-            settings.language_key)
+            source_language_key,
+            validate_translation_target=validate_translation_target)
         _validate_fields(
             card.field_languages,
-            settings.language_key)
+            source_language_key,
+            validate_translation_target=validate_translation_target)
         field_languages = complete_field_languages(
                 settings.language_key,
                 card.field_languages)
         _validate_fields(
             field_languages,
-            settings.language_key)
+            source_language_key,
+            validate_translation_target=validate_translation_target)
         if len(field_languages) != len(FIELD_OPTIONS):
             raise ValueError(
                 "Every card field must remember one response language.")
@@ -523,14 +589,33 @@ def validate_pipelines(pipelines):
         active = get_language_settings(
             pipeline,
             pipeline.language_key)
-        _validate_language_settings(active)
+        _validate_language_settings(
+            active,
+            source_language_key=pipeline.language_key)
         seen_languages = set()
         for settings in pipeline.language_settings:
             if settings.language_key in seen_languages:
                 raise ValueError(
                     "Each language may have only one saved preference.")
             seen_languages.add(settings.language_key)
-            _validate_language_settings(settings)
+            if (
+                    settings.language_key
+                    == get_language(
+                        pipeline.language_key).model_language_key):
+                settings_source_language_key = pipeline.language_key
+                validate_translation_target = True
+            else:
+                settings_source_language_key = settings.language_key
+                # Inactive settings are persistent preferences.  In
+                # particular, Translation -> English may be saved for the
+                # historical-English variants while another tab is active.
+                # The restriction is enforced when that settings group is
+                # activated for a concrete generation language.
+                validate_translation_target = False
+            _validate_language_settings(
+                settings,
+                source_language_key=settings_source_language_key,
+                validate_translation_target=validate_translation_target)
         if not (1 << 30) <= pipeline.generated_deck_id < (1 << 31):
             raise ValueError(
                 "Generated deck IDs must be between 2^30 and 2^31.")
