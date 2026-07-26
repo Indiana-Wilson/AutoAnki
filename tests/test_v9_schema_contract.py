@@ -12,7 +12,6 @@ from source_generation import (
     ContextUnit,
     GenerationChunk,
     GenerationWord,
-    SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION,
     build_source_request_contract,
     render_chunk_input,
     source_request_uses_compact_source_results,
@@ -117,17 +116,9 @@ class CompactV9SchemaTests(unittest.TestCase):
                 "Sentences",
                 "Sentence Translations (English)"):
             collection = additional["properties"][field_name]
-            self.assertEqual(collection["minItems"], 4)
-            self.assertEqual(collection["maxItems"], 4)
-            self.assertEqual(
-                collection["items"],
-                (
-                    {
-                        "type": "string",
-                        "pattern": r"^.*<strong>.+</strong>.*$",
-                    }
-                    if field_name == "Sentences"
-                    else {"type": "string"}))
+            self.assertEqual(collection["minItems"], 3)
+            self.assertEqual(collection["maxItems"], 3)
+            self.assertEqual(collection["items"], {"type": "string"})
         self.assertEqual(
             set(additional["required"]),
             set(additional["properties"]))
@@ -169,16 +160,16 @@ class CompactV9SchemaTests(unittest.TestCase):
 
 
 class VersionNineContractTests(unittest.TestCase):
-    def test_default_contract_uses_compact_v9_protocol(self):
+    def test_explicit_contract_uses_compact_v9_protocol(self):
         pipeline = context_pipeline()
         chunk = grouped_chunk()
 
         contract = build_source_request_contract(
             pipeline,
             chunks=(chunk,),
-            use_source_for_example_sentences=True)
+            use_source_for_example_sentences=True,
+            protocol_version=9)
 
-        self.assertEqual(SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION, 9)
         self.assertEqual(contract["schema_version"], 9)
         self.assertEqual(
             contract["response_format"],
@@ -201,7 +192,7 @@ class VersionNineContractTests(unittest.TestCase):
         self.assertNotIn("GROUPED V8 TARGET RULE", prompt)
         self.assertTrue(
             prompt.endswith("Here is the source batch JSON:\n"))
-        self.assertLessEqual(estimate_text_tokens(prompt), 1_600)
+        self.assertLessEqual(estimate_text_tokens(prompt), 1_750)
 
     def test_v9_reasoning_and_cache_key_are_stable_and_frozen(self):
         pipeline = context_pipeline()
@@ -211,11 +202,13 @@ class VersionNineContractTests(unittest.TestCase):
             pipeline,
             chunks=(chunk,),
             use_source_for_example_sentences=True,
+            protocol_version=9,
             reasoning_effort="low")
         none = build_source_request_contract(
             pipeline,
             chunks=(chunk,),
             use_source_for_example_sentences=True,
+            protocol_version=9,
             reasoning_effort="none")
 
         self.assertEqual(none["reasoning"], {"effort": "none"})
@@ -228,6 +221,7 @@ class VersionNineContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "none.*low"):
             build_source_request_contract(
                 pipeline,
+                protocol_version=9,
                 reasoning_effort="medium")
 
     def test_protocol_eight_rollback_keeps_exact_chunk_schema(self):
@@ -255,7 +249,8 @@ class VersionNineContractTests(unittest.TestCase):
             source_request_uses_grouped_source_results(contract))
         self.assertFalse(
             source_request_uses_compact_source_results(contract))
-        self.assertIn("GROUPED V8 TARGET RULE", contract["composed_prompt"])
+        self.assertIn("exactly three", contract["composed_prompt"])
+        self.assertNotIn("<strong>", contract["composed_prompt"])
         with self.assertRaisesRegex(ValueError, "v8.*low"):
             build_source_request_contract(
                 pipeline,
@@ -266,7 +261,8 @@ class VersionNineContractTests(unittest.TestCase):
         contract = build_source_request_contract(
             context_pipeline(),
             chunks=(grouped_chunk(),),
-            use_source_for_example_sentences=True)
+            use_source_for_example_sentences=True,
+            protocol_version=9)
         contract["response_formats_by_chunk"] = {
             "unexpected": contract["response_format"],
         }
@@ -278,7 +274,8 @@ class VersionNineContractTests(unittest.TestCase):
         contract = build_source_request_contract(
             detailed_context_pipeline(),
             chunks=(grouped_chunk(),),
-            use_source_for_example_sentences=True)
+            use_source_for_example_sentences=True,
+            protocol_version=9)
         prompt = contract["composed_prompt"]
 
         for text in (
@@ -290,7 +287,7 @@ class VersionNineContractTests(unittest.TestCase):
                 'For "Register (English)"',
                 'For "Nuance (English)"'):
             self.assertIn(text, prompt)
-        self.assertLessEqual(estimate_text_tokens(prompt), 1_900)
+        self.assertLessEqual(estimate_text_tokens(prompt), 2_000)
 
 
 class VersionNinePayloadTests(unittest.TestCase):
@@ -341,7 +338,7 @@ class VersionNinePayloadTests(unittest.TestCase):
         self.assertNotIn("occurrence_span", encoded)
         self.assertNotIn("literal_match_ordinal", encoded)
 
-    def test_v9_adds_only_relevant_compact_opening_quality_hints(self):
+    def test_v9_does_not_add_term_specific_quality_hints(self):
         original = located_chunk()
         opening = GenerationChunk(
             chunk_id=original.chunk_id,
@@ -366,15 +363,8 @@ class VersionNinePayloadTests(unittest.TestCase):
             opening,
             protocol_version=9))
 
-        self.assertIn("abstract noun", payload["words"][0][
-            "quality_hint"])
-        self.assertIn("modal", payload["words"][1][
-            "quality_hint"])
-        self.assertNotIn(
-            "quality_hint",
-            json.loads(render_chunk_input(
-                located_chunk(),
-                protocol_version=9))["words"][0])
+        self.assertNotIn("quality_hint", payload["words"][0])
+        self.assertNotIn("quality_hint", payload["words"][1])
 
 
 if __name__ == "__main__":

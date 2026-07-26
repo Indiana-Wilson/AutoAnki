@@ -1,0 +1,20 @@
+{
+  "model": "gpt-5.4-mini-2026-03-17",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"speak\",\"Dictionary Meaning (English)\":\"to express something in words; to talk or say it\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"verb\",\"Register (English)\":\"Wang Bi recension; inherited Classical Chinese\",\"Nuance (English)\":\"Used as the verbal sense of the graph in the Laozi opening, not as the noun 'Way'.\"},\"additional_senses\":[{\"Translation (English)\":\"the Way\",\"Dictionary Meaning (English)\":\"the underlying guiding principle, order, or course that governs things\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"Wang Bi recension; philosophical Classical Chinese\",\"Nuance (English)\":\"A capitalized or technical philosophical sense in translation is often appropriate, but the Chinese itself is a common pre-Qin abstract noun.\",\"Sentences\":[\"道大而不名。\",\"人循道而行。\",\"守道者寡言。\",\"知道而不爭。\"],\"Sentence Translations (English)\":[\"The Way is vast and cannot be named.\",\"People follow the Way in their conduct.\",\"Those who keep to the Way speak little.\",\"To know the Way is not to contend.\"]},{\"Translation (English)\":\"path\",\"Dictionary Meaning (English)\":\"a road, route, or way of passage\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"Classical Chinese; common inherited sense\",\"Nuance (English)\":\"Refers to a concrete route of movement, not a doctrine or principle.\",\"Sentences\":[\"前有道。\",\"車循道而進。\",\"迷道不返。\",\"夜半無道。\"],\"Sentence Translations (English)\":[\"There is a road ahead.\",\"The cart advances along the road.\",\"Lost on the road, he does not return.\",\"At midnight there is no road.\"]},{\"Translation (English)\":\"method\",\"Dictionary Meaning (English)\":\"a way of doing something; a procedure or technique\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"Classical Chinese; general learned usage\",\"Nuance (English)\":\"Abstracts a practical way of proceeding rather than a physical path.\",\"Sentences\":[\"工有道。\",\"治國有道。\",\"學必有道。\",\"其道甚簡。\"],\"Sentence Translations (English)\":[\"Craft has its method.\",\"Ruling the state has its method.\",\"Learning must have a method.\",\"Its method is very simple.\"]}],\"occurrence_sense_indices\":[0,2]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.\"}]}",
+  "received_at": "2026-07-26T07:13:54.900655+00:00",
+  "response_id": "resp_01e6e9fa71a6709a006a65b3acf18c8198b9e98e80c7e51027",
+  "schema_version": 1,
+  "service_tier": "default",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 3164,
+    "output_tokens": 643,
+    "reasoning_tokens": 0,
+    "total_tokens": 3807,
+    "uncached_input_tokens": 3164,
+    "visible_output_tokens": 643,
+    "web_search_calls": 0
+  }
+}

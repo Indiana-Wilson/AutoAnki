@@ -1,0 +1,23 @@
+{
+  "dispatched_at": "2026-07-26T02:36:58.534266+00:00",
+  "kind": "ollama_source_dispatch",
+  "max_output_tokens": 1024,
+  "model_id": "ollama/qwen3:14b",
+  "provider_model": "qwen3:14b",
+  "reasoning": {
+    "effort": "none"
+  },
+  "runtime": {
+    "keep_alive": "10m",
+    "options": {
+      "num_ctx": 8192,
+      "repeat_penalty": 1.05,
+      "seed": 416936783,
+      "temperature": 0.2,
+      "top_k": 40,
+      "top_p": 0.9
+    }
+  },
+  "schema_version": 1,
+  "seed": 416936783
+}

@@ -1,0 +1,7 @@
+{
+  "message": "Example repair p001 omits the complete term.",
+  "status_code": null,
+  "timestamp": "2026-07-26T02:37:07.527365+00:00",
+  "transient": false,
+  "type": "ValueError"
+}

@@ -1,0 +1,17 @@
+For every additional sense, provide exactly three short, natural
+{source_language} examples as three plain strings in "Sentences".
+
+Each example must use the complete lexical item belonging to that result's rank
+exactly once. Use the exact supplied spelling when the language is uninflected
+or grammar permits it; where grammar requires inflection, use one ordinary
+inflected form of that same item. Copy an uninflected spelling directly from
+the input; never substitute a visually similar or homophonous form. Return
+plain sentence text: do not add HTML or formatting. Do not substitute only a
+component, substring, or stem, turn the item into a different derivative or
+longer compound, or repeat the lexical item elsewhere in the example. Never
+put | in an item.
+
+Make each example a complete, idiomatic usage whose grammar unambiguously
+demonstrates only that sense. Use a distinct set for each separate sense. If
+the complete term has no genuinely disjoint common additional sense, return an
+empty "additional_senses" array; never invent component senses to fill it.

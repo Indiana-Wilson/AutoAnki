@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"way; principle; doctrine\",\"Dictionary Meaning (English)\":\"A fundamental, underlying reality or principle that governs the universe and all phenomena.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"Classical Chinese (Wang Bi recension)\",\"Nuance (English)\":\"\"},\"additional_senses\":[{\"Translation (English)\":\"to speak; to say\",\"Dictionary Meaning (English)\":\"To articulate or express verbally.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"verb\",\"Register (English)\":\"Classical Chinese (Wang Bi recension)\",\"Nuance (English)\":\"This usage is rare in the Laozi text but appears in other classical texts.\",\"Sentences\":[\"道言，不言而信。\",\"君子道其言，小人道其行。\",\"道可道，非常道。\",\"道不可道，可道非道。\"],\"Sentence Translations (English)\":[\"To speak, yet without speaking, trust is gained.\",\"A gentleman speaks his words; a petty person speaks his actions.\",\"What is spoken may be spoken, but it is not the eternal way.\",\"The way cannot be spoken; what is spoken is not the way.\"]}],\"occurrence_sense_indices\":[0,1]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name.\"}]}",
+  "received_at": "2026-07-26T07:11:31.873237+00:00",
+  "response_id": "ollama-f67589c0d413336ca333836b",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2849,
+    "output_tokens": 347,
+    "reasoning_tokens": 0,
+    "total_tokens": 3196,
+    "uncached_input_tokens": 2849,
+    "visible_output_tokens": 347,
+    "web_search_calls": 0
+  }
+}

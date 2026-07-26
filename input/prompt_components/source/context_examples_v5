@@ -11,24 +11,24 @@ these rules:
    whole context. Do not add an unrequested context_id, omit a requested one,
    or return the same context_id twice.
 2. Each context translation is one undelimited JSON string. It may contain
-   normal English punctuation and multiple clauses or sentences, but never |,
-   <strong> tags, or any other HTML. Do not split one context translation into
+   normal English punctuation and multiple clauses or sentences, but never |
+   or HTML. Do not split one context translation into
    several items. If the context is already Modern English, repeat it as plain
    text.
 3. Keep the sense used in a term's retained source context as that term's first
    card entry. OMIT both "Sentences" and
    "Sentence Translations (English)" from this contextual entry. The processor
-   supplies both values; do not repeat, rewrite, or highlight the context or
+   supplies both values; do not repeat or rewrite the context or
    its translation inside the card. If the input word object supplies an
    "occurrence_span", that span identifies the exact occurrence whose sense
    this first entry must describe; do not use another identical spelling
    elsewhere in the retained context to select the sense.
 4. For another genuinely disjoint common lexical sense, create a separate card
-   entry as usual. It MUST include "Sentences" as exactly four array items and
-   "Sentence Translations (English)" as exactly four positionally matched array
+   entry as usual. It MUST include "Sentences" as exactly three array items and
+   "Sentence Translations (English)" as exactly three positionally matched array
    items.
 
 Only the first, contextual card entry for each supplied term may omit those two
-sentence fields. Every additional sense entry must include both four-item
+sentence fields. Every additional sense entry must include both three-item
 arrays. These source-context rules override any general example instruction
 for contextual entries only.

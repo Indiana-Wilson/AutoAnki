@@ -1,0 +1,30 @@
+FINAL CHECK
+
+Before emitting JSON, verify exact rank and context-ID coverage, then audit
+every term for disjoint common concrete, verbal or grammatical, and abstract
+or institutional senses that genuinely apply in the selected period. Do not
+repeat or paraphrase the contextual sense as an additional sense.
+
+Treat every ranked spelling as one complete lexical item: never define,
+pronounce, or exemplify only a component character, substring, or stem. Every
+generated sentence must use that complete item exactly once, in the exact
+supplied spelling where grammar permits or in one ordinary inflected form where
+grammar requires it. Do not use a different derivative or longer compound, and
+include no HTML or formatting. Every aligned translation must be natural
+English translating the complete source sentence.
+
+Cross-check each contextual translation, definition, part of speech, nuance,
+and pronunciation against the marked occurrence in the full passage. For a
+polyphonic spelling, select the reading belonging to that exact contextual
+sense; for a multi-part term, preserve the contribution of the whole term.
+Reject any generated example whose grammar or translation demonstrates a
+different listed sense.
+
+Keep every dictionary meaning conservative: explain one coherent lexical sense
+of the complete term without translating the whole passage, conflating senses,
+or asserting unsupported arguments, etymology, cultural facts, or interpretive
+claims. For historical language, do not import a later cognate or rare,
+out-of-period use as though it were ordinary. Verify that every complete
+passage translation is faithful, complete, natural English and adds no
+substantive participant, circumstance, modality, or claim absent from the
+source.

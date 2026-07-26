@@ -1,0 +1,67 @@
+{
+  "audited_at": "2026-07-26T05:12:43.212128+00:00",
+  "batch_count": 1,
+  "candidate_sha256": "4b237900f92b11cf3ec68ada5e50dd3b73a5c2fd3116b339b9a0726878550ca2",
+  "case_count": 4,
+  "error": null,
+  "failed_case_count": 0,
+  "kind": "local_batched_example_semantic_audit",
+  "max_cases_per_batch": 4,
+  "model_id": "ollama/qwen3:14b",
+  "passes": [
+    true,
+    true,
+    true,
+    true
+  ],
+  "prompt_sha256": "11c9431e088b4590c0747626534ae1c0aca9e1561f3b78c9e62fc975481da9f6",
+  "requests": [
+    {
+      "dispatched_at": "2026-07-26T05:12:39.573117+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 128,
+      "model_id": "ollama/qwen3:14b",
+      "provider_model": "qwen3:14b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 164235295,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 164235295
+    }
+  ],
+  "responses": [
+    {
+      "model": "qwen3:14b",
+      "raw_text": "{\"passes\": [true, true, true, true]}",
+      "received_at": "2026-07-26T05:12:43.212076+00:00",
+      "response_id": "ollama-48551844ce2aa7935c453e16",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 409,
+        "output_tokens": 13,
+        "reasoning_tokens": 0,
+        "total_tokens": 422,
+        "uncached_input_tokens": 409,
+        "visible_output_tokens": 13,
+        "web_search_calls": 0
+      }
+    }
+  ],
+  "schema_version": 3,
+  "status": "passed"
+}

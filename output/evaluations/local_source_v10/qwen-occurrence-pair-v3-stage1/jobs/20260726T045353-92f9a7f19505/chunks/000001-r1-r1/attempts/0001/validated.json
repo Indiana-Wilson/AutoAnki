@@ -1,0 +1,26 @@
+{
+  "cards": [
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "The fundamental, ineffable principle underlying the universe and all existence, often described as the source of all things and the guiding force of nature.",
+      "Nuance (English)": "Implies a cosmic order that is beyond human comprehension and cannot be fully expressed in language.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "philosophical, literary, classical",
+      "Sentence Translations (English)": "The Dao that can be spoken of is not the eternal Dao; the name that can be named is not the eternal name;",
+      "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+      "Translation (English)": "way; principle; Dao"
+    },
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "A physical or metaphorical route taken by someone or something.",
+      "Nuance (English)": "May imply a journey or direction, but not the cosmic principle.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "neutral, literary",
+      "Sentence Translations (English)": "The path is distant and cannot be reached.|Those who walk the path do not lose their way.|This road leads to the other shore.|Wherever the path is, people are drawn to it.",
+      "Sentences": "<strong>道</strong>遠，不可至也。|行於<strong>道</strong>者，不迷其途。|此<strong>道</strong>通於彼岸。|<strong>道</strong>之所在，人皆趨之。",
+      "Translation (English)": "path; road"
+    }
+  ]
+}

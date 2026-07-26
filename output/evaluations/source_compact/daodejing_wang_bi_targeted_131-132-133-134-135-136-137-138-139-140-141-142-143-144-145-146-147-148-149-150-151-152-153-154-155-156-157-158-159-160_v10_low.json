@@ -1,0 +1,1096 @@
+{
+  "additional_sense_count": 22,
+  "card_count": 52,
+  "context_count": 10,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cached_input_aud": 0.00019268817204301077,
+    "cached_input_tokens": 1792,
+    "cached_input_usd": 0.00013440000000000001,
+    "execution_mode": "standard",
+    "input_aud": 0.0025346236559139783,
+    "input_tokens": 3970,
+    "input_usd": 0.0017679,
+    "model": "gpt-5.4-mini",
+    "output_aud": 0.050032258064516125,
+    "output_tokens": 7755,
+    "output_usd": 0.0348975,
+    "pricing": {
+      "cached_input_usd_per_million": 0.075,
+      "input_usd_per_million": 0.75,
+      "label": "standard pricing published 2026-07-24",
+      "model": "gpt-5.4-mini",
+      "output_usd_per_million": 4.5
+    },
+    "pricing_label": "standard pricing published 2026-07-24",
+    "total_aud": 0.05256688172043011,
+    "total_tokens": 11725,
+    "total_usd": 0.0366654,
+    "uncached_input_aud": 0.002341935483870968,
+    "uncached_input_tokens": 2178,
+    "uncached_input_usd": 0.0016335,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-25T15:51:54.880976+00:00",
+  "local_repair_audit": {
+    "candidate_sha256": "d14c3e4507eb634ed38e53e8bee8e6f4b1967ddd8bfc8bf73ef84bbb61a021c0",
+    "change_count": 0,
+    "changed": false,
+    "changes": [],
+    "kind": "compact_local_response_repair",
+    "original_sha256": "d14c3e4507eb634ed38e53e8bee8e6f4b1967ddd8bfc8bf73ef84bbb61a021c0",
+    "schema_version": 1
+  },
+  "local_repair_count": 0,
+  "max_output_tokens": 71064,
+  "model": "gpt-5.4-mini",
+  "payload_estimated_tokens": 1624,
+  "prompt_estimated_tokens": 1908,
+  "protocol": "v10",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-b5356c309abd2348a04e",
+        "translation": "Too much talk leads to repeated failure; it is better to hold to the center."
+      },
+      {
+        "context_id": "source-context-d6ed2ca3b56cc82f94af",
+        "translation": "The valley spirit does not die; this is called the mysterious female."
+      },
+      {
+        "context_id": "source-context-dba4b82bd4930ffb2e8d",
+        "translation": "The gate of the mysterious female is called the root of Heaven and Earth."
+      },
+      {
+        "context_id": "source-context-7bec845e2a6fdaf09711",
+        "translation": "It is continuous and seems to endure, yet its use is never exhausted."
+      },
+      {
+        "context_id": "source-context-8b2040fab8ad48b733f4",
+        "translation": "Heaven is long-lasting; Earth is enduring."
+      },
+      {
+        "context_id": "source-context-284b6cdbabba5dac6114",
+        "translation": "Heaven and Earth are able to last long and endure because they do not live for themselves,"
+      },
+      {
+        "context_id": "source-context-a325dd785cd091d48fdd",
+        "translation": "Therefore the sage puts himself behind, and yet comes first; he sets himself aside, and yet survives."
+      },
+      {
+        "context_id": "source-context-c3828244165c933a2094",
+        "translation": "Is it not because he is without selfishness? Therefore he is able to realize his own interests."
+      },
+      {
+        "context_id": "source-context-e984829d20ab5ad88c7c",
+        "translation": "The highest goodness is like water."
+      },
+      {
+        "context_id": "source-context-307ce0da84b832c8b7af",
+        "translation": "Water benefits the ten thousand things and does not contend, dwelling in places that others dislike,"
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A large amount or degree; in this context, excessive quantity of speech.",
+          "Nuance (English)": "Often implies excess or an undesirable amount when used of speech or action.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "duō",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "many; too much"
+        },
+        "rank": 131
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A countable quantity or numeral value.",
+            "Nuance (English)": "Used for numerical quantity rather than frequency.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "shù",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "Its number can be known.",
+              "All things have a count.",
+              "The number does not reach ten.",
+              "He asked the historian for the tally."
+            ],
+            "Sentences": [
+              "其數可知。",
+              "百物有數。",
+              "數不盈十。",
+              "問其數於史。"
+            ],
+            "Translation (English)": "number; amount"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "At frequent intervals or on many occasions, not just in number but in recurrence.",
+          "Nuance (English)": "In this kind of text it marks repeated occurrence, not numerical counting.",
+          "Part of Speech (English)": "adverb",
+          "Pronunciation (English)": "shù",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "often; repeatedly"
+        },
+        "rank": 132
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Lacking resources or in a low, needy condition.",
+            "Nuance (English)": "Describes material poverty or a lowly condition.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "qióng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "Though the gentleman is poor, his will is not bent.",
+              "He lived in poverty and held to himself.",
+              "A noble man does not resent poverty.",
+              "That man is very poor."
+            ],
+            "Sentences": [
+              "士雖窮而志不屈。",
+              "窮居自守。",
+              "君子不怨窮。",
+              "其人甚窮。"
+            ],
+            "Translation (English)": "poor; destitute"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To reach a limit and fail to continue; to run out of effectiveness, possibilities, or resources.",
+          "Nuance (English)": "Suggests final depletion or getting stuck at a limit.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "qióng",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "come to an end; be exhausted"
+        },
+        "rank": 133
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Used to compare two alternatives and say that the first is inferior to the second in fitness or desirability.",
+          "Nuance (English)": "A judgment of comparative preference, not merely factual inequality.",
+          "Part of Speech (English)": "verb phrase",
+          "Pronunciation (English)": "bù rú",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "not as good as"
+        },
+        "rank": 134
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To watch over something and keep it safe from harm or loss.",
+            "Nuance (English)": "Focuses on defense or custody rather than steadfast adherence.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "shǒu",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "They guarded the city and waited for relief.",
+              "I should guard the gate.",
+              "Guard it and do not let it be lost.",
+              "The troops were few but could hold the defense."
+            ],
+            "Sentences": [
+              "守城以待援。",
+              "臣當守門。",
+              "守之勿失。",
+              "兵少而能守。"
+            ],
+            "Translation (English)": "guard; protect"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To maintain or adhere to a principle, position, or state.",
+          "Nuance (English)": "Here it means steady adherence rather than physical guarding.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "shǒu",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "hold to; keep to"
+        },
+        "rank": 135
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The central part of something in space or position.",
+            "Nuance (English)": "Used of physical or positional center.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "zhōng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "He lived in the middle of the city.",
+              "There is a high terrace in the center.",
+              "Look to the center and act.",
+              "Take the middle course."
+            ],
+            "Sentences": [
+              "居城之中。",
+              "中有高台。",
+              "視其中而行。",
+              "取其中道。"
+            ],
+            "Translation (English)": "middle; center"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A central, balanced, or middle position, especially the proper course that avoids extremes.",
+          "Nuance (English)": "Here it is not merely spatial middle, but the balanced norm of conduct or being.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "zhōng",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "the center; the proper mean"
+        },
+        "rank": 136
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A mysterious generative power imagined as dwelling in or like a valley, and associated with enduring fertility.",
+          "Nuance (English)": "A Daoist cosmological image, not a literal spirit of an actual valley.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "gǔ shén",
+          "Register (English)": "Classical Chinese, Laozi base text in the Wang Bi recension",
+          "Translation (English)": "valley spirit"
+        },
+        "rank": 137
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "No longer living; having died.",
+            "Nuance (English)": "Describes the state of having ceased to live.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "sǐ",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "That tree seems dead.",
+              "A dead horse still has bones.",
+              "The man has died.",
+              "The air was very lifeless."
+            ],
+            "Sentences": [
+              "其木若死。",
+              "死馬猶存骨。",
+              "人而死矣。",
+              "死氣甚重。"
+            ],
+            "Translation (English)": "dead"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To cease living; to be no longer alive.",
+          "Nuance (English)": "Neutral basic verb for death, without special literary elevation.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "sǐ",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "die"
+        },
+        "rank": 138
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A demonstrative referring to something present, already mentioned, or about to be identified.",
+            "Nuance (English)": "Used for pointing back to a specific thing or statement.",
+            "Part of Speech (English)": "demonstrative pronoun",
+            "Pronunciation (English)": "shì",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "This is then acceptable.",
+              "This and that are not yet clear.",
+              "It rained hard on that day.",
+              "This man can be trusted."
+            ],
+            "Sentences": [
+              "是則可取。",
+              "是非未明。",
+              "是日大雨。",
+              "是人可信。"
+            ],
+            "Translation (English)": "this"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A copular or demonstrative identification introducing an explanation or naming something.",
+          "Nuance (English)": "Here it introduces an explanatory identification, not a yes/no answer.",
+          "Part of Speech (English)": "copula / demonstrative",
+          "Pronunciation (English)": "shì",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "this is; that is"
+        },
+        "rank": 139
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A darkly hidden feminine source or generative principle, used as a Daoist cosmological name.",
+          "Nuance (English)": "A technical Daoist image of fecund origin, not ordinary reference to a woman.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "xuán pìn",
+          "Register (English)": "Classical Chinese, Laozi base text in the Wang Bi recension",
+          "Translation (English)": "mysterious female"
+        },
+        "rank": 140
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The underground part of a plant.",
+            "Nuance (English)": "Literal botanical sense.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "gēn",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The tree roots are deep.",
+              "Cut the roots.",
+              "Root and leaves flourish together.",
+              "Transplant the roots into the courtyard."
+            ],
+            "Sentences": [
+              "樹根深矣。",
+              "斫其根。",
+              "根葉並茂。",
+              "移根於庭。"
+            ],
+            "Translation (English)": "root"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The underlying base or origin from which something grows, begins, or depends.",
+          "Nuance (English)": "In this phrase it means ultimate source rather than a plant root alone.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "gēn",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "root; source"
+        },
+        "rank": 141
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Extended in a soft, thin, or uninterrupted way, without obvious break or end.",
+          "Nuance (English)": "Suggests a subtle, scarcely perceptible continuity.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "mián mián",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "continuous; fine and unbroken"
+        },
+        "rank": 142
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Introduces a condition or supposition.",
+            "Nuance (English)": "Conditional use, common in classical prose.",
+            "Part of Speech (English)": "conjunction",
+            "Pronunciation (English)": "ruò",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "If it rains, then stop.",
+              "If he does not come, what then?",
+              "If one can turn back on oneself, that is good.",
+              "If so, why worry?"
+            ],
+            "Sentences": [
+              "若雨，則止。",
+              "若其不來，奈何。",
+              "若能自反，則善。",
+              "若此，何憂。"
+            ],
+            "Translation (English)": "if"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Marks resemblance or conjectural comparison: something appears to be or seems like another state.",
+          "Nuance (English)": "Here it introduces an appearance or likeness, not a condition.",
+          "Part of Speech (English)": "particle / conjunction",
+          "Pronunciation (English)": "ruò",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "as if; like"
+        },
+        "rank": 143
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Applying steady effort and labor.",
+            "Nuance (English)": "Describes energetic application, especially in service or study.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "qín",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "If one studies without diligence, how can one succeed?",
+              "He was diligent in affairs of state.",
+              "That person is very hardworking.",
+              "He diligently cultivated his virtue."
+            ],
+            "Sentences": [
+              "學而不勤，何成。",
+              "勤於政事。",
+              "其人甚勤。",
+              "勤修其德。"
+            ],
+            "Translation (English)": "diligent; hard-working"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To use up strength or resources, or to cause something to become exhausted.",
+          "Nuance (English)": "Suggests depletion through use or effort, not simple diligence.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "qín",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "wear out; exhaust"
+        },
+        "rank": 144
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The visible expanse above the earth.",
+            "Nuance (English)": "Literal physical sky rather than cosmological Heaven.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "tiān",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "He looked up and saw the sky.",
+              "The sky is about to darken.",
+              "Clouds came out in the sky.",
+              "Rain covered the whole sky."
+            ],
+            "Sentences": [
+              "仰見其天。",
+              "天色將暮。",
+              "雲出於天。",
+              "雨覆滿天。"
+            ],
+            "Translation (English)": "sky"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The sky or the celestial realm, often as a cosmic power or order in classical thought.",
+          "Nuance (English)": "Often carries cosmological force, not just the visible sky.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "tiān",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "heaven"
+        },
+        "rank": 145
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To become longer, larger, or more extended.",
+            "Nuance (English)": "A separate reading with the sense of increase or growth.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "zhǎng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The plants have grown.",
+              "It grows day and night.",
+              "Its momentum gradually increases.",
+              "In time it grows longer."
+            ],
+            "Sentences": [
+              "草木長矣。",
+              "日夜而長。",
+              "其勢漸長。",
+              "久而長之。"
+            ],
+            "Translation (English)": "to grow; to increase"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Continuing for a great length of time; enduring without ending soon.",
+          "Nuance (English)": "Here it describes durability or continuance, not simple spatial length.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "cháng",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "long-lasting"
+        },
+        "rank": 146
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The surface of the earth or a piece of land.",
+            "Nuance (English)": "Physical ground or territory rather than cosmic Earth.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dì",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "He sat on the ground.",
+              "The ground was flat as a palm.",
+              "He plowed the land.",
+              "Rain moistens the ground."
+            ],
+            "Sentences": [
+              "坐於地上。",
+              "地平如掌。",
+              "耕其地。",
+              "雨潤其地。"
+            ],
+            "Translation (English)": "ground; land"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The terrestrial world, the land, or the earthly realm in cosmic pairing with Heaven.",
+          "Nuance (English)": "Cosmological counterpart to Heaven, not merely soil.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "dì",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "earth"
+        },
+        "rank": 147
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Continuing over an extended time, without quick termination.",
+          "Nuance (English)": "Emphasizes duration and staying power.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "jiǔ",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "long; enduring"
+        },
+        "rank": 148
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A location or point where something is situated or happens.",
+            "Nuance (English)": "Literal spatial sense.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "suǒ",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "He had no fixed place to live.",
+              "Wherever he directed himself, all went smoothly.",
+              "What he had not yet seen.",
+              "This place is very quiet."
+            ],
+            "Sentences": [
+              "居無定所。",
+              "所向皆通。",
+              "其所未見。",
+              "此所甚寂。"
+            ],
+            "Translation (English)": "place"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces the basis, method, or explanation for something.",
+          "Nuance (English)": "In this construction it forms an explanatory relative phrase, not a concrete place noun.",
+          "Part of Speech (English)": "grammatical particle / nominalizer",
+          "Pronunciation (English)": "suǒ",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "the means by which; the reason why"
+        },
+        "rank": 149
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The power or competence to do something.",
+            "Nuance (English)": "Refers to capacity as a quality or a person who possesses it.",
+            "Part of Speech (English)": "noun / adjective",
+            "Pronunciation (English)": "néng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "His ability surpasses others.",
+              "This is not within human ability.",
+              "Those who are capable are employed.",
+              "He is versatile and makes few mistakes."
+            ],
+            "Sentences": [
+              "其能過人。",
+              "非人之能也。",
+              "能者用之。",
+              "多能而寡失。"
+            ],
+            "Translation (English)": "ability; capable"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To have the capacity, power, or possibility to do something.",
+          "Nuance (English)": "Marks capability or effective power, not mere permission.",
+          "Part of Speech (English)": "auxiliary verb",
+          "Pronunciation (English)": "néng",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "can; be able to"
+        },
+        "rank": 150
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Used to intensify a statement or add an emphatic further point.",
+            "Nuance (English)": "Often strengthens what follows rather than merely joining clauses.",
+            "Part of Speech (English)": "adverb / conjunction",
+            "Pronunciation (English)": "qiě",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "Furthermore, ask the reason.",
+              "He walked while also stopping.",
+              "Its momentum is even more vigorous.",
+              "Wait for another day."
+            ],
+            "Sentences": [
+              "且問其故。",
+              "且行且止。",
+              "其勢且盛。",
+              "且待來日。"
+            ],
+            "Translation (English)": "even; furthermore"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Adds another element or parallel case, often with a sense of further inclusion.",
+          "Nuance (English)": "Here it links two enduring qualities and can suggest ‘even’ or ‘moreover’ depending on context.",
+          "Part of Speech (English)": "conjunction / adverb",
+          "Pronunciation (English)": "qiě",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "also; yet; and"
+        },
+        "rank": 151
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Indicates a starting point or source.",
+            "Nuance (English)": "Marks origin or starting point.",
+            "Part of Speech (English)": "preposition",
+            "Pronunciation (English)": "zì",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "He came from home.",
+              "He arrived from the east.",
+              "It has been so since ancient times.",
+              "Enter from its gate."
+            ],
+            "Sentences": [
+              "自家而來。",
+              "自東而至。",
+              "自古如此。",
+              "自其門入。"
+            ],
+            "Translation (English)": "from"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Marks that an action or state originates from oneself rather than from others or outside causes.",
+          "Nuance (English)": "Here it means self-generated or self-directed, not the standalone noun 'self.'",
+          "Part of Speech (English)": "prefix / adverb",
+          "Pronunciation (English)": "zì",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "self-"
+        },
+        "rank": 152
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Following in time, sequence, or order.",
+            "Nuance (English)": "Temporal or ordinal sense.",
+            "Part of Speech (English)": "adjective / adverb",
+            "Pronunciation (English)": "hòu",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "He arrived three days later.",
+              "The matter was later.",
+              "Later he heard those words.",
+              "Only afterward did he know it."
+            ],
+            "Sentences": [
+              "後三日而至。",
+              "其事在後。",
+              "後聞其言。",
+              "後乃知之。"
+            ],
+            "Translation (English)": "after; later"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To take a rear or secondary position, yielding precedence to others.",
+          "Nuance (English)": "An intentional act of self-effacement, not merely being later in time.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "hòu",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "put behind; place oneself last"
+        },
+        "rank": 153
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The physical frame of a person or animal.",
+            "Nuance (English)": "Literal bodily sense.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "shēn",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "His body was very thin.",
+              "He injured his body.",
+              "He entered in person through the gate.",
+              "He nourished his body."
+            ],
+            "Sentences": [
+              "其身甚瘦。",
+              "傷其身。",
+              "身入其門。",
+              "養其身。"
+            ],
+            "Translation (English)": "body"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The physical person, and by extension oneself as an embodied being.",
+          "Nuance (English)": "Can point either to the bodily self or the person as a whole; here it is the person in relation to advancement or preservation.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "shēn",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "body; self"
+        },
+        "rank": 154
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Outside a space, boundary, or group.",
+            "Nuance (English)": "Spatial sense of being external.",
+            "Part of Speech (English)": "noun / adjective / adverb",
+            "Pronunciation (English)": "wài",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "It is outside the gate.",
+              "Outsiders may not enter.",
+              "There are layered gates outside.",
+              "Its sound spread outside."
+            ],
+            "Sentences": [
+              "在門外。",
+              "外人不入。",
+              "外有重門。",
+              "其聲傳於外。"
+            ],
+            "Translation (English)": "outside"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To place beyond concern or to treat as secondary, as when one does not make personal advantage central.",
+          "Nuance (English)": "This is a deliberate self-distancing, not simple physical exteriority.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "wài",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "put outside; set aside"
+        },
+        "rank": 155
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Concern for one's own advantage or advantage for one’s own side rather than for the whole.",
+          "Nuance (English)": "Here it names self-regarding partiality, contrasted with impartiality or non-selfing.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "sī xié",
+          "Register (English)": "Classical Chinese, Laozi base text in the Wang Bi recension",
+          "Translation (English)": "selfishness; private self-interest"
+        },
+        "rank": 156
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Belonging to an individual rather than to the public or state.",
+            "Nuance (English)": "Not public or official.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "sī",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "This is his private property.",
+              "Do not discuss his private affairs.",
+              "The private gate is already closed.",
+              "Private feelings are hard to exhaust."
+            ],
+            "Sentences": [
+              "此乃其私財。",
+              "勿議其私事。",
+              "私門已閉。",
+              "私情難盡。"
+            ],
+            "Translation (English)": "private"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "What belongs to or benefits oneself rather than the public, shared, or impartial good.",
+          "Nuance (English)": "Often contrasts with public or impartial concerns; here it is the object being achieved or preserved.",
+          "Part of Speech (English)": "noun / adjective",
+          "Pronunciation (English)": "sī",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "private interest; personal gain"
+        },
+        "rank": 157
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "In a higher position or location.",
+            "Nuance (English)": "Spatial or positional sense.",
+            "Part of Speech (English)": "noun / adverb",
+            "Pronunciation (English)": "shàng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The book was placed on the table.",
+              "There were clouds above.",
+              "He climbed up the mountain.",
+              "Top and bottom are distinguished."
+            ],
+            "Sentences": [
+              "書置案上。",
+              "上有雲氣。",
+              "登上山。",
+              "上與下分。"
+            ],
+            "Translation (English)": "above; on top"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "At the top or in the most excellent position.",
+          "Nuance (English)": "In this phrase it means the highest grade of goodness, not spatial above.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "shàng",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "highest; supreme"
+        },
+        "rank": 158
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The liquid substance that flows, nourishes, and takes the shape of its container.",
+          "Nuance (English)": "Standard natural substance, here used as a moral and cosmological model.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "shuǐ",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "water"
+        },
+        "rank": 159
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Having a sharp edge or acute cutting power.",
+            "Nuance (English)": "Concrete physical sharpness.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "lì",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "Its blade is very sharp.",
+              "The knife is not sharp.",
+              "A sharp tool may be used.",
+              "A stone can be worn to sharpness."
+            ],
+            "Sentences": [
+              "其刃甚利。",
+              "刀不利。",
+              "利器可用。",
+              "石可磨而利。"
+            ],
+            "Translation (English)": "sharp; keen"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To provide advantage, help, or practical benefit to something or someone.",
+          "Nuance (English)": "In this context it emphasizes beneficial action rather than profit-making.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "lì",
+          "Register (English)": "Classical Chinese, inherited Laozi base text in the Wang Bi recension",
+          "Translation (English)": "benefit; be of use to"
+        },
+        "rank": 160
+      }
+    ]
+  },
+  "reasoning_effort": "low",
+  "response_id": "resp_02c12fc1b2911de4006a64db64dcbc8196ad1c085917b5f245",
+  "response_status": "completed",
+  "schema_estimated_tokens": 519,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "target_ranks": [
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160
+  ],
+  "term_result_count": 30,
+  "terms": [
+    {
+      "rank": 131,
+      "term": "多"
+    },
+    {
+      "rank": 132,
+      "term": "數"
+    },
+    {
+      "rank": 133,
+      "term": "窮"
+    },
+    {
+      "rank": 134,
+      "term": "不如"
+    },
+    {
+      "rank": 135,
+      "term": "守"
+    },
+    {
+      "rank": 136,
+      "term": "中"
+    },
+    {
+      "rank": 137,
+      "term": "谷神"
+    },
+    {
+      "rank": 138,
+      "term": "死"
+    },
+    {
+      "rank": 139,
+      "term": "是"
+    },
+    {
+      "rank": 140,
+      "term": "玄牝"
+    },
+    {
+      "rank": 141,
+      "term": "根"
+    },
+    {
+      "rank": 142,
+      "term": "緜緜"
+    },
+    {
+      "rank": 143,
+      "term": "若"
+    },
+    {
+      "rank": 144,
+      "term": "勤"
+    },
+    {
+      "rank": 145,
+      "term": "天"
+    },
+    {
+      "rank": 146,
+      "term": "長"
+    },
+    {
+      "rank": 147,
+      "term": "地"
+    },
+    {
+      "rank": 148,
+      "term": "久"
+    },
+    {
+      "rank": 149,
+      "term": "所"
+    },
+    {
+      "rank": 150,
+      "term": "能"
+    },
+    {
+      "rank": 151,
+      "term": "且"
+    },
+    {
+      "rank": 152,
+      "term": "自"
+    },
+    {
+      "rank": 153,
+      "term": "後"
+    },
+    {
+      "rank": 154,
+      "term": "身"
+    },
+    {
+      "rank": 155,
+      "term": "外"
+    },
+    {
+      "rank": 156,
+      "term": "私邪"
+    },
+    {
+      "rank": 157,
+      "term": "私"
+    },
+    {
+      "rank": 158,
+      "term": "上"
+    },
+    {
+      "rank": 159,
+      "term": "水"
+    },
+    {
+      "rank": 160,
+      "term": "利"
+    }
+  ],
+  "usage": {
+    "cached_input_tokens": 1792,
+    "input_tokens": 3970,
+    "output_tokens": 7755,
+    "reasoning_tokens": 1187,
+    "total_tokens": 11725,
+    "uncached_input_tokens": 2178,
+    "visible_output_tokens": 6568,
+    "web_search_calls": 0
+  },
+  "valid": true,
+  "validation_error": null,
+  "word_count": 30
+}

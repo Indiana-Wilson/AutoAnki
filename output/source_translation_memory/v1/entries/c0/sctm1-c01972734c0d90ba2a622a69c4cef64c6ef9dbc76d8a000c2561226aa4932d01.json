@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-c01972734c0d90ba2a622a69c4cef64c6ef9dbc76d8a000c2561226aa4932d01",
+  "created_at": "2026-07-26T09:35:06.976747+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "天下皆知美之為美，斯惡已。",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T09:35:06.976771+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-4413afde456bbd1ce9d9",
+          "effective_raw_sha256": "b02c026cf782352ed95e2b7726c5de1435e3ce76a0241046b2e00d2dbda897ec",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T093429-4f2acf1c0f47",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "7ad7fdd56d0cd67075fff21f222a201c0f29c93a1d2cd50262a04ceebbb9582e",
+          "provider_raw_sha256": "b02c026cf782352ed95e2b7726c5de1435e3ce76a0241046b2e00d2dbda897ec",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "085f48fdd675087d33b3cab888bd192f20d198145629e116397bf8bbe4cbea65",
+          "validated_at": "2026-07-26T09:35:06.976623+00:00"
+        }
+      ],
+      "translation": "When all under Heaven know beauty as beauty, there is already ugliness.",
+      "translation_sha256": "43044bc75d5c245eb09561eedacbebd58faa118d0d25059c7985e058a7241e7b"
+    }
+  ]
+}

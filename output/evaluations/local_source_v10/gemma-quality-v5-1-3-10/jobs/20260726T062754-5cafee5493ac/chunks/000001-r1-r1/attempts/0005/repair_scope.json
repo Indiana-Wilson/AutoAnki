@@ -1,0 +1,71 @@
+{
+  "automatic": true,
+  "base_attempt": 4,
+  "base_raw_sha256": "fb31af57c027eceecb5aedcfe18cf8eb54bd5a4af0a0611d2f4decdd82189d87",
+  "dispatch_ordinal": 4,
+  "kind": "compact_v10_example_pair_repair",
+  "schema_version": 1,
+  "target_count": 2,
+  "targets": [
+    {
+      "additional_sense_index": 0,
+      "example_index": 1,
+      "key": "p001",
+      "problem_codes": [
+        "missing_exact_form_source_term"
+      ],
+      "problem_ids": [
+        "missing_exact_form_source_term:ba3af375c396df00"
+      ],
+      "replace_sentence": true,
+      "replace_translation": true,
+      "sense_fields": {
+        "Dictionary Meaning (English)": "The act of expressing something in words or speech.",
+        "Nuance (English)": "Refers specifically to the verbal expression of thoughts or facts.",
+        "Part of Speech (English)": "Verb",
+        "Pronunciation (English)": "dào",
+        "Register (English)": "Literary/Classical",
+        "Translation (English)": "to speak; to say"
+      },
+      "sentence": "This [thing] cannot be spoken.",
+      "sibling_sentences": [
+        "此道不可言。",
+        "彼道其意。",
+        "He spoke his intention.\",\"他道：『吾必去。』\",\"He said, 'I must go.'\",\"道法自然。\",\"The way of the world is to follow nature.\"]},{"
+      ],
+      "source_rank": 1,
+      "term": "道",
+      "translation": "He spoke his intention."
+    },
+    {
+      "additional_sense_index": 0,
+      "example_index": 3,
+      "key": "p002",
+      "problem_codes": [
+        "repeated_exact_form_source_term"
+      ],
+      "problem_ids": [
+        "repeated_exact_form_source_term:71aa01a3df5a7bf2"
+      ],
+      "replace_sentence": true,
+      "replace_translation": true,
+      "sense_fields": {
+        "Dictionary Meaning (English)": "The act of expressing something in words or speech.",
+        "Nuance (English)": "Refers specifically to the verbal expression of thoughts or facts.",
+        "Part of Speech (English)": "Verb",
+        "Pronunciation (English)": "dào",
+        "Register (English)": "Literary/Classical",
+        "Translation (English)": "to speak; to say"
+      },
+      "sentence": "He spoke his intention.\",\"他道：『吾必去。』\",\"He said, 'I must go.'\",\"道法自然。\",\"The way of the world is to follow nature.\"]},{",
+      "sibling_sentences": [
+        "此道不可言。",
+        "This [thing] cannot be spoken.",
+        "彼道其意。"
+      ],
+      "source_rank": 1,
+      "term": "道",
+      "translation": "The way of the world is to follow nature."
+    }
+  ]
+}

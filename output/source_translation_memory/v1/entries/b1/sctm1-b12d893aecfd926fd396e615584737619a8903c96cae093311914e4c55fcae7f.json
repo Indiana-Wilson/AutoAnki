@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-b12d893aecfd926fd396e615584737619a8903c96cae093311914e4c55fcae7f",
+  "created_at": "2026-07-26T09:35:06.966573+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "此兩者，同出而異名，同謂之玄。",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T09:35:06.966594+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r30",
+          "context_id": "source-context-9a8214630e984de604cc",
+          "effective_raw_sha256": "4a1ce0a55b9f39b0579506545e80ab4fda390106bb7f2578002da5fb96c3037d",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T093429-4f2acf1c0f47",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "c98b0ca1a579ad8bef64b16dfd1312f190c2c16aa973abcc1316e9803e2e3bc6",
+          "provider_raw_sha256": "bebc34dda410fa039a334bd81762c583b30322529d7ea45ae3b81d48933c64a4",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "085f48fdd675087d33b3cab888bd192f20d198145629e116397bf8bbe4cbea65",
+          "validated_at": "2026-07-26T09:35:06.966465+00:00"
+        }
+      ],
+      "translation": "These two come forth from the same source but are named differently; together they are called the mysterious.",
+      "translation_sha256": "cb0b7e11bf6fb28f1ba0077f7d839a8434bdf4a23d2082450a1d704f29ea1774"
+    }
+  ]
+}

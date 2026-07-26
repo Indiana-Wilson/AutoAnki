@@ -1,0 +1,374 @@
+{
+  "additional_sense_count": 5,
+  "card_count": 15,
+  "context_count": 4,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cached_input_aud": 0.00019268817204301077,
+    "cached_input_tokens": 1792,
+    "cached_input_usd": 0.00013440000000000001,
+    "execution_mode": "standard",
+    "input_aud": 0.0011238709677419355,
+    "input_tokens": 2658,
+    "input_usd": 0.0007839,
+    "model": "gpt-5.4-mini",
+    "output_aud": 0.018677419354838708,
+    "output_tokens": 2895,
+    "output_usd": 0.0130275,
+    "pricing": {
+      "cached_input_usd_per_million": 0.075,
+      "input_usd_per_million": 0.75,
+      "label": "standard pricing published 2026-07-24",
+      "model": "gpt-5.4-mini",
+      "output_usd_per_million": 4.5
+    },
+    "pricing_label": "standard pricing published 2026-07-24",
+    "total_aud": 0.019801290322580645,
+    "total_tokens": 5553,
+    "total_usd": 0.0138114,
+    "uncached_input_aud": 0.0009311827956989247,
+    "uncached_input_tokens": 866,
+    "uncached_input_usd": 0.0006495,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-25T15:53:42.715895+00:00",
+  "local_repair_audit": {
+    "candidate_sha256": "bbeb4443b5313ca811d4deb6e0e54b54c8a8b73a7b228a1f1cf459eec1df850d",
+    "change_count": 0,
+    "changed": false,
+    "changes": [],
+    "kind": "compact_local_response_repair",
+    "original_sha256": "bbeb4443b5313ca811d4deb6e0e54b54c8a8b73a7b228a1f1cf459eec1df850d",
+    "schema_version": 1
+  },
+  "local_repair_count": 0,
+  "max_output_tokens": 23724,
+  "model": "gpt-5.4-mini",
+  "payload_estimated_tokens": 552,
+  "prompt_estimated_tokens": 1908,
+  "protocol": "v10",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-f445a2b40f8c937726cd",
+        "translation": "When he concentrates his breath and brings it to softness, can he become like an infant?"
+      },
+      {
+        "context_id": "source-context-04fb527e9364ee675a8f",
+        "translation": "Can he cleanse and clear his dark inner vision so that it is without flaw?"
+      },
+      {
+        "context_id": "source-context-fb58aa9ae8ff2443e745",
+        "translation": "Can he love the state and govern the people without employing knowledge?"
+      },
+      {
+        "context_id": "source-context-f8b2538bdc32a257bb3f",
+        "translation": "Can he let Heaven’s gate open and shut and remain female?"
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To send something or someone to a place or person.",
+            "Nuance (English)": "Neutral and common in literary prose.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "zhì",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The lord sent a letter to me.",
+              "The envoy delivered the order to Chu.",
+              "The cart brought grain to the army.",
+              "The official sent his son to school."
+            ],
+            "Sentences": [
+              "君使人致書於我。",
+              "使者致命於楚。",
+              "車致粟於軍。",
+              "吏致其子於學。"
+            ],
+            "Translation (English)": "send; dispatch"
+          },
+          {
+            "Dictionary Meaning (English)": "To arrive at a state, standard, or result through effort or process.",
+            "Nuance (English)": "Usually implies accomplishment or full realization, not mere approach.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "zhì",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "Study and attain knowledge.",
+              "Excess labor brings on illness.",
+              "Long travel leads to fatigue.",
+              "Sincerity can earn trust."
+            ],
+            "Sentences": [
+              "學而致知。",
+              "勞則致病。",
+              "久行而致疲。",
+              "誠可致信。"
+            ],
+            "Translation (English)": "attain; reach"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To cause a condition or result to come about, especially by acting so that something is produced or attained.",
+          "Nuance (English)": "Often marks the successful outcome of sustained action or cultivation rather than simple motion toward a goal.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "zhì",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "bring about; make"
+        },
+        "rank": 191
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Having little hardness, force, or rigidity; also used of a mild, yielding disposition or quality.",
+          "Nuance (English)": "In the Laozi, the word often carries the valued sense of yielding softness opposed to hardness or coercion.",
+          "Part of Speech (English)": "adjective",
+          "Pronunciation (English)": "róu",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "soft; gentle"
+        },
+        "rank": 192
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A very young child, especially one too young to speak or reason fully.",
+          "Nuance (English)": "In Laozi usage, it evokes unforced innocence and unselfconscious naturalness.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "yīng'ér",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "infant; baby"
+        },
+        "rank": 193
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To remove dirt or other matter by washing.",
+            "Nuance (English)": "Concrete physical cleansing rather than moral or mental purification.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "dí chú",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "At dawn he washed away the dust and grime.",
+              "Use water to rinse the vessels clean.",
+              "Long rain can wash the mud off the steps.",
+              "First wash his clothes clean, and then use them."
+            ],
+            "Sentences": [
+              "晨起滌除塵垢。",
+              "以水滌除器皿。",
+              "久雨可滌除階上泥。",
+              "先滌除其衣，然後用之。"
+            ],
+            "Translation (English)": "wash off; rinse away"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To wash away or remove what is unwanted, so that something becomes clean or clear.",
+          "Nuance (English)": "A deliberate removal of impediment or defilement, often with a strong sense of purification.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "dí chú",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "cleanse; purge"
+        },
+        "rank": 194
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A quiet, inward mode of viewing or contemplating that is not based on ordinary sense perception.",
+          "Nuance (English)": "In this passage it refers to inward, unobstructed understanding rather than visual inspection.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "xuán lǎn",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "dark contemplation; inner vision"
+        },
+        "rank": 195
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A general imperfection or shortcoming in a thing, person, or plan.",
+            "Nuance (English)": "Broader than a visible blemish; can refer to any failing or weakness.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "cī",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "If a vessel has a defect, it cannot be used.",
+              "Who has no faults?",
+              "Though the writing is good, it still has flaws.",
+              "His plan has only a small weakness."
+            ],
+            "Sentences": [
+              "器有疵，則不可用。",
+              "人誰無疵。",
+              "文雖善，亦有疵。",
+              "其策少疵。"
+            ],
+            "Translation (English)": "fault; defect"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A mark, defect, or imperfection that mars something’s condition or appearance.",
+          "Nuance (English)": "Usually a small defect, often with the sense of something that spoils otherwise good quality.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "cī",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "blemish; flaw"
+        },
+        "rank": 196
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To hold someone or something in affection, value, or tender regard.",
+          "Nuance (English)": "Often implies valued regard that can include restraint and protective care, not only emotional warmth.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "ài",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "love; cherish"
+        },
+        "rank": 197
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A politically organized territory or realm under a ruler or government.",
+          "Nuance (English)": "In Warring States and Han literary usage, it can mean a feudal state, a realm, or a polity rather than a modern nation-state.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "guó",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "state; country"
+        },
+        "rank": 198
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A symbolic or cosmic gate associated with Heaven, the source or threshold of natural processes.",
+          "Nuance (English)": "In the Laozi, it is a metaphysical image for the origin or opening through which forces emerge and return.",
+          "Part of Speech (English)": "noun phrase",
+          "Pronunciation (English)": "tiān mén",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "Heaven’s gate"
+        },
+        "rank": 199
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The act or process of opening and closing, especially viewed as a paired movement or cycle.",
+            "Nuance (English)": "Used when the two motions are treated as a single process or pattern.",
+            "Part of Speech (English)": "noun phrase",
+            "Pronunciation (English)": "kāi hé",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": [
+              "The opening and closing of a gate depend on the time.",
+              "Observe the opening and closing of yin and yang.",
+              "Its mechanism lies in opening and closing.",
+              "If opening and closing are regulated, affairs succeed."
+            ],
+            "Sentences": [
+              "門之開闔，時也。",
+              "觀陰陽之開闔。",
+              "其機在開闔。",
+              "開闔有節，則事成。"
+            ],
+            "Translation (English)": "opening and closing"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To open and close repeatedly or in alternation.",
+          "Nuance (English)": "The pair often suggests rhythmic alternation or the functioning of a threshold, not merely a single act of opening.",
+          "Part of Speech (English)": "verb phrase",
+          "Pronunciation (English)": "kāi hé",
+          "Register (English)": "Classical Chinese; received Laozi text transmitted with Wang Bi commentary",
+          "Translation (English)": "open and shut; open and close"
+        },
+        "rank": 200
+      }
+    ]
+  },
+  "reasoning_effort": "low",
+  "response_id": "resp_02782a5fcf63bf7f006a64dbeffb8c81978d5005e6f8660ec2",
+  "response_status": "completed",
+  "schema_estimated_tokens": 519,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "target_ranks": [
+    191,
+    192,
+    193,
+    194,
+    195,
+    196,
+    197,
+    198,
+    199,
+    200
+  ],
+  "term_result_count": 10,
+  "terms": [
+    {
+      "rank": 191,
+      "term": "致"
+    },
+    {
+      "rank": 192,
+      "term": "柔"
+    },
+    {
+      "rank": 193,
+      "term": "嬰兒"
+    },
+    {
+      "rank": 194,
+      "term": "滌除"
+    },
+    {
+      "rank": 195,
+      "term": "玄覽"
+    },
+    {
+      "rank": 196,
+      "term": "疵"
+    },
+    {
+      "rank": 197,
+      "term": "愛"
+    },
+    {
+      "rank": 198,
+      "term": "國"
+    },
+    {
+      "rank": 199,
+      "term": "天門"
+    },
+    {
+      "rank": 200,
+      "term": "開闔"
+    }
+  ],
+  "usage": {
+    "cached_input_tokens": 1792,
+    "input_tokens": 2658,
+    "output_tokens": 2895,
+    "reasoning_tokens": 801,
+    "total_tokens": 5553,
+    "uncached_input_tokens": 866,
+    "visible_output_tokens": 2094,
+    "web_search_calls": 0
+  },
+  "valid": true,
+  "validation_error": null,
+  "word_count": 10
+}

@@ -41,8 +41,8 @@ ADDITIONAL SENSE CARDS
 
 Put only genuinely disjoint additional common senses in
 "additional_sense_cards". Every object in this array must belong to a supplied
-term and must include "Sentences" as exactly four array items and
-"Sentence Translations (English)" as exactly four positionally matched array
+term and must include "Sentences" as exactly three array items and
+"Sentence Translations (English)" as exactly three positionally matched array
 items. Keep entries for each term together in ascending source-rank order. Do
 not repeat the contextual sense here. If no requested term has an additional
 qualifying sense, return an empty array.
@@ -60,10 +60,10 @@ how many words refer to it. Return one object for every input context in
 Do not add an unrequested context_id, omit a requested one, or return the same
 context_id twice. Each context translation is one undelimited JSON string. It
 may contain normal English punctuation and multiple clauses or sentences, but
-never |, <strong> tags, or any other HTML. Do not split one context translation
+never |, or any HTML. Do not split one context translation
 into several items. If the context is already Modern English, repeat it as
 plain text.
 
 The processor will insert the exact retained context and its matched root
 translation into each contextual card. Do not repeat, rewrite, delimit, or
-highlight either value inside a card object.
+repeat either value inside a card object.

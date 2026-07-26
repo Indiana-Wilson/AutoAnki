@@ -57,6 +57,41 @@ class AnkiConnectClientTests(unittest.TestCase):
                     "sync: auth not configured")):
             client.invoke("sync")
 
+    def test_http_service_on_configured_port_is_identified(self):
+        client = anki_integration.AnkiConnectClient(
+            url="http://127.0.0.1:8765")
+        error = anki_integration.urllib.error.HTTPError(
+            client.url,
+            501,
+            "Unsupported method",
+            {"Server": "InformerBrowser/1"},
+            io.BytesIO(b"not AnkiConnect"))
+
+        with (
+                patch.object(
+                    anki_integration.urllib.request,
+                    "urlopen",
+                    side_effect=error),
+                self.assertRaisesRegex(
+                    anki_integration.AnkiConnectResponseError,
+                    "HTTP 501.*InformerBrowser.*Another service")):
+            client.invoke("version")
+
+    def test_non_json_service_on_configured_port_is_identified(self):
+        client = anki_integration.AnkiConnectClient(
+            url="http://127.0.0.1:8765")
+        response = io.BytesIO(b"<html>not AnkiConnect</html>")
+
+        with (
+                patch.object(
+                    anki_integration.urllib.request,
+                    "urlopen",
+                    return_value=response),
+                self.assertRaisesRegex(
+                    anki_integration.AnkiConnectResponseError,
+                    "invalid JSON.*Another service")):
+            client.invoke("version")
+
     def test_connection_settings_are_stored_with_owner_only_permissions(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / "anki_connection.json"
@@ -176,6 +211,24 @@ class AnkiStartupTests(unittest.TestCase):
         minimize_new_windows.assert_called_once_with(
             {"0x-existing"})
         sleep.assert_called_once_with(0)
+
+    def test_wrong_local_service_does_not_launch_or_wait(self):
+        client = MagicMock()
+        client.is_available.side_effect = (
+            anki_integration.AnkiConnectResponseError(
+                "Another service is using the port."))
+        launch = MagicMock()
+
+        with self.assertRaisesRegex(
+                anki_integration.AnkiConnectResponseError,
+                "Another service"):
+            anki_integration.ensure_anki_running(
+                client,
+                launch=launch)
+
+        launch.assert_not_called()
+        client.is_available.assert_called_once_with(
+            raise_response_errors=True)
 
     def test_remote_anki_is_never_launched_locally(self):
         client = anki_integration.AnkiConnectClient(

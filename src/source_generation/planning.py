@@ -9,17 +9,20 @@ from pathlib import Path
 
 import runtime_paths
 from corpus_pipeline.catalogue import get_corpus_spec
-from corpus_pipeline.models import CORPUS_SCHEMA_VERSION
+from corpus_pipeline.models import CORPUS_SCHEMA_VERSION, TokenOccurrence
 from corpus_pipeline.processing import normalize_word
 from corpus_pipeline.storage import (
     build_id,
     read_vocabulary_view,
     resolve_corpus_base,
+    verify_artifact_hashes,
 )
 from source_generation.models import (
+    ContextOccurrenceSpan,
     ContextMode,
     ContextUnit,
     CostEstimate,
+    DEFAULT_SOURCE_MODEL,
     GenerationChunk,
     GenerationPlan,
     GenerationWord,
@@ -32,23 +35,28 @@ from source_generation.models import (
     Pricing,
     SourceGenerationConfig,
 )
+from source_generation.model_catalog import source_model_profile
 
 
 STANDARD_PRICING = Pricing(
-    model="gpt-5.4-mini",
+    model=DEFAULT_SOURCE_MODEL,
     input_usd_per_million=0.75,
     output_usd_per_million=4.50,
     label="standard pricing published 2026-07-24",
     cached_input_usd_per_million=0.075,
 )
 BATCH_PRICING = Pricing(
-    model="gpt-5.4-mini",
+    model=DEFAULT_SOURCE_MODEL,
     input_usd_per_million=0.375,
     output_usd_per_million=2.25,
     label="Batch/Flex pricing published 2026-07-24",
     cached_input_usd_per_million=0.0375,
 )
 DEFAULT_PRICING = STANDARD_PRICING
+_PRICING_BY_MODEL_AND_MODE = {
+    (STANDARD_PRICING.model, "standard"): STANDARD_PRICING,
+    (BATCH_PRICING.model, "economy"): BATCH_PRICING,
+}
 # OpenAI bills in USD.  This dated conversion keeps saved estimates
 # reproducible instead of silently changing between authorization and job
 # creation. RBA AUD/USD at 4:00 pm on 2026-07-24 was 0.6975.
@@ -105,9 +113,13 @@ _FIELD_OUTPUT_TOKENS = {
 }
 _TERM_OUTPUT_TOKENS = 5
 _JSON_OVERHEAD_TOKENS_PER_CARD = 13
-_EXAMPLE_SENTENCE_OUTPUT_TOKENS = 72
-_EXAMPLE_TRANSLATION_OUTPUT_TOKENS = 72
+_EXAMPLE_SENTENCE_OUTPUT_TOKENS = 54
+_EXAMPLE_TRANSLATION_OUTPUT_TOKENS = 54
 _RESPONSE_ENVELOPE_TOKENS = 12
+_AUTOMATIC_REPAIR_FIXED_INPUT_TOKENS = 400
+_AUTOMATIC_REPAIR_INPUT_TOKENS_PER_PAIR = 220
+_AUTOMATIC_REPAIR_OUTPUT_TOKENS_PER_PAIR = 80
+_AUTOMATIC_REPAIR_MAX_PAIRS_PER_CALL = 64
 _SOURCE_TERM_RESULT_OVERHEAD_TOKENS = 8
 _SOURCE_CONTEXT_TRANSLATION_OVERHEAD_TOKENS = 8
 
@@ -550,6 +562,82 @@ def _make_occurrence_locator(word, context):
     )
 
 
+def _load_selected_source_occurrences(loaded_source, normalized_terms):
+    """Stream only requested token occurrences from a verified saved build."""
+    occurrence_path = loaded_source.run_path / "occurrences.jsonl"
+    if not occurrence_path.is_file():
+        return {}
+    verify_artifact_hashes(loaded_source.run_path)
+    selected = {
+        normalized: []
+        for normalized in normalized_terms
+    }
+    with occurrence_path.open(
+            "r",
+            encoding="utf-8",
+            newline="") as source:
+        for line_number, line in enumerate(source, start=1):
+            if not line.strip():
+                continue
+            try:
+                occurrence = TokenOccurrence(**json.loads(line))
+            except (TypeError, ValueError, json.JSONDecodeError) as error:
+                raise ValueError(
+                    "Invalid occurrences.jsonl record on line "
+                    f"{line_number}.") from error
+            if occurrence.normalized in selected:
+                selected[occurrence.normalized].append(occurrence)
+    return {
+        normalized: tuple(occurrences)
+        for normalized, occurrences in selected.items()
+    }
+
+
+def _chunk_context_occurrences(
+        loaded_source,
+        words,
+        contexts_by_id,
+        rank_to_context,
+        occurrences_by_normalized):
+    """Return complete tokenizer spans relative to each retained context."""
+    canonical_text = loaded_source.build.snapshot.canonical_text
+    result = {}
+    for word in words:
+        context = contexts_by_id.get(rank_to_context.get(word.rank))
+        if context is None:
+            continue
+        spans = []
+        for occurrence in occurrences_by_normalized.get(
+                word.normalized,
+                ()):
+            if (
+                    occurrence.start_offset < context.start_offset
+                    or occurrence.end_offset > context.end_offset):
+                continue
+            if (
+                    canonical_text[
+                        occurrence.start_offset:occurrence.end_offset]
+                    != occurrence.surface):
+                raise ValueError(
+                    "A saved token occurrence disagrees with canonical "
+                    "source text.")
+            relative_start = (
+                occurrence.start_offset - context.start_offset)
+            relative_end = occurrence.end_offset - context.start_offset
+            if (
+                    context.text[relative_start:relative_end]
+                    != occurrence.surface):
+                raise ValueError(
+                    "A saved token occurrence disagrees with its retained "
+                    "source context.")
+            spans.append(ContextOccurrenceSpan(
+                relative_start,
+                relative_end,
+                occurrence.surface))
+        result[word.rank] = tuple(spans)
+    return result
+
+
 def plan_source_generation(loaded_source, config):
     """Repartition saved vocabulary and deduplicate context within each query."""
     if not isinstance(loaded_source, LoadedSource):
@@ -590,6 +678,15 @@ def plan_source_generation(loaded_source, config):
             source_language_key) not in excluded
     )
     groups = _partition_words(selected_words, config.chunk_size)
+    occurrences_by_normalized = (
+        _load_selected_source_occurrences(
+            loaded_source,
+            {
+                word.normalized
+                for word in selected_words
+            })
+        if config.request_protocol == "v10"
+        else {})
     total = len(groups)
     chunks = []
     for index, words in enumerate(groups, start=1):
@@ -602,6 +699,15 @@ def plan_source_generation(loaded_source, config):
             context.context_id: context
             for context in context_units
         }
+        context_occurrences_by_rank = (
+            _chunk_context_occurrences(
+                loaded_source,
+                words,
+                contexts_by_id,
+                rank_to_context,
+                occurrences_by_normalized)
+            if config.request_protocol == "v10"
+            else {})
         chunk_id = (
             f"{index:06d}-r{words[0].rank}-r{words[-1].rank}")
         chunks.append(GenerationChunk(
@@ -623,7 +729,11 @@ def plan_source_generation(loaded_source, config):
                     occurrence_locator=_make_occurrence_locator(
                         word,
                         contexts_by_id.get(
-                            rank_to_context.get(word.rank))))
+                            rank_to_context.get(word.rank))),
+                    context_occurrences=(
+                        context_occurrences_by_rank.get(
+                            word.rank,
+                            ())))
                 for word in words
             ),
             contexts=context_units,
@@ -763,8 +873,9 @@ def _source_chunk_output_tokens(
         chunk,
         *,
         additional_senses_per_word,
-        context_translation_token_ratio):
-    """Estimate the visible v8/v9 source-context response shape.
+        context_translation_token_ratio,
+        remembered_context_ids=()):
+    """Estimate the visible compact source-context response shape.
 
     The contextual entry is lexical-only. Additional senses retain generated
     examples, and each deduplicated source context is translated exactly once.
@@ -786,6 +897,7 @@ def _source_chunk_output_tokens(
                 * context_translation_token_ratio)
             + _SOURCE_CONTEXT_TRANSLATION_OVERHEAD_TOKENS)
         for context in chunk.contexts
+        if context.context_id not in remembered_context_ids
     )
     return math.ceil(
         (
@@ -810,20 +922,31 @@ def _reasoning_multiplier(reasoning_effort, scenario):
         'Source reasoning effort must be either "none" or "low".')
 
 
-def _pricing_for_execution_mode(execution_mode):
-    if execution_mode == "standard":
-        return STANDARD_PRICING
-    if execution_mode == "economy":
-        return BATCH_PRICING
-    raise ValueError(
-        'Source execution mode must be either "standard" or "economy".')
+def _pricing_for_execution_mode(
+        execution_mode,
+        model=DEFAULT_SOURCE_MODEL):
+    try:
+        return _PRICING_BY_MODEL_AND_MODE[(model, execution_mode)]
+    except KeyError as error:
+        if execution_mode not in {"standard", "economy"}:
+            raise ValueError(
+                'Source execution mode must be either "standard" or '
+                '"economy".') from error
+        raise ValueError(
+            f"No source-generation pricing is configured for {model!r}.") \
+            from error
 
 
 def _usd_for_tokens(tokens, rate_per_million):
     return tokens * rate_per_million / 1_000_000
 
 
-def price_source_usage(usage, *, execution_mode="standard"):
+def price_source_usage(
+        usage,
+        *,
+        execution_mode="standard",
+        model=DEFAULT_SOURCE_MODEL,
+        pricing=None):
     """Price an exact normalized source-generation usage summary.
 
     ``cached_input_tokens`` and ``uncached_input_tokens`` are disjoint.
@@ -836,6 +959,7 @@ def price_source_usage(usage, *, execution_mode="standard"):
     for key in (
             "uncached_input_tokens",
             "cached_input_tokens",
+            "cache_write_input_tokens",
             "output_tokens"):
         value = usage.get(key, 0)
         if (
@@ -853,7 +977,12 @@ def price_source_usage(usage, *, execution_mode="standard"):
         raise ValueError(
             "Source usage web_search_calls must be a non-negative integer.")
 
-    pricing = _pricing_for_execution_mode(execution_mode)
+    if pricing is None:
+        pricing = _pricing_for_execution_mode(execution_mode, model)
+    elif isinstance(pricing, dict):
+        pricing = Pricing(**pricing)
+    if not isinstance(pricing, Pricing):
+        raise TypeError("A pricing profile is required.")
     cached_input_rate = (
         pricing.cached_input_usd_per_million
         if pricing.cached_input_usd_per_million is not None
@@ -864,12 +993,22 @@ def price_source_usage(usage, *, execution_mode="standard"):
     cached_input_usd = _usd_for_tokens(
         token_counts["cached_input_tokens"],
         cached_input_rate)
+    cache_write_rate = (
+        pricing.cache_write_input_usd_per_million
+        if pricing.cache_write_input_usd_per_million is not None
+        else pricing.input_usd_per_million)
+    cache_write_input_usd = _usd_for_tokens(
+        token_counts["cache_write_input_tokens"],
+        cache_write_rate)
     output_usd = _usd_for_tokens(
         token_counts["output_tokens"],
         pricing.output_usd_per_million)
     web_search_usd = (
         web_search_calls * WEB_SEARCH_USD_PER_CALL)
-    input_usd = uncached_input_usd + cached_input_usd
+    input_usd = (
+        uncached_input_usd
+        + cached_input_usd
+        + cache_write_input_usd)
     total_usd = input_usd + output_usd + web_search_usd
 
     return {
@@ -881,19 +1020,24 @@ def price_source_usage(usage, *, execution_mode="standard"):
         "web_search_calls": web_search_calls,
         "input_tokens": (
             token_counts["uncached_input_tokens"]
-            + token_counts["cached_input_tokens"]),
+            + token_counts["cached_input_tokens"]
+            + token_counts["cache_write_input_tokens"]),
         "total_tokens": (
             token_counts["uncached_input_tokens"]
             + token_counts["cached_input_tokens"]
+            + token_counts["cache_write_input_tokens"]
             + token_counts["output_tokens"]),
         "uncached_input_usd": uncached_input_usd,
         "cached_input_usd": cached_input_usd,
+        "cache_write_input_usd": cache_write_input_usd,
         "input_usd": input_usd,
         "output_usd": output_usd,
         "web_search_usd": web_search_usd,
         "total_usd": total_usd,
         "uncached_input_aud": uncached_input_usd * USD_TO_AUD_RATE,
         "cached_input_aud": cached_input_usd * USD_TO_AUD_RATE,
+        "cache_write_input_aud": (
+            cache_write_input_usd * USD_TO_AUD_RATE),
         "input_aud": input_usd * USD_TO_AUD_RATE,
         "output_aud": output_usd * USD_TO_AUD_RATE,
         "web_search_aud": web_search_usd * USD_TO_AUD_RATE,
@@ -916,10 +1060,11 @@ def estimate_plan_cost(
         request_protocol=None,
         reasoning_effort=None,
         execution_mode=None,
-        response_formats_by_chunk=None):
+        response_formats_by_chunk=None,
+        translation_memory_by_chunk=None):
     """Estimate one source plan without contacting OpenAI.
 
-    A fixed ``response_format`` represents v9's reusable schema.
+    A fixed ``response_format`` represents a compact reusable schema.
     ``response_formats_by_chunk`` represents v8's exact dynamic schemas.
     """
     if not isinstance(plan, GenerationPlan):
@@ -948,14 +1093,16 @@ def estimate_plan_cost(
         plan.config.execution_mode
         if execution_mode is None
         else execution_mode)
-    if request_protocol not in {"v8", "v9"}:
+    if request_protocol not in {"v8", "v9", "v10"}:
         raise ValueError(
-            'Source request protocol must be either "v8" or "v9".')
+            'Source request protocol must be "v8", "v9", or "v10".')
     if request_protocol == "v8" and reasoning_effort != "low":
         raise ValueError(
             'Source request protocol "v8" requires reasoning effort "low".')
     _reasoning_multiplier(reasoning_effort, "central")
-    selected_pricing = _pricing_for_execution_mode(execution_mode)
+    selected_pricing = _pricing_for_execution_mode(
+        execution_mode,
+        plan.config.model)
     if pricing is None:
         pricing = selected_pricing
     if not isinstance(pricing, Pricing):
@@ -966,9 +1113,12 @@ def estimate_plan_cost(
         raise ValueError(
             "Choose either one fixed response format or per-chunk response "
             "formats, not both.")
-    if request_protocol == "v9" and response_formats_by_chunk is not None:
+    if (
+            request_protocol in {"v9", "v10"}
+            and response_formats_by_chunk is not None):
         raise ValueError(
-            "Source request protocol v9 requires one fixed response format.")
+            "Compact source request protocols require one fixed response "
+            "format.")
     if (
             request_protocol == "v8"
             and use_source_for_example_sentences
@@ -983,6 +1133,24 @@ def estimate_plan_cost(
         raise ValueError(
             "Source-context request protocol v8 requires per-chunk response "
             "formats.")
+    if translation_memory_by_chunk is None:
+        translation_memory_by_chunk = {}
+    if not isinstance(translation_memory_by_chunk, dict):
+        raise TypeError(
+            "Source translation-memory snapshot must be an object.")
+    expected_chunk_ids = {
+        chunk.chunk_id
+        for chunk in plan.chunks
+    }
+    unknown_memory_chunks = (
+        set(translation_memory_by_chunk) - expected_chunk_ids)
+    if unknown_memory_chunks:
+        raise ValueError(
+            "Source translation memory contains unknown request chunks.")
+    for chunk_id, hits in translation_memory_by_chunk.items():
+        if not isinstance(hits, dict):
+            raise TypeError(
+                f"Translation-memory hits for {chunk_id} must be an object.")
 
     # Imported here to keep planning's module import independent from the
     # request module, whose contract builder imports estimator constants.
@@ -996,7 +1164,10 @@ def estimate_plan_cost(
             render_chunk_input(
                 chunk,
                 protocol_version=int(
-                    request_protocol.removeprefix("v"))))
+                    request_protocol.removeprefix("v")),
+                source_context_translation_memory=(
+                    translation_memory_by_chunk.get(
+                        chunk.chunk_id))))
         for chunk in plan.chunks
     }
     payload_tokens = sum(payload_tokens_by_chunk.values())
@@ -1056,7 +1227,11 @@ def estimate_plan_cost(
                     additional_senses_per_word=(
                         SOURCE_ADDITIONAL_SENSES_PER_WORD_LOW),
                     context_translation_token_ratio=(
-                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_LOW))
+                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_LOW),
+                    remembered_context_ids=set(
+                        translation_memory_by_chunk.get(
+                            chunk.chunk_id,
+                            ())))
                 for chunk in plan.chunks),
             "central": tuple(
                 _source_chunk_output_tokens(
@@ -1065,7 +1240,11 @@ def estimate_plan_cost(
                     additional_senses_per_word=(
                         SOURCE_ADDITIONAL_SENSES_PER_WORD_CENTRAL),
                     context_translation_token_ratio=(
-                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_CENTRAL))
+                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_CENTRAL),
+                    remembered_context_ids=set(
+                        translation_memory_by_chunk.get(
+                            chunk.chunk_id,
+                            ())))
                 for chunk in plan.chunks),
             "high": tuple(
                 _source_chunk_output_tokens(
@@ -1074,7 +1253,11 @@ def estimate_plan_cost(
                     additional_senses_per_word=(
                         SOURCE_ADDITIONAL_SENSES_PER_WORD_HIGH),
                     context_translation_token_ratio=(
-                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_HIGH))
+                        SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_HIGH),
+                    remembered_context_ids=set(
+                        translation_memory_by_chunk.get(
+                            chunk.chunk_id,
+                            ())))
                 for chunk in plan.chunks),
         }
         response_shape = "source_contextual_lexical_plus_additional"
@@ -1165,17 +1348,33 @@ def estimate_plan_cost(
     largest_total_high = largest_input + largest_output_high
 
     shared_cache_prefix_tokens = prompt_tokens_per_request
-    if schema_cache_shared:
+    cache_mode = source_model_profile(
+        plan.config.model).prompt_cache_mode
+    if cache_mode == "implicit" and schema_cache_shared:
         shared_cache_prefix_tokens += schema_tokens_per_request
     cache_eligible = (
+        cache_mode != "none"
+        and
         request_count > 1
         and shared_cache_prefix_tokens >= PROMPT_CACHE_MINIMUM_TOKENS)
+    cache_write_input_tokens = (
+        shared_cache_prefix_tokens
+        if (
+            cache_eligible
+            and cache_mode == "explicit_write")
+        else 0)
     cached_input_tokens = (
         (request_count - 1) * shared_cache_prefix_tokens
         if cache_eligible
         else 0)
     cached_input_tokens = min(input_tokens, cached_input_tokens)
-    uncached_input_tokens = input_tokens - cached_input_tokens
+    cache_write_input_tokens = min(
+        input_tokens - cached_input_tokens,
+        cache_write_input_tokens)
+    uncached_input_tokens = (
+        input_tokens
+        - cached_input_tokens
+        - cache_write_input_tokens)
     cached_input_rate = (
         pricing.cached_input_usd_per_million
         if pricing.cached_input_usd_per_million is not None
@@ -1183,13 +1382,37 @@ def estimate_plan_cost(
     cached_input_usd = _usd_for_tokens(
         cached_input_tokens,
         cached_input_rate)
+    cache_write_input_rate = (
+        pricing.cache_write_input_usd_per_million
+        if pricing.cache_write_input_usd_per_million is not None
+        else pricing.input_usd_per_million)
+    cache_write_input_usd = _usd_for_tokens(
+        cache_write_input_tokens,
+        cache_write_input_rate)
     uncached_input_usd = _usd_for_tokens(
         uncached_input_tokens,
         pricing.input_usd_per_million)
-    input_usd = cached_input_usd + uncached_input_usd
-    cold_input_usd = _usd_for_tokens(
-        input_tokens,
-        pricing.input_usd_per_million)
+    input_usd = (
+        cached_input_usd
+        + cache_write_input_usd
+        + uncached_input_usd)
+    if (
+            cache_eligible
+            and cache_mode == "explicit_write"):
+        high_cache_write_tokens = min(
+            input_tokens,
+            request_count * shared_cache_prefix_tokens)
+        cold_input_usd = (
+            _usd_for_tokens(
+                high_cache_write_tokens,
+                cache_write_input_rate)
+            + _usd_for_tokens(
+                input_tokens - high_cache_write_tokens,
+                pricing.input_usd_per_million))
+    else:
+        cold_input_usd = _usd_for_tokens(
+            input_tokens,
+            pricing.input_usd_per_million)
     low_output_usd = _usd_for_tokens(
         low_output_tokens,
         pricing.output_usd_per_million)
@@ -1208,6 +1431,51 @@ def estimate_plan_cost(
             + _usd_for_tokens(
                 WEB_SEARCH_CONTENT_TOKENS_PER_CALL_HIGH,
                 pricing.input_usd_per_million))
+    automatic_repair_max_requests = (
+        request_count * plan.config.max_automatic_repairs
+        if plan.config.automatic_repair
+        else 0)
+    automatic_repair_input_tokens = 0
+    automatic_repair_output_tokens = 0
+    if automatic_repair_max_requests:
+        per_round_input = 0
+        per_round_output = 0
+        for chunk in plan.chunks:
+            target_count = min(
+                _AUTOMATIC_REPAIR_MAX_PAIRS_PER_CALL,
+                len(chunk.words) * 4)
+            per_round_input += (
+                _AUTOMATIC_REPAIR_FIXED_INPUT_TOKENS
+                + (
+                    target_count
+                    * _AUTOMATIC_REPAIR_INPUT_TOKENS_PER_PAIR))
+            per_round_output += (
+                _RESPONSE_ENVELOPE_TOKENS
+                + (
+                    target_count
+                    * _AUTOMATIC_REPAIR_OUTPUT_TOKENS_PER_PAIR))
+        automatic_repair_input_tokens = (
+            per_round_input
+            * plan.config.max_automatic_repairs)
+        automatic_repair_output_tokens = (
+            per_round_output
+            * plan.config.max_automatic_repairs)
+    automatic_repair_reserve_usd = (
+        _usd_for_tokens(
+            automatic_repair_input_tokens,
+            pricing.input_usd_per_million)
+        + _usd_for_tokens(
+            automatic_repair_output_tokens,
+            pricing.output_usd_per_million))
+    translation_memory_hit_count = sum(
+        len(hits)
+        for hits in translation_memory_by_chunk.values())
+    translation_memory_digest = (
+        hashlib.sha256(
+            _canonical_json(
+                translation_memory_by_chunk).encode("utf-8")).hexdigest()
+        if translation_memory_hit_count
+        else None)
 
     return CostEstimate(
         model=pricing.model,
@@ -1219,10 +1487,12 @@ def estimate_plan_cost(
         schema_tokens=schema_tokens,
         estimated_input_tokens=input_tokens,
         estimated_cached_input_tokens=cached_input_tokens,
+        estimated_cache_write_input_tokens=cache_write_input_tokens,
         estimated_uncached_input_tokens=uncached_input_tokens,
         estimated_output_tokens=output_tokens,
         estimated_input_usd=input_usd,
         estimated_cached_input_usd=cached_input_usd,
+        estimated_cache_write_input_usd=cache_write_input_usd,
         estimated_uncached_input_usd=uncached_input_usd,
         estimated_output_usd=output_usd,
         estimated_total_usd=total,
@@ -1280,6 +1550,8 @@ def estimate_plan_cost(
                 if cache_eligible
                 else 0),
             "estimated_cached_input_tokens": cached_input_tokens,
+            "estimated_cache_write_input_tokens": (
+                cache_write_input_tokens),
             "estimated_uncached_input_tokens": uncached_input_tokens,
             "cold_input_usd": cold_input_usd,
             "field_output_tokens_per_sense": {
@@ -1295,6 +1567,26 @@ def estimate_plan_cost(
                 if detail.include_example_sentences
                 else 0),
             "context_deduplication_scope": "within each request",
+            "translation_memory_hit_count": (
+                translation_memory_hit_count),
+            "translation_memory_sha256": (
+                translation_memory_digest),
+            "automatic_repair_enabled": (
+                plan.config.automatic_repair),
+            "automatic_repair_max_requests": (
+                automatic_repair_max_requests),
+            "automatic_repair_reserve_input_tokens": (
+                automatic_repair_input_tokens),
+            "automatic_repair_reserve_output_tokens": (
+                automatic_repair_output_tokens),
+            "automatic_repair_reserve_usd": (
+                automatic_repair_reserve_usd),
+            "automatic_repair_reserve_aud": (
+                automatic_repair_reserve_usd * USD_TO_AUD_RATE),
+            "automatic_repair_reserve_basis": (
+                "conservative upper reserve if every base request uses all "
+                "authorized micro-repair dispatches at up to 64 example "
+                "pairs per call; excluded from headline and range"),
             "web_search_enabled": bool(web_search_enabled),
             "web_search_max_calls_per_request": (
                 1 if web_search_enabled else 0),

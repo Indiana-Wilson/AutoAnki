@@ -1,0 +1,13 @@
+{
+  "attempts": 3,
+  "chunk_id": "000001-r1-r1",
+  "completed_at": "2026-07-26T03:47:19.241612+00:00",
+  "created_at": "2026-07-26T03:37:30.906541+00:00",
+  "index": 1,
+  "last_error": null,
+  "latest_attempt_path": "attempts/0003",
+  "started_at": "2026-07-26T03:37:30.932044+00:00",
+  "status": "succeeded",
+  "updated_at": "2026-07-26T03:47:19.242096+00:00",
+  "worker": "automatic selective v10 repair"
+}

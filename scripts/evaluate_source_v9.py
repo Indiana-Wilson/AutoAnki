@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explicit paid smoke test for AutoAnki's compact source protocol."""
+"""Explicit paid smoke test for AutoAnki's compact source protocols."""
 
 import argparse
 from datetime import datetime, timezone
@@ -74,7 +74,7 @@ def _request_options(contract, chunk):
             contract["composed_prompt"]
             + render_chunk_input(
                 chunk,
-                protocol_version=9)),
+                protocol_version=contract["schema_version"])),
         "reasoning": contract["reasoning"],
         "text": {"format": contract["response_format"]},
         "max_output_tokens": contract[
@@ -92,11 +92,15 @@ def _parse_args():
     parser.add_argument(
         "--source",
         default="daodejing_wang_bi")
+    parser.add_argument(
+        "--protocol",
+        choices=("v9", "v10"),
+        default="v10")
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument(
         "--count",
         type=int,
-        choices=(1, 3, 10, 100))
+        choices=(1, 3, 10, 30, 60, 100, 200))
     selection.add_argument(
         "--ranks",
         help=(
@@ -113,7 +117,7 @@ def _parse_args():
             PROJECT_ROOT
             / "output"
             / "evaluations"
-            / "source_v9"))
+            / "source_compact"))
     parser.add_argument(
         "--force",
         action="store_true")
@@ -152,7 +156,9 @@ def main():
         planned_chunk_size = max(target_ranks)
     result_path = (
         args.output_dir
-        / f"{args.source}_{selection_name}_{args.reasoning}.json")
+        / (
+            f"{args.source}_{selection_name}_{args.protocol}_"
+            f"{args.reasoning}.json"))
     if result_path.is_file() and not args.force:
         print(f"Retained result already exists: {result_path}")
         return 0
@@ -177,7 +183,7 @@ def main():
         concurrency=1,
         request_stagger_ms=0,
         max_transient_retries=0,
-        request_protocol="v9",
+        request_protocol=args.protocol,
         reasoning_effort=args.reasoning,
         execution_mode="standard")
     plan = plan_source_generation(source, config)
@@ -217,7 +223,7 @@ def main():
         pipeline,
         chunks=(chunk,),
         use_source_for_example_sentences=True,
-        protocol_version=9,
+        protocol_version=int(args.protocol[1:]),
         reasoning_effort=args.reasoning)
     options = _request_options(contract, chunk)
     api_key = process_text.get_api_key()
@@ -242,9 +248,12 @@ def main():
         }
     validator = make_pipeline_response_validator(
         pipeline,
-        use_compact_source_results=True)
+        use_compact_source_results=True,
+        use_local_example_emphasis=(
+            args.protocol == "v10"))
     valid = True
     validation_error = None
+    failed_local_repair_audit = None
     if response_error is not None:
         valid = False
         validated = None
@@ -257,6 +266,10 @@ def main():
         except Exception as error:
             valid = False
             validated = None
+            failed_local_repair_audit = getattr(
+                error,
+                "local_repair_audit",
+                None)
             validation_error = {
                 "type": type(error).__name__,
                 "message": str(error),
@@ -307,14 +320,14 @@ def main():
         ],
         "context_count": len(chunk.contexts),
         "reasoning_effort": args.reasoning,
-        "protocol": "v9",
+        "protocol": args.protocol,
         "model": contract["model"],
         "prompt_estimated_tokens": estimate_text_tokens(
             contract["composed_prompt"]),
         "payload_estimated_tokens": estimate_text_tokens(
             render_chunk_input(
                 chunk,
-                protocol_version=9)),
+                protocol_version=contract["schema_version"])),
         "schema_estimated_tokens": estimate_text_tokens(
             json.dumps(
                 contract["response_format"],
@@ -336,6 +349,25 @@ def main():
             else None),
         "term_result_count": len(term_results),
         "additional_sense_count": additional_senses,
+        "local_repair_count": (
+            (
+                validated.local_repair_audit or {}
+            ).get("change_count", 0)
+            if validated is not None
+            else (
+                ((validation_error or {}).get(
+                    "validation_report",
+                    {}) or {}).get(
+                        "local_repair_count",
+                        0)
+            )),
+        "local_repair_audit": (
+            getattr(
+                validated,
+                "local_repair_audit",
+                None)
+            if validated is not None
+            else failed_local_repair_audit),
         "raw_response": parsed,
     }
     _write_json(result_path, record)
@@ -353,6 +385,7 @@ def main():
                 "valid",
                 "card_count",
                 "additional_sense_count",
+                "local_repair_count",
             )
         },
         ensure_ascii=False,

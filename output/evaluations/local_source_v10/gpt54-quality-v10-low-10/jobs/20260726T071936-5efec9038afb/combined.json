@@ -1,0 +1,372 @@
+{
+  "cards": [
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "The fundamental course, principle, or path that can be followed or articulated.",
+      "Nuance (English)": "Often refers to the ultimate Way rather than an ordinary road.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+      "Translation (English)": "Way"
+    },
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "To utter words or state something verbally.",
+      "Nuance (English)": "Common in early literary Chinese, where the same form can also mean a noun.",
+      "Part of Speech (English)": "verb",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "The ruler does not speak.|The Master states the matter.|Everyone speaks of it.|I do not dare speak it.",
+      "Sentences": "君不<strong>道</strong>。|子<strong>道</strong>其事。|人皆<strong>道</strong>之。|吾不敢<strong>道</strong>。",
+      "Translation (English)": "to speak"
+    },
+    {
+      "Classical Chinese": "可",
+      "Dictionary Meaning (English)": "Expressing possibility, capability, or permissibility.",
+      "Nuance (English)": "Marks potential or permissive force rather than completed action.",
+      "Part of Speech (English)": "modal verb",
+      "Pronunciation (English)": "kě",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S道<strong>可</strong>道，非常道，名可名，非常名；",
+      "Translation (English)": "can; may"
+    },
+    {
+      "Classical Chinese": "非",
+      "Dictionary Meaning (English)": "A negative marker that denies or reverses the following predicate or relation.",
+      "Nuance (English)": "In this text it introduces contrastive negation rather than simple rejection.",
+      "Part of Speech (English)": "negative particle",
+      "Pronunciation (English)": "fēi",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S道可道，<strong>非</strong>常道，名可名，非常名；",
+      "Translation (English)": "not"
+    },
+    {
+      "Classical Chinese": "非",
+      "Dictionary Meaning (English)": "Being mistaken, incorrect, or not right.",
+      "Nuance (English)": "Used predicatively to judge a thing or statement as incorrect.",
+      "Part of Speech (English)": "adjective",
+      "Pronunciation (English)": "fēi",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "This is not right.|Its speech is wrong.|Right and wrong are not yet settled.|The Way is not trivial.",
+      "Sentences": "此<strong>非</strong>也。|其言<strong>非</strong>。|是<strong>非</strong>未定。|道<strong>非</strong>小。",
+      "Translation (English)": "wrong"
+    },
+    {
+      "Classical Chinese": "常道",
+      "Dictionary Meaning (English)": "The enduring, unchanging Way; the stable principle that does not vary.",
+      "Nuance (English)": "Denotes a permanent principle, not a temporary or ordinary path.",
+      "Part of Speech (English)": "noun phrase",
+      "Pronunciation (English)": "cháng dào",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S道可道，非<strong>常道</strong>，名可名，非常名；",
+      "Translation (English)": "constant Way"
+    },
+    {
+      "Classical Chinese": "名",
+      "Dictionary Meaning (English)": "The word, title, or designation by which something is called or identified.",
+      "Nuance (English)": "In this passage it contrasts with the nameless source behind things.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "míng",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S道可道，非常道，<strong>名</strong>可名，非常名；",
+      "Translation (English)": "name"
+    },
+    {
+      "Classical Chinese": "名",
+      "Dictionary Meaning (English)": "To give something a name or call it by a designation.",
+      "Nuance (English)": "Often takes an object and may be followed by the resulting name.",
+      "Part of Speech (English)": "verb",
+      "Pronunciation (English)": "míng",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "Later people named it.|The people name the mountain.|Confucius named it.|The minister names the vessel.",
+      "Sentences": "後人<strong>名</strong>之。|眾人<strong>名</strong>山。|孔子<strong>名</strong>之。|臣<strong>名</strong>其器。",
+      "Translation (English)": "to name"
+    },
+    {
+      "Classical Chinese": "常名",
+      "Dictionary Meaning (English)": "A fixed, enduring designation that does not change.",
+      "Nuance (English)": "Suggests a name that is stable and not contingent or temporary.",
+      "Part of Speech (English)": "noun phrase",
+      "Pronunciation (English)": "cháng míng",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S道可道，非常道，名可名，非<strong>常名</strong>；",
+      "Translation (English)": "constant name"
+    },
+    {
+      "Classical Chinese": "無",
+      "Dictionary Meaning (English)": "Indicates absence of something, or a state in which something is not present.",
+      "Nuance (English)": "Here it forms a privative expression, not a substantive philosophical noun.",
+      "Part of Speech (English)": "negative adjective",
+      "Pronunciation (English)": "wú",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "Nameless, it is the beginning of heaven and earth; named, it is the mother of the myriad things.",
+      "Sentences": "S<strong>無</strong>名，天地之始，有名，萬物之母。",
+      "Translation (English)": "without; lacking"
+    },
+    {
+      "Classical Chinese": "無",
+      "Dictionary Meaning (English)": "Nonbeing or complete absence, treated as a substantive philosophical concept.",
+      "Nuance (English)": "Abstract and philosophical, especially common in Laozi-style discourse.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "wú",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "All things are born from nothingness.|The sage holds to nothingness.|Nothingness arises from stillness.|The Way is rooted in nothingness.",
+      "Sentences": "萬物生於<strong>無</strong>。|聖人守<strong>無</strong>。|<strong>無</strong>生於靜。|道本於<strong>無</strong>。",
+      "Translation (English)": "nothingness"
+    },
+    {
+      "Classical Chinese": "天地",
+      "Dictionary Meaning (English)": "The paired cosmic realms of heaven and earth; the whole ordered world.",
+      "Nuance (English)": "A fixed cosmological pair, not two separate ordinary objects.",
+      "Part of Speech (English)": "noun phrase",
+      "Pronunciation (English)": "tiān dì",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "Nameless, it is the beginning of heaven and earth; named, it is the mother of the myriad things.",
+      "Sentences": "S無名，<strong>天地</strong>之始，有名，萬物之母。",
+      "Translation (English)": "heaven and earth"
+    },
+    {
+      "Classical Chinese": "之",
+      "Dictionary Meaning (English)": "A structural or possessive particle linking a noun modifier to what follows.",
+      "Nuance (English)": "Marks a noun relation rather than carrying independent lexical content.",
+      "Part of Speech (English)": "particle",
+      "Pronunciation (English)": "zhī",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "Nameless, it is the beginning of heaven and earth; named, it is the mother of the myriad things.",
+      "Sentences": "S無名，天地<strong>之</strong>始，有名，萬物之母。",
+      "Translation (English)": "of"
+    },
+    {
+      "Classical Chinese": "之",
+      "Dictionary Meaning (English)": "A third-person object pronoun referring back to a previously mentioned person or thing.",
+      "Nuance (English)": "Common in early literary Chinese as a direct object or resumed object.",
+      "Part of Speech (English)": "pronoun",
+      "Pronunciation (English)": "zhī",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "I see it.|The people love it.|The ruler uses it.|You know it.",
+      "Sentences": "吾見<strong>之</strong>。|民愛<strong>之</strong>。|王用<strong>之</strong>。|子知<strong>之</strong>。",
+      "Translation (English)": "it"
+    },
+    {
+      "Classical Chinese": "始",
+      "Dictionary Meaning (English)": "The first stage, onset, or origin of something.",
+      "Nuance (English)": "Refers to origin in time or sequence, not merely a starting point in space.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "shǐ",
+      "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "Nameless, it is the beginning of heaven and earth; named, it is the mother of the myriad things.",
+      "Sentences": "S無名，天地之<strong>始</strong>，有名，萬物之母。",
+      "Translation (English)": "beginning"
+    },
+    {
+      "Classical Chinese": "始",
+      "Dictionary Meaning (English)": "To start an action, process, or state.",
+      "Nuance (English)": "Used for the onset of an event or activity.",
+      "Part of Speech (English)": "verb",
+      "Pronunciation (English)": "shǐ",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "Spring begins to grow.|The ruler begins to listen.|The people begin to know.|The Way begins to become clear.",
+      "Sentences": "春<strong>始</strong>生。|君<strong>始</strong>聽。|民<strong>始</strong>知。|道<strong>始</strong>明。",
+      "Translation (English)": "to begin"
+    }
+  ],
+  "chunks": [
+    {
+      "chunk_id": "000001-r1-r10",
+      "output": {
+        "cards": [
+          {
+            "Classical Chinese": "道",
+            "Dictionary Meaning (English)": "The fundamental course, principle, or path that can be followed or articulated.",
+            "Nuance (English)": "Often refers to the ultimate Way rather than an ordinary road.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+            "Translation (English)": "Way"
+          },
+          {
+            "Classical Chinese": "道",
+            "Dictionary Meaning (English)": "To utter words or state something verbally.",
+            "Nuance (English)": "Common in early literary Chinese, where the same form can also mean a noun.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "The ruler does not speak.|The Master states the matter.|Everyone speaks of it.|I do not dare speak it.",
+            "Sentences": "君不<strong>道</strong>。|子<strong>道</strong>其事。|人皆<strong>道</strong>之。|吾不敢<strong>道</strong>。",
+            "Translation (English)": "to speak"
+          },
+          {
+            "Classical Chinese": "可",
+            "Dictionary Meaning (English)": "Expressing possibility, capability, or permissibility.",
+            "Nuance (English)": "Marks potential or permissive force rather than completed action.",
+            "Part of Speech (English)": "modal verb",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S道<strong>可</strong>道，非常道，名可名，非常名；",
+            "Translation (English)": "can; may"
+          },
+          {
+            "Classical Chinese": "非",
+            "Dictionary Meaning (English)": "A negative marker that denies or reverses the following predicate or relation.",
+            "Nuance (English)": "In this text it introduces contrastive negation rather than simple rejection.",
+            "Part of Speech (English)": "negative particle",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S道可道，<strong>非</strong>常道，名可名，非常名；",
+            "Translation (English)": "not"
+          },
+          {
+            "Classical Chinese": "非",
+            "Dictionary Meaning (English)": "Being mistaken, incorrect, or not right.",
+            "Nuance (English)": "Used predicatively to judge a thing or statement as incorrect.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "This is not right.|Its speech is wrong.|Right and wrong are not yet settled.|The Way is not trivial.",
+            "Sentences": "此<strong>非</strong>也。|其言<strong>非</strong>。|是<strong>非</strong>未定。|道<strong>非</strong>小。",
+            "Translation (English)": "wrong"
+          },
+          {
+            "Classical Chinese": "常道",
+            "Dictionary Meaning (English)": "The enduring, unchanging Way; the stable principle that does not vary.",
+            "Nuance (English)": "Denotes a permanent principle, not a temporary or ordinary path.",
+            "Part of Speech (English)": "noun phrase",
+            "Pronunciation (English)": "cháng dào",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S道可道，非<strong>常道</strong>，名可名，非常名；",
+            "Translation (English)": "constant Way"
+          },
+          {
+            "Classical Chinese": "名",
+            "Dictionary Meaning (English)": "The word, title, or designation by which something is called or identified.",
+            "Nuance (English)": "In this passage it contrasts with the nameless source behind things.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "míng",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S道可道，非常道，<strong>名</strong>可名，非常名；",
+            "Translation (English)": "name"
+          },
+          {
+            "Classical Chinese": "名",
+            "Dictionary Meaning (English)": "To give something a name or call it by a designation.",
+            "Nuance (English)": "Often takes an object and may be followed by the resulting name.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "míng",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "Later people named it.|The people name the mountain.|Confucius named it.|The minister names the vessel.",
+            "Sentences": "後人<strong>名</strong>之。|眾人<strong>名</strong>山。|孔子<strong>名</strong>之。|臣<strong>名</strong>其器。",
+            "Translation (English)": "to name"
+          },
+          {
+            "Classical Chinese": "常名",
+            "Dictionary Meaning (English)": "A fixed, enduring designation that does not change.",
+            "Nuance (English)": "Suggests a name that is stable and not contingent or temporary.",
+            "Part of Speech (English)": "noun phrase",
+            "Pronunciation (English)": "cháng míng",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S道可道，非常道，名可名，非<strong>常名</strong>；",
+            "Translation (English)": "constant name"
+          },
+          {
+            "Classical Chinese": "無",
+            "Dictionary Meaning (English)": "Indicates absence of something, or a state in which something is not present.",
+            "Nuance (English)": "Here it forms a privative expression, not a substantive philosophical noun.",
+            "Part of Speech (English)": "negative adjective",
+            "Pronunciation (English)": "wú",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "Nameless, it is the beginning of heaven and earth; named, it is the mother of the myriad things.",
+            "Sentences": "S<strong>無</strong>名，天地之始，有名，萬物之母。",
+            "Translation (English)": "without; lacking"
+          },
+          {
+            "Classical Chinese": "無",
+            "Dictionary Meaning (English)": "Nonbeing or complete absence, treated as a substantive philosophical concept.",
+            "Nuance (English)": "Abstract and philosophical, especially common in Laozi-style discourse.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "wú",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "All things are born from nothingness.|The sage holds to nothingness.|Nothingness arises from stillness.|The Way is rooted in nothingness.",
+            "Sentences": "萬物生於<strong>無</strong>。|聖人守<strong>無</strong>。|<strong>無</strong>生於靜。|道本於<strong>無</strong>。",
+            "Translation (English)": "nothingness"
+          },
+          {
+            "Classical Chinese": "天地",
+            "Dictionary Meaning (English)": "The paired cosmic realms of heaven and earth; the whole ordered world.",
+            "Nuance (English)": "A fixed cosmological pair, not two separate ordinary objects.",
+            "Part of Speech (English)": "noun phrase",
+            "Pronunciation (English)": "tiān dì",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "Nameless, it is the beginning of heaven and earth; named, it is the mother of the myriad things.",
+            "Sentences": "S無名，<strong>天地</strong>之始，有名，萬物之母。",
+            "Translation (English)": "heaven and earth"
+          },
+          {
+            "Classical Chinese": "之",
+            "Dictionary Meaning (English)": "A structural or possessive particle linking a noun modifier to what follows.",
+            "Nuance (English)": "Marks a noun relation rather than carrying independent lexical content.",
+            "Part of Speech (English)": "particle",
+            "Pronunciation (English)": "zhī",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "Nameless, it is the beginning of heaven and earth; named, it is the mother of the myriad things.",
+            "Sentences": "S無名，天地<strong>之</strong>始，有名，萬物之母。",
+            "Translation (English)": "of"
+          },
+          {
+            "Classical Chinese": "之",
+            "Dictionary Meaning (English)": "A third-person object pronoun referring back to a previously mentioned person or thing.",
+            "Nuance (English)": "Common in early literary Chinese as a direct object or resumed object.",
+            "Part of Speech (English)": "pronoun",
+            "Pronunciation (English)": "zhī",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "I see it.|The people love it.|The ruler uses it.|You know it.",
+            "Sentences": "吾見<strong>之</strong>。|民愛<strong>之</strong>。|王用<strong>之</strong>。|子知<strong>之</strong>。",
+            "Translation (English)": "it"
+          },
+          {
+            "Classical Chinese": "始",
+            "Dictionary Meaning (English)": "The first stage, onset, or origin of something.",
+            "Nuance (English)": "Refers to origin in time or sequence, not merely a starting point in space.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "shǐ",
+            "Register (English)": "Classical Chinese; especially philosophical Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "Nameless, it is the beginning of heaven and earth; named, it is the mother of the myriad things.",
+            "Sentences": "S無名，天地之<strong>始</strong>，有名，萬物之母。",
+            "Translation (English)": "beginning"
+          },
+          {
+            "Classical Chinese": "始",
+            "Dictionary Meaning (English)": "To start an action, process, or state.",
+            "Nuance (English)": "Used for the onset of an event or activity.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "shǐ",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "Spring begins to grow.|The ruler begins to listen.|The people begin to know.|The Way begins to become clear.",
+            "Sentences": "春<strong>始</strong>生。|君<strong>始</strong>聽。|民<strong>始</strong>知。|道<strong>始</strong>明。",
+            "Translation (English)": "to begin"
+          }
+        ]
+      }
+    }
+  ],
+  "complete": true,
+  "completed_chunk_count": 1,
+  "job_id": "20260726T071936-5efec9038afb",
+  "plan_id": "f0f57223e155abd26428329b",
+  "schema_version": 1,
+  "source_key": "daodejing_wang_bi",
+  "total_chunk_count": 1
+}

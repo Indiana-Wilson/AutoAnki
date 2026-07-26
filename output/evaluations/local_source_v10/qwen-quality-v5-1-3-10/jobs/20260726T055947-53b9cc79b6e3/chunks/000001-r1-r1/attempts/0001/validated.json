@@ -1,0 +1,26 @@
+{
+  "cards": [
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "The fundamental, ineffable principle underlying the universe and all phenomena. It is the source of all things and cannot be fully expressed in words.",
+      "Nuance (English)": "Implies a transcendent, unnameable reality that is the foundation of existence.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "philosophical, literary, classical",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+      "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+      "Translation (English)": "way; principle; doctrine"
+    },
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "A physical or metaphorical route taken by a person or thing.",
+      "Nuance (English)": "May imply a journey or direction, but not the metaphysical sense.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "neutral, literary",
+      "Sentence Translations (English)": "The path is distant and cannot be reached.|Walking along the road, one will not be lost.|This road is open and accessible; one should advance quickly.|The mountain path is dangerous; travelers must be cautious.",
+      "Sentences": "<strong>道</strong>遠，不可至也。|行於<strong>道</strong>，則無迷。|此<strong>道</strong>通達，宜速進。|山<strong>道</strong>險峻，行者慎之。",
+      "Translation (English)": "path; road"
+    }
+  ]
+}

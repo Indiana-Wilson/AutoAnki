@@ -1,0 +1,39 @@
+{
+  "audited_at": "2026-07-26T07:54:16.154188+00:00",
+  "candidate_sha256": "2a1d29e347543e682a0910a1fb69701ab470517462a2c521c1f74b27a327b868",
+  "common_sense_coverage_case_count": 10,
+  "context_translation_case_count": 2,
+  "error": null,
+  "example_case_count": 44,
+  "kind": "paid_unified_historical_quality_occurrence_coverage_audit",
+  "lexical_case_count": 21,
+  "model_id": "gpt-5.4-mini",
+  "occurrence_assignment_case_count": 15,
+  "occurrence_assignment_enabled": true,
+  "prompt_sha256": "a43d5e85230c82a228c867f62001736f895b26c0d3d03958e4ae511ddd13e1ce",
+  "request_contract_sha256": "ea149b88f6def7faee8d7015469ac8d6155f3ff15e245fe331eb89cea0e31a9e",
+  "request_sha256": "b3da5a5a616436883114b3eda470b97b6f7b4aa0501de5b60976139e6d828a57",
+  "response": {
+    "model": "gpt-5.4-mini-2026-03-17",
+    "raw_text": "{\"target_sense_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"historical_grammar_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"standalone_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"translation_fidelity_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"conservative_definition_passes\":[true,true,true,false,true,true,true,true,true,false,true,true,true,true,true,true,true,true,true,true,false],\"faithful_passes\":[true,true],\"complete_passes\":[true,true],\"natural_english_passes\":[true,true],\"occurrence_assignment_passes\":[true,false,true,true,true,true,true,true,true,true,true,true,true,true,true],\"common_sense_coverage_passes\":[true,true,true,true,true,true,true,true,true,true]}",
+    "received_at": "2026-07-26T07:54:16.141995+00:00",
+    "response_id": "resp_01214e72ebee961b006a65bd19325c819abbf87b21ea01c408",
+    "schema_version": 1,
+    "service_tier": "default",
+    "status": "completed",
+    "usage": {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 0,
+      "input_tokens": 9246,
+      "output_tokens": 2001,
+      "reasoning_tokens": 1682,
+      "total_tokens": 11247,
+      "uncached_input_tokens": 9246,
+      "visible_output_tokens": 319,
+      "web_search_calls": 0
+    }
+  },
+  "response_raw_sha256": "3c6d523cf1231885e414f81b2a15a0f68f80faad947e77bb044c2e598b7f07f9",
+  "schema_version": 6,
+  "status": "failed"
+}

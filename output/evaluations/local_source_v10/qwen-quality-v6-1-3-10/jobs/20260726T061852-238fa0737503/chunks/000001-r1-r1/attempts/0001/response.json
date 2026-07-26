@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"way; principle; doctrine\",\"Dictionary Meaning (English)\":\"The fundamental, ineffable principle underlying the universe and all phenomena, often described as the source of all existence and change.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"philosophical, literary, classical\",\"Nuance (English)\":\"Implies a transcendental, unnameable reality that cannot be fully captured by language.\"},\"additional_senses\":[{\"Translation (English)\":\"path; road\",\"Dictionary Meaning (English)\":\"A physical or metaphorical route taken between two points.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"neutral, literary\",\"Nuance (English)\":\"Often used in the context of travel or journey.\",\"Sentences\":[\"道遠，不可輕行。\",\"此道通向山頂。\",\"行人沿道而行。\",\"古道今猶在。\"],\"Sentence Translations (English)\":[\"The path is distant and cannot be traversed lightly.\",\"This road leads to the summit.\",\"Travelers walk along the path.\",\"The ancient road still exists today.\"]}],\"occurrence_sense_indices\":[0,1]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;\" }]}",
+  "received_at": "2026-07-26T06:20:08.085591+00:00",
+  "response_id": "ollama-aee35260976966a3d5bd9054",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2638,
+    "output_tokens": 332,
+    "reasoning_tokens": 0,
+    "total_tokens": 2970,
+    "uncached_input_tokens": 2638,
+    "visible_output_tokens": 332,
+    "web_search_calls": 0
+  }
+}

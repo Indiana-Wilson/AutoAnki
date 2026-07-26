@@ -148,6 +148,26 @@ class PreparedFixture:
 
 
 class SourceWorkflowTests(unittest.TestCase):
+    def test_response_usage_partitions_cache_reads_writes_and_uncached_input(
+            self):
+        response = SimpleNamespace(
+            output=(),
+            usage=SimpleNamespace(
+                input_tokens=100,
+                output_tokens=40,
+                total_tokens=140,
+                input_tokens_details=SimpleNamespace(
+                    cached_tokens=20,
+                    cache_write_tokens=30),
+                output_tokens_details=SimpleNamespace(
+                    reasoning_tokens=5)))
+
+        usage = source_workflow._response_usage(response)
+
+        self.assertEqual(usage["cached_input_tokens"], 20)
+        self.assertEqual(usage["cache_write_input_tokens"], 30)
+        self.assertEqual(usage["uncached_input_tokens"], 50)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -208,6 +228,54 @@ class SourceWorkflowTests(unittest.TestCase):
         self.assertEqual(call["tools"], [{"type": "web_search"}])
         self.assertEqual(call["tool_choice"], "auto")
         self.assertEqual(call["max_tool_calls"], 1)
+
+    def test_v10_enables_local_emphasis_only_for_compact_contracts(self):
+        chunk = one_word_plan().chunks[0]
+        noncompact = build_source_request_contract(
+            self.pipeline,
+            chunks=(chunk,),
+            protocol_version=10)
+        compact = build_source_request_contract(
+            context_source_pipeline(),
+            chunks=(chunk,),
+            use_source_for_example_sentences=True,
+            protocol_version=10)
+        marker = object()
+
+        noncompact_validator = self.controller()._response_validator(
+            self.pipeline,
+            noncompact)
+        validated = noncompact_validator(
+            self.valid_output(),
+            chunk)
+        self.assertEqual(
+            validated["cards"][0]["Classical Chinese"],
+            "甲")
+
+        for contract, expected in (
+                (noncompact, False),
+                (compact, True)):
+            with (
+                    self.subTest(compact=expected),
+                    patch(
+                        "source_workflow.make_pipeline_response_validator",
+                        return_value=marker) as factory):
+                result = self.controller()._response_validator(
+                    (
+                        context_source_pipeline()
+                        if expected
+                        else self.pipeline),
+                    contract)
+
+                self.assertIs(result, marker)
+                self.assertEqual(
+                    factory.call_args.kwargs[
+                        "use_compact_source_results"],
+                    expected)
+                self.assertEqual(
+                    factory.call_args.kwargs[
+                        "use_local_example_emphasis"],
+                    expected)
 
     def test_empty_plan_makes_no_client_request_package_or_import(self):
         self.install_plan(empty_plan())
@@ -500,8 +568,7 @@ class SourceWorkflowTests(unittest.TestCase):
                     "Sentences": (
                         "<strong>甲</strong>一。|"
                         "二<strong>甲</strong>。|"
-                        "三<strong>甲</strong>。|"
-                        "四<strong>甲</strong>。"),
+                        "三<strong>甲</strong>。"),
                 }],
             }, ensure_ascii=False),
         ))

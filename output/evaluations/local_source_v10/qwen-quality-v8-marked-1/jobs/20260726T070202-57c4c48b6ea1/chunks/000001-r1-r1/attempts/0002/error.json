@@ -1,0 +1,326 @@
+{
+  "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+  "status_code": null,
+  "timestamp": "2026-07-26T07:04:58.215006+00:00",
+  "transient": false,
+  "type": "GeneratedCardValidationError",
+  "validation": {
+    "accepted_problem_count": 0,
+    "all_problems_resolved": false,
+    "attempt": 2,
+    "available": true,
+    "can_complete_with_manual_acceptance": false,
+    "can_manually_accept": false,
+    "full_retry_required": false,
+    "local_repair_applied": false,
+    "local_repair_count": 0,
+    "local_repairs": [],
+    "non_overrideable_problem_count": 7,
+    "overrideable_problem_count": 0,
+    "problem_count": 7,
+    "problems": [
+      {
+        "accepted": false,
+        "actual": {
+          "aligned_translation": "A gentleman speaks his words and performs his rites.",
+          "sentence": "君子道其言，而行其禮。"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "To express verbally or in writing.",
+          "part_of_speech": "verb",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "道",
+          "translation": "to speak; to say"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 1 → additional sense 1 → sentence 1",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0][\"Sentences\"][0]",
+        "problem_id": "example_target_semantic_mismatch:283fce8eb0bb9662",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "semantic_quality_case_index": 0,
+        "semantic_quality_dimension": "target_sense",
+        "source_rank": 1,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "道",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "aligned_translation": "The Master said: Lead them by virtue and regulate them by ritual, and they will have a sense of shame and be upright.",
+          "sentence": "子曰：道之以德，齊之以禮，則有恥且格。"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "To express verbally or in writing.",
+          "part_of_speech": "verb",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "道",
+          "translation": "to speak; to say"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 1 → additional sense 1 → sentence 2",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0][\"Sentences\"][1]",
+        "problem_id": "example_target_semantic_mismatch:a2f9ae0a16f01b6d",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "semantic_quality_case_index": 1,
+        "semantic_quality_dimension": "target_sense",
+        "source_rank": 1,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "道",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "aligned_translation": "The master's way can be heard but not seen.",
+          "sentence": "夫子之道，可聞而不可見。"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "To express verbally or in writing.",
+          "part_of_speech": "verb",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "道",
+          "translation": "to speak; to say"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 1 → additional sense 1 → sentence 3",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0][\"Sentences\"][2]",
+        "problem_id": "example_target_semantic_mismatch:1fdd456414e80f0c",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "semantic_quality_case_index": 2,
+        "semantic_quality_dimension": "target_sense",
+        "source_rank": 1,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "道",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "aligned_translation": "To speak is to utter words, not to act.",
+          "sentence": "道者，言也，非行也。"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "To express verbally or in writing.",
+          "part_of_speech": "verb",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "道",
+          "translation": "to speak; to say"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 1 → additional sense 1 → sentence 4",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0][\"Sentences\"][3]",
+        "problem_id": "example_target_semantic_mismatch:cc35634440a4703e",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "semantic_quality_case_index": 3,
+        "semantic_quality_dimension": "target_sense",
+        "source_rank": 1,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "道",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "dictionary_meaning": "To express verbally or in writing.",
+          "example_pairs": [
+            {
+              "aligned_translation": "A gentleman speaks his words and performs his rites.",
+              "sentence": "君子道其言，而行其禮。"
+            },
+            {
+              "aligned_translation": "The Master said: Lead them by virtue and regulate them by ritual, and they will have a sense of shame and be upright.",
+              "sentence": "子曰：道之以德，齊之以禮，則有恥且格。"
+            },
+            {
+              "aligned_translation": "The master's way can be heard but not seen.",
+              "sentence": "夫子之道，可聞而不可見。"
+            },
+            {
+              "aligned_translation": "To speak is to utter words, not to act.",
+              "sentence": "道者，言也，非行也。"
+            }
+          ],
+          "kind": "additional",
+          "nuance": "Used in contexts where verbal expression is the focus, such as in dialogue or discourse.",
+          "part_of_speech": "verb",
+          "rank": 1,
+          "register": "Classical Chinese (Wang Bi recension)",
+          "term": "道",
+          "translation": "to speak; to say"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "lexical_definition_not_conservative",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "One coherent, historically supported, independently useful sense of the complete term, stated without unsupported lexical or interpretive claims.",
+        "field_name": "Dictionary Meaning (English)",
+        "location": "Response → rank 1 → additional sense 1",
+        "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0]",
+        "problem_id": "lexical_definition_not_conservative:d4b3f4d368a57dcd",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "card",
+        "semantic_lexical_case_index": 1,
+        "source_rank": 1,
+        "suggestion": "Regenerate this source rank so all lexical fields, examples, and occurrence accounting remain coherent.",
+        "term": "道",
+        "title": "Lexical definition is not conservative"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "assigned_sense": {
+            "dictionary_meaning": "A fundamental, underlying reality or principle that governs the universe and human conduct. It is ineffable and cannot be fully captured by language.",
+            "index": 0,
+            "kind": "contextual",
+            "nuance": "Implies a cosmic order that is both natural and moral, often associated with the Daoist concept of the Dao.",
+            "part_of_speech": "noun",
+            "register": "Classical Chinese (Wang Bi recension)",
+            "translation": "way; principle; doctrine"
+          },
+          "full_context": "道可道，非常道，名可名，非常名；",
+          "occurrence": {
+            "index": 0,
+            "selected": true,
+            "span": [
+              0,
+              1
+            ],
+            "surface": "道"
+          },
+          "rank": 1,
+          "term": "道"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "context_occurrence_sense_assignment_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "assigned_sense_index": 0,
+          "dictionary_meaning": "A fundamental, underlying reality or principle that governs the universe and human conduct. It is ineffable and cannot be fully captured by language.",
+          "part_of_speech": "noun",
+          "requirement": "The exact occurrence has the assigned lexical meaning and grammatical role.",
+          "translation": "way; principle; doctrine"
+        },
+        "field_name": "occurrence_sense_indices",
+        "location": "Response → rank 1 → occurrence_sense_indices → occurrence 1",
+        "message": "The exact trusted occurrence in the retained context does not express the meaning and part of speech of the sense assigned by occurrence_sense_indices.",
+        "overrideable": false,
+        "path": "$.term_results[0].occurrence_sense_indices[0]",
+        "problem_id": "context_occurrence_sense_assignment_mismatch:040ba13c93774483",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "card",
+        "semantic_occurrence_assignment_case_index": 0,
+        "source_rank": 1,
+        "suggestion": "Regenerate this source rank so its sense objects and every trusted occurrence assignment agree.",
+        "term": "道",
+        "title": "Context occurrence maps to the wrong lexical sense"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "assigned_sense": {
+            "dictionary_meaning": "To express verbally or in writing.",
+            "index": 1,
+            "kind": "additional",
+            "nuance": "Used in contexts where verbal expression is the focus, such as in dialogue or discourse.",
+            "part_of_speech": "verb",
+            "register": "Classical Chinese (Wang Bi recension)",
+            "translation": "to speak; to say"
+          },
+          "full_context": "道可道，非常道，名可名，非常名；",
+          "occurrence": {
+            "index": 1,
+            "selected": false,
+            "span": [
+              2,
+              3
+            ],
+            "surface": "道"
+          },
+          "rank": 1,
+          "term": "道"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "context_occurrence_sense_assignment_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "assigned_sense_index": 1,
+          "dictionary_meaning": "To express verbally or in writing.",
+          "part_of_speech": "verb",
+          "requirement": "The exact occurrence has the assigned lexical meaning and grammatical role.",
+          "translation": "to speak; to say"
+        },
+        "field_name": "occurrence_sense_indices",
+        "location": "Response → rank 1 → occurrence_sense_indices → occurrence 2",
+        "message": "The exact trusted occurrence in the retained context does not express the meaning and part of speech of the sense assigned by occurrence_sense_indices.",
+        "overrideable": false,
+        "path": "$.term_results[0].occurrence_sense_indices[1]",
+        "problem_id": "context_occurrence_sense_assignment_mismatch:25cbd4cf1b3d8f65",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "card",
+        "semantic_occurrence_assignment_case_index": 1,
+        "source_rank": 1,
+        "suggestion": "Regenerate this source rank so its sense objects and every trusted occurrence assignment agree.",
+        "term": "道",
+        "title": "Context occurrence maps to the wrong lexical sense"
+      }
+    ],
+    "remaining_problem_count": 7,
+    "structurally_valid": true,
+    "syntax_valid": true,
+    "valid": false
+  }
+}

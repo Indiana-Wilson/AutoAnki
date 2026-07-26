@@ -28,7 +28,7 @@ overrides any general instruction to copy a supplied term into a term field.
 "contextual_sense" also excludes "Sentences" and
 "Sentence Translations (English)". The processor inserts the retained source
 context and its matching translation for this one sense. Do not repeat,
-rewrite, delimit, or highlight either value in "contextual_sense".
+rewrite, delimit, or repeat either value in "contextual_sense".
 
 Each input word supplies an "occurrence_span", a pair of zero-based character
 offsets [start, end) relative to the referenced context object's "text". It
@@ -69,10 +69,10 @@ when they are common in the selected period. If one is contextual, the other
 qualifying senses still belong in "additional_senses".
 
 Every "additional_senses" item contains the same requested lexical fields as
-"contextual_sense", plus "Sentences" as exactly four array items and
-"Sentence Translations (English)" as exactly four positionally matched array
+"contextual_sense", plus "Sentences" as exactly three array items and
+"Sentence Translations (English)" as exactly three positionally matched array
 items. It contains no source-language term field. Follow all general generated
-example, emphasis, and translation rules for these arrays.
+example and translation rules for these arrays.
 
 SOURCE CONTEXT TRANSLATIONS
 
@@ -85,6 +85,6 @@ The value of each context-ID property is one complete, natural English
 translation of that entire context, directly as a JSON string. It is not an
 object or array. Translate each context exactly once regardless of how many
 ranks refer to it. The string may contain normal English punctuation and
-multiple clauses or sentences, but never |, <strong> tags, or any other HTML.
+multiple clauses or sentences, but never |, or any HTML.
 Do not split one context translation into several values. If the context is
 already Modern English, repeat it as plain text.

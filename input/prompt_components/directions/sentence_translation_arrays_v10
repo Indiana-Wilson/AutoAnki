@@ -1,0 +1,8 @@
+For every generated example, return one complete, natural English translation
+at the same position in "Sentence Translations (English)". Translate the whole
+sentence and preserve the card's exact sense and grammar. Never copy
+source-language text, return only a gloss, include HTML, or put | in an item.
+Do not invent a specific subject, object, referent, place, time, cause, or
+modality absent from the source sentence. Semantically neutral English
+function words or pronouns required for natural grammar are allowed only when
+they preserve an unspecified source argument as unspecified.

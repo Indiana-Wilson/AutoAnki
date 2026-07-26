@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-210daacf39bdf60f1eccac70e372d253dd80b7193d6c3551f494c14a5b94444e",
+  "created_at": "2026-07-26T09:35:06.961555+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "無名，天地之始，有名，萬物之母。",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T09:35:06.961581+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r30",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "effective_raw_sha256": "4a1ce0a55b9f39b0579506545e80ab4fda390106bb7f2578002da5fb96c3037d",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T093429-4f2acf1c0f47",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "76bbde27f5c59c38c93c52f2c4522bdf77c469286594aeaee508658d6399efba",
+          "provider_raw_sha256": "bebc34dda410fa039a334bd81762c583b30322529d7ea45ae3b81d48933c64a4",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "085f48fdd675087d33b3cab888bd192f20d198145629e116397bf8bbe4cbea65",
+          "validated_at": "2026-07-26T09:35:06.961403+00:00"
+        }
+      ],
+      "translation": "Nameless: the beginning of Heaven and Earth; named: the mother of the myriad things.",
+      "translation_sha256": "6ee0d8f85d34706638cfad160ac68e3901ccb6305a66bc5e90d0c3333e0fbe83"
+    }
+  ]
+}

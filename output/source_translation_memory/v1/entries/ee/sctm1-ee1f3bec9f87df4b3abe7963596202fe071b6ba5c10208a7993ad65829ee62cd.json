@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-ee1f3bec9f87df4b3abe7963596202fe071b6ba5c10208a7993ad65829ee62cd",
+  "created_at": "2026-07-26T09:35:06.974882+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "玄之又玄，眾妙之門。",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T09:35:06.974907+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-3388aa6d59c18c53d536",
+          "effective_raw_sha256": "b02c026cf782352ed95e2b7726c5de1435e3ce76a0241046b2e00d2dbda897ec",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T093429-4f2acf1c0f47",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "dc930efcc17efb8f98a647529a12ac4ccf320b0c6a3c3c0b42254bb6f3b70fd6",
+          "provider_raw_sha256": "b02c026cf782352ed95e2b7726c5de1435e3ce76a0241046b2e00d2dbda897ec",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "085f48fdd675087d33b3cab888bd192f20d198145629e116397bf8bbe4cbea65",
+          "validated_at": "2026-07-26T09:35:06.974733+00:00"
+        }
+      ],
+      "translation": "Profound and again profound: the gate of all mysteries.",
+      "translation_sha256": "a34c347dbbc18c6cab40cfa821a252dc2971d356e18e9aaa1fafdaaf9900553b"
+    }
+  ]
+}

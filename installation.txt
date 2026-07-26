@@ -42,8 +42,9 @@ Requirements on your friend's computer
 
 3. Launch AutoAnki.exe.
 
-4. Enter an OpenAI API key when AutoAnki asks for one. Ideally, your friend
-   should use their own API key because generation requests cost money.
+4. Enter an OpenAI API key when AutoAnki asks for one.
+   Ideally, your friend should use their own API key because generation
+   requests cost money.
 
 5. Create the intended destination decks in Anki before selecting them in
    AutoAnki.
@@ -77,24 +78,23 @@ Generate mode.
 
 Opening AutoAnki, calculating a source estimate, inspecting a source, preparing
 a local file, and running the test suite do not call the OpenAI card API.
-From Source displays an estimated range and requires its paid-authorization
-checkbox before it can send one OpenAI request per chunk.
+From Source displays an estimate and requires its provider-appropriate
+authorization checkbox before it can send one provider request per chunk.
 
-The displayed source price uses AutoAnki's configured gpt-5.4-mini prices and
-limits, labelled with their publication date (24 July 2026). It is not a live
-price lookup. Check current OpenAI pricing/model documentation before relying
-on it later.
+The Generate page uses gpt-5.4-mini. Its displayed source price uses
+configured, dated rates and is not a live lookup.
 
 When a source run is authorized, AutoAnki saves the exact composed prompt,
 strict JSON schema, model, and reasoning-effort setting used by that job.
 Retries reuse those saved settings even if prompts in Advanced are edited
-afterward. Invalid outputs are not retried automatically; Retry selected and
-Retry all failed each require a new paid confirmation.
+afterward. Invalid outputs normally require a confirmed retry. If Automatic
+repair was explicitly selected, exact translation reuse and narrowly scoped
+example-pair repair may make at most three additional paid calls per failed
+OpenAI request; paid automation never regenerates a whole rank or chunk.
 
 Codex Retrieve is different: it is a separately authorized network action
 using the Codex CLI and may consume Codex plan/API usage. It only retrieves
 and prepares a source; it cannot authorize card generation.
-
 
 Optional historical-Chinese source preparation
 ----------------------------------------------
@@ -179,11 +179,11 @@ fields. Card templates are not selected because fields belong to the note,
 not to one of the cards generated from it. Visible field
 text is compared exactly after HTML/entity/whitespace cleanup and Unicode NFC
 normalization; AutoAnki does not stem or split it. If every candidate is
-already present, no OpenAI request, package, or deck is created.
+already present, no provider request, package, or deck is created.
 
 The estimate may reuse the same read-only lookup for up to 30 seconds. After
-paid generation is confirmed, AutoAnki waits for Anki to be ready and forces a
-fresh lookup immediately before saving the paid source plan.
+generation is authorized, AutoAnki waits for Anki to be ready and forces a
+fresh lookup immediately before saving the source plan.
 
 A completed source run imports a final deck named:
 
@@ -197,6 +197,6 @@ include different stable source keys. The title itself is retained, so this
 does not add the key to the generated deck name.
 
 Saved request jobs use operating-system advisory locks per chunk so two
-AutoAnki processes do not issue the same paid chunk simultaneously. Completed
+AutoAnki processes do not issue the same provider chunk simultaneously. Completed
 chunks remain reusable, and a failed Deck row can be retried without repeating
-successful OpenAI requests.
+successful provider requests.

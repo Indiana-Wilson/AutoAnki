@@ -1,0 +1,186 @@
+{
+  "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+  "status_code": null,
+  "timestamp": "2026-07-26T06:50:10.725149+00:00",
+  "transient": false,
+  "type": "GeneratedCardValidationError",
+  "validation": {
+    "accepted_problem_count": 0,
+    "all_problems_resolved": false,
+    "attempt": 1,
+    "available": true,
+    "can_complete_with_manual_acceptance": false,
+    "can_manually_accept": false,
+    "full_retry_required": false,
+    "local_repair_applied": false,
+    "local_repair_count": 0,
+    "local_repairs": [],
+    "non_overrideable_problem_count": 3,
+    "overrideable_problem_count": 0,
+    "problem_count": 3,
+    "problems": [
+      {
+        "accepted": false,
+        "actual": {
+          "dictionary_meaning": "To express verbally or in writing.",
+          "example_pairs": [
+            {
+              "aligned_translation": "To speak, not by words. ",
+              "sentence": "道言，不以言也。"
+            },
+            {
+              "aligned_translation": "To express one's will, not by rhetoric. ",
+              "sentence": "道其志，不以辞也。"
+            },
+            {
+              "aligned_translation": "To convey what is known, not by writing. ",
+              "sentence": "道其所知，不以文也。"
+            },
+            {
+              "aligned_translation": "To express the mind, not by form.",
+              "sentence": "道其心，不以形也。"
+            }
+          ],
+          "kind": "additional",
+          "nuance": "Often used in the context of communication or articulation, especially when referring to the act of conveying meaning.",
+          "part_of_speech": "verb",
+          "rank": 1,
+          "register": "literary, classical",
+          "term": "道",
+          "translation": "to speak; to say"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "lexical_definition_not_conservative",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "One coherent, historically supported, independently useful sense of the complete term, stated without unsupported lexical or interpretive claims.",
+        "field_name": "Dictionary Meaning (English)",
+        "location": "Response → rank 1 → additional sense 1",
+        "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0]",
+        "problem_id": "lexical_definition_not_conservative:d4b3f4d368a57dcd",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "card",
+        "semantic_lexical_case_index": 1,
+        "source_rank": 1,
+        "suggestion": "Regenerate this source rank so all lexical fields, examples, and occurrence accounting remain coherent.",
+        "term": "道",
+        "title": "Lexical definition is not conservative"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "assigned_sense": {
+            "dictionary_meaning": "The fundamental, ineffable principle underlying the universe and all phenomena, often described as the source of all things and the ideal to be followed in life.",
+            "index": 0,
+            "kind": "contextual",
+            "nuance": "Implies a cosmic order that is beyond human comprehension and cannot be fully expressed in language.",
+            "part_of_speech": "noun",
+            "register": "literary, philosophical, classical",
+            "translation": "way; principle; Dao"
+          },
+          "full_context": "道可道，非常道，名可名，非常名；",
+          "occurrence": {
+            "index": 0,
+            "selected": true,
+            "span": [
+              0,
+              1
+            ],
+            "surface": "道"
+          },
+          "rank": 1,
+          "term": "道"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "context_occurrence_sense_assignment_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "assigned_sense_index": 0,
+          "dictionary_meaning": "The fundamental, ineffable principle underlying the universe and all phenomena, often described as the source of all things and the ideal to be followed in life.",
+          "part_of_speech": "noun",
+          "requirement": "The exact occurrence has the assigned lexical meaning and grammatical role.",
+          "translation": "way; principle; Dao"
+        },
+        "field_name": "occurrence_sense_indices",
+        "location": "Response → rank 1 → occurrence_sense_indices → occurrence 1",
+        "message": "The exact trusted occurrence in the retained context does not express the meaning and part of speech of the sense assigned by occurrence_sense_indices.",
+        "overrideable": false,
+        "path": "$.term_results[0].occurrence_sense_indices[0]",
+        "problem_id": "context_occurrence_sense_assignment_mismatch:040ba13c93774483",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "card",
+        "semantic_occurrence_assignment_case_index": 0,
+        "source_rank": 1,
+        "suggestion": "Regenerate this source rank so its sense objects and every trusted occurrence assignment agree.",
+        "term": "道",
+        "title": "Context occurrence maps to the wrong lexical sense"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "assigned_sense": {
+            "dictionary_meaning": "To express verbally or in writing.",
+            "index": 1,
+            "kind": "additional",
+            "nuance": "Often used in the context of communication or articulation, especially when referring to the act of conveying meaning.",
+            "part_of_speech": "verb",
+            "register": "literary, classical",
+            "translation": "to speak; to say"
+          },
+          "full_context": "道可道，非常道，名可名，非常名；",
+          "occurrence": {
+            "index": 1,
+            "selected": false,
+            "span": [
+              2,
+              3
+            ],
+            "surface": "道"
+          },
+          "rank": 1,
+          "term": "道"
+        },
+        "card_index": null,
+        "card_number": null,
+        "code": "context_occurrence_sense_assignment_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "assigned_sense_index": 1,
+          "dictionary_meaning": "To express verbally or in writing.",
+          "part_of_speech": "verb",
+          "requirement": "The exact occurrence has the assigned lexical meaning and grammatical role.",
+          "translation": "to speak; to say"
+        },
+        "field_name": "occurrence_sense_indices",
+        "location": "Response → rank 1 → occurrence_sense_indices → occurrence 2",
+        "message": "The exact trusted occurrence in the retained context does not express the meaning and part of speech of the sense assigned by occurrence_sense_indices.",
+        "overrideable": false,
+        "path": "$.term_results[0].occurrence_sense_indices[1]",
+        "problem_id": "context_occurrence_sense_assignment_mismatch:25cbd4cf1b3d8f65",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "card",
+        "semantic_occurrence_assignment_case_index": 1,
+        "source_rank": 1,
+        "suggestion": "Regenerate this source rank so its sense objects and every trusted occurrence assignment agree.",
+        "term": "道",
+        "title": "Context occurrence maps to the wrong lexical sense"
+      }
+    ],
+    "remaining_problem_count": 3,
+    "structurally_valid": true,
+    "syntax_valid": true,
+    "valid": false
+  }
+}

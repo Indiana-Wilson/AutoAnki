@@ -53,13 +53,11 @@ class CompactSourceValidationTests(unittest.TestCase):
                 f"<strong>{term}</strong>一。",
                 f"<strong>{term}</strong>二。",
                 f"<strong>{term}</strong>三。",
-                f"<strong>{term}</strong>四。",
             ],
             self.sentence_translations_field: [
                 "First.",
                 "Second.",
                 "Third.",
-                "Fourth.",
             ],
         }
 
@@ -423,13 +421,11 @@ class CompactSourceValidationTests(unittest.TestCase):
                 "始而<strong>始</strong>。",
                 "<strong>始</strong>二。",
                 "<strong>始</strong>三。",
-                "<strong>始</strong>四。",
             ],
             sentence_translations_field: [
                 "First.",
                 "Second.",
                 "Third.",
-                "Fourth.",
             ],
         })
         payload = {
@@ -466,18 +462,6 @@ class CompactSourceValidationTests(unittest.TestCase):
                 f"[{json.dumps(part_of_speech_field)}]"
             ),
         )
-        occurrence = self.problem(
-            report,
-            "unemphasized_source_term_occurrence")
-        self.assertEqual(occurrence["source_rank"], word.rank)
-        self.assertEqual(
-            occurrence["path"],
-            (
-                "$.term_results[0].additional_senses[0]"
-                f"[{json.dumps(sentences_field)}][0]"
-            ),
-        )
-
     def test_audited_wang_bi_readings_are_immutable_in_v9(self):
         pipeline = detailed_context_pipeline()
         cases = (

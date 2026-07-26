@@ -45,13 +45,11 @@ class GroupedSourceRawPathTests(unittest.TestCase):
                 f"<strong>{term}</strong>一。",
                 f"<strong>{term}</strong>二。",
                 f"<strong>{term}</strong>三。",
-                f"<strong>{term}</strong>四。",
             ],
             sentence_translations_field: [
                 "First.",
                 "Second.",
                 "Third.",
-                "Fourth.",
             ],
         }
 
@@ -225,64 +223,6 @@ class GroupedSourceRawPathTests(unittest.TestCase):
             problem["path"].startswith("$.cards[")
             for problem in report["problems"]
         ))
-
-    def test_unemphasized_term_occurrence_reports_exact_raw_array_item(self):
-        pipeline = context_classical_pipeline()
-        payload, fields = self.payload(pipeline)
-        first_rank = str(self.chunk.words[0].rank)
-        additional = payload[
-            process_text.SOURCE_TERM_RESULTS_KEY][first_rank][
-                process_text.SOURCE_ADDITIONAL_SENSES_KEY][0]
-        additional[fields["sentences"]][0] = (
-            "是道可辨，未必皆<strong>道</strong>。")
-
-        report = self.inspect(payload, pipeline)
-
-        problem = self.problem(
-            report,
-            "unemphasized_source_term_occurrence")
-        self.assertTrue(problem["overrideable"])
-        self.assertEqual(problem["card_index"], 1)
-        self.assertEqual(
-            problem["path"],
-            (
-                f'$.term_results["{first_rank}"].additional_senses[0]'
-                f'[{json.dumps(fields["sentences"])}][0]'
-            ),
-        )
-        self.assertEqual(
-            problem["actual"]["unemphasized_character_offsets"],
-            [1],
-        )
-
-    def test_repeated_emphasized_term_reports_exact_raw_array_item(self):
-        pipeline = context_classical_pipeline()
-        payload, fields = self.payload(pipeline)
-        first_rank = str(self.chunk.words[0].rank)
-        additional = payload[
-            process_text.SOURCE_TERM_RESULTS_KEY][first_rank][
-                process_text.SOURCE_ADDITIONAL_SENSES_KEY][0]
-        additional[fields["sentences"]][0] = (
-            "<strong>道</strong>可<strong>道</strong>。")
-
-        report = self.inspect(payload, pipeline)
-
-        problem = self.problem(
-            report,
-            "repeated_emphasized_source_term")
-        self.assertTrue(problem["overrideable"])
-        self.assertEqual(problem["card_index"], 1)
-        self.assertEqual(
-            problem["path"],
-            (
-                f'$.term_results["{first_rank}"].additional_senses[0]'
-                f'[{json.dumps(fields["sentences"])}][0]'
-            ),
-        )
-        self.assertEqual(
-            problem["actual"]["emphasized_occurrence_count"],
-            2,
-        )
 
     def test_legacy_card_paths_are_unchanged(self):
         pipeline = context_classical_pipeline()

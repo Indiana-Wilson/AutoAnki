@@ -1,0 +1,8 @@
+{
+  "repairs": {
+    "p001": {
+      "sentence": "子道其言，而人不應。",
+      "translation": "He spoke his words, but no one responded."
+    }
+  }
+}

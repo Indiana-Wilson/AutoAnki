@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"way; principle; Dao\",\"Dictionary Meaning (English)\":\"The fundamental, ineffable principle underlying the universe and all phenomena, often described as the source of all things and the path to harmony.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"philosophical, literary, classical\",\"Nuance (English)\":\"Implies a metaphysical and cosmic dimension beyond ordinary human understanding.\"},\"additional_senses\":[{\"Translation (English)\":\"to speak; to say\",\"Dictionary Meaning (English)\":\"To express or articulate something verbally.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"verb\",\"Register (English)\":\"literary, classical\",\"Nuance (English)\":\"Often used in contexts involving communication or discourse.\",\"Sentences\":[\"道者，言其所由也。\",\"君子之道，不可道也。\",\"道其言，而人不聽。\",\"道之以德，齊之以禮。\"],\"Sentence Translations (English)\":[\"The way is the explanation of its origin.\",\"The gentleman's way cannot be spoken.\",\"To speak his words, yet people do not listen.\",\"Govern them with virtue and regulate them with rites.\"]}],\"occurrence_sense_indices\":[0,1]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Dao that can be spoken of is not the eternal Dao; the name that can be named is not the eternal name;\" }]}",
+  "received_at": "2026-07-26T06:24:36.071250+00:00",
+  "response_id": "ollama-47bbd2fb2f772650f902ddf0",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2638,
+    "output_tokens": 342,
+    "reasoning_tokens": 0,
+    "total_tokens": 2980,
+    "uncached_input_tokens": 2638,
+    "visible_output_tokens": 342,
+    "web_search_calls": 0
+  }
+}

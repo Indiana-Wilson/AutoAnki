@@ -8,17 +8,16 @@ text on the card for the contextual sense. For each supplied term:
   "Sentence Translations (English)", provide one complete, natural English
   translation of that exact retained context as a single undelimited text
   block. Translate the whole passage, not only the requested term. If the
-  retained context is already Modern English, repeat it as plain text without
-  <strong> tags.
+  retained context is already Modern English, repeat it as plain text.
 - If the term has another genuinely disjoint common lexical sense that meets
   the inclusion criteria, create its separate entry as usual and INCLUDE the
-  "Sentences" property with exactly four distinct, pipe-separated example
-  sentences. Also include exactly four pipe-separated English translations in
+  "Sentences" property with exactly three distinct, pipe-separated example
+  sentences. Also include exactly three pipe-separated English translations in
   "Sentence Translations (English)", positionally matched to those examples.
   Each sentence must make that particular additional sense unambiguous.
 
 Only the first, contextual entry for each term may omit "Sentences". Every
 additional sense entry must include it. This instruction overrides the general
-requirement to generate four example sentences and four translations only for
+requirement to generate three example sentences and three translations only for
 those first contextual entries; their single translation must instead match
 the exact source context that the processor will insert.

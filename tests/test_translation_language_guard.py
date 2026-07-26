@@ -152,11 +152,10 @@ class SentenceTranslationLanguageGuardTests(unittest.TestCase):
             "Sentences": (
                 "One <strong>astrolabe</strong>.|"
                 "Two <strong>astrolabes</strong>.|"
-                "This <strong>astrolabe</strong>.|"
-                "That <strong>astrolabe</strong>."),
+                "This <strong>astrolabe</strong>."),
             "Sentence Translations (English)": (
                 "One astrolabe.|Two astrolabes.|"
-                "This astrolabe.|That astrolabe."),
+                "This astrolabe."),
             "Dictionary Meaning (English)": (
                 "An instrument formerly used to determine celestial "
                 "positions."),

@@ -1,0 +1,39 @@
+{
+  "all_passed": false,
+  "anki_mutation_performed": false,
+  "automatic_repair": true,
+  "complete": false,
+  "completed_stage_count": 1,
+  "completion_state": "failed",
+  "counts": [
+    1,
+    3,
+    10
+  ],
+  "created_at": "2026-07-26T06:18:52.566843+00:00",
+  "kind": "local_source_v10_progressive_evaluation",
+  "maximum_automatic_repairs": 5,
+  "maximum_words_per_request": 5,
+  "mode": "execute_local",
+  "model": "ollama/qwen3:14b",
+  "pipeline_id": "default-english-vocabulary",
+  "requested_stage_count": 3,
+  "schema_version": 2,
+  "session_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/qwen-quality-v6-1-3-10",
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "source_display_name": "Daodejing [Wang Bi]",
+  "stages": [
+    {
+      "job_id": "20260726T061852-238fa0737503",
+      "passed": false,
+      "report_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/qwen-quality-v6-1-3-10/stages/0001-000001-unique/report.json",
+      "requested_unique_count": 1,
+      "source_prefix_token_limit": 1,
+      "stage_number": 1,
+      "status": "failed"
+    }
+  ],
+  "stopped_after_count": 1,
+  "updated_at": "2026-07-26T06:25:13.584952+00:00"
+}

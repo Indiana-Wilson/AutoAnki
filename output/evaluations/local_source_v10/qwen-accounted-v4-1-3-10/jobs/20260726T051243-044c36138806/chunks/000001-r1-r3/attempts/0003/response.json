@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":2,\"contextual_sense\":{\"Translation (English)\":\"can, may\",\"Dictionary Meaning (English)\":\"To be capable of; to be possible; to be permissible.\",\"Pronunciation (English)\":\"kě\",\"Part of Speech (English)\":\"adverb\",\"Register (English)\":\"Classical Chinese (Wang Bi recension)\",\"Nuance (English)\":\"Implies potentiality or possibility, often in a philosophical or moral context.\"},\"additional_senses\":[{\"Translation (English)\":\"worthy, fit\",\"Dictionary Meaning (English)\":\"To be suitable or appropriate for a particular purpose or situation.\",\"Pronunciation (English)\":\"kě\",\"Part of Speech (English)\":\"adjective\",\"Register (English)\":\"Classical Chinese (Wang Bi recension)\",\"Nuance (English)\":\"Implies suitability or appropriateness, often in a moral or evaluative context.\",\"Sentences\":[\"君子可貴，不可恃。\",\"此計可行，宜速決。\",\"此人可任，毋庸疑也。\",\"言可聽，行可觀。\"],\"Sentence Translations (English)\":[\"A gentleman is worthy of respect, but cannot be relied upon.\",\"This plan is feasible; a decision should be made quickly.\",\"This person is fit for the position; there is no need to doubt.\",\"Words are worth listening to; actions are worth observing.\"]}],\"occurrence_sense_indices\":[0,1]}],\"source_context_translations\":[] }",
+  "received_at": "2026-07-26T05:17:55.762050+00:00",
+  "response_id": "ollama-520acf2de440387c3a4029c4",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2377,
+    "output_tokens": 307,
+    "reasoning_tokens": 0,
+    "total_tokens": 2684,
+    "uncached_input_tokens": 2377,
+    "visible_output_tokens": 307,
+    "web_search_calls": 0
+  }
+}

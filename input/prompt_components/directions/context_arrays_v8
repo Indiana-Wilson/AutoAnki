@@ -1,36 +1,11 @@
-Provide exactly four short, natural {source_language} example sentences for
-each additional-sense entry. Return them as exactly four separate strings in
-the "Sentences" JSON array. Never join sentences with | and never put | inside
-an array item. Generate a distinct set for every separate sense and make the
-selected meaning unambiguous without the definition.
+Provide exactly three short, natural {source_language} example sentences for
+each additional-sense entry. Return them as exactly three separate plain
+strings in the "Sentences" JSON array. Never join sentences with | and never
+put | inside an array item.
 
-GROUPED V8 TARGET RULE—THIS REPLACES THE GENERAL REPEATED-USAGE RULE:
-
-Each sentence must contain the exact complete spelling requested for that rank
-exactly once. Put that one occurrence immediately and exclusively inside
-literal <strong> and </strong> tags. Use no inflected substitute, component,
-substring, second occurrence, untagged homograph, or occurrence embedded in
-another word or compound. Use no other HTML or formatting.
-
-Before returning, inspect every individual array item and verify:
-
-1. It has exactly one nonempty <strong>...</strong> span.
-2. The span's content equals the rank's complete requested spelling
-   character-for-character.
-3. Removing that one span leaves no other occurrence of the requested
-   spelling anywhere in the sentence.
-4. The highlighted usage actually has this additional entry's selected sense
-   and grammatical role.
-
-For a rank whose exact term is run:
-
-VALID: They <strong>run</strong> daily.
-INVALID: They <strong>ran</strong> daily. (The requested spelling changed.)
-INVALID: <strong>Run</strong> if you can <strong>run</strong>.
-       (The term occurs twice.)
-INVALID: They <strong>run</strong> daily but run a shop.
-       (A second untagged homograph remains.)
-INVALID: They <strong>run daily</strong>. (The span contains extra text.)
-
-Every array item is invalid if any one of these checks fails. The caller will
-not add, repair, or move emphasis tags later.
+Each sentence must use the complete requested term naturally and demonstrate
+only that additional entry's selected sense and grammatical role. Use the
+exact supplied spelling when the language is uninflected or grammar permits
+it; otherwise use an ordinary inflected form of the same lexical item. Do not
+substitute only a component, substring, or different derivative. Use no HTML
+or other formatting. Generate a distinct set for every separate sense.

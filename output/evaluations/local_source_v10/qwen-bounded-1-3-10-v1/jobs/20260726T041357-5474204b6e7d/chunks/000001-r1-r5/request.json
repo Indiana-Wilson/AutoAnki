@@ -1,0 +1,116 @@
+{
+  "chunk_id": "000001-r1-r5",
+  "contexts": [
+    {
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "end_offset": 16,
+      "mode": "sentence",
+      "section_ids": [
+        "daodejing_wang_bi:chapter:001"
+      ],
+      "sentence_ids": [
+        "daodejing_wang_bi:chapter:001:sentence:00001"
+      ],
+      "start_offset": 0,
+      "text": "道可道，非常道，名可名，非常名；",
+      "word_ranks": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "end_rank": 5,
+  "index": 1,
+  "start_rank": 1,
+  "total": 2,
+  "words": [
+    {
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "end_offset": 1,
+      "normalized": "道",
+      "occurrence_locator": {
+        "after": "可道，非常道，名可名，非常名；",
+        "before": "",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "⟪TARGET⟫道⟪/TARGET⟫可道，非常道，名可名，非常名；",
+        "target": "道"
+      },
+      "rank": 1,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00001",
+      "start_offset": 0,
+      "surface": "道"
+    },
+    {
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "end_offset": 2,
+      "normalized": "可",
+      "occurrence_locator": {
+        "after": "道，非常道，名可名，非常名；",
+        "before": "道",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "道⟪TARGET⟫可⟪/TARGET⟫道，非常道，名可名，非常名；",
+        "target": "可"
+      },
+      "rank": 2,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00001",
+      "start_offset": 1,
+      "surface": "可"
+    },
+    {
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "end_offset": 5,
+      "normalized": "非",
+      "occurrence_locator": {
+        "after": "常道，名可名，非常名；",
+        "before": "道可道，",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "道可道，⟪TARGET⟫非⟪/TARGET⟫常道，名可名，非常名；",
+        "target": "非"
+      },
+      "rank": 3,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00001",
+      "start_offset": 4,
+      "surface": "非"
+    },
+    {
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "end_offset": 7,
+      "normalized": "常道",
+      "occurrence_locator": {
+        "after": "，名可名，非常名；",
+        "before": "道可道，非",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "道可道，非⟪TARGET⟫常道⟪/TARGET⟫，名可名，非常名；",
+        "target": "常道"
+      },
+      "rank": 4,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00001",
+      "start_offset": 5,
+      "surface": "常道"
+    },
+    {
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "end_offset": 9,
+      "normalized": "名",
+      "occurrence_locator": {
+        "after": "可名，非常名；",
+        "before": "道可道，非常道，",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "道可道，非常道，⟪TARGET⟫名⟪/TARGET⟫可名，非常名；",
+        "target": "名"
+      },
+      "rank": 5,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00001",
+      "start_offset": 8,
+      "surface": "名"
+    }
+  ]
+}

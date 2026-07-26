@@ -1,0 +1,61 @@
+{
+  "audited_at": "2026-07-26T03:47:23.948115+00:00",
+  "candidate_sha256": "8d4214b93c30e7c00b25fc9e860b4bc1bed368385264916e16ab27666131dae5",
+  "coverage_case_count": 1,
+  "coverage_passes": [
+    true
+  ],
+  "error": null,
+  "example_case_count": 0,
+  "example_passes": [],
+  "failed_coverage_case_count": 0,
+  "failed_example_case_count": 0,
+  "kind": "local_combined_semantic_audit",
+  "model_id": "ollama/qwen3:14b",
+  "prompt_sha256": "3124fa7688a6af0358aba5fdcc5b76914a147bfeb0c0b2cb5aedf18f655fbf85",
+  "request": {
+    "dispatched_at": "2026-07-26T03:47:19.264361+00:00",
+    "kind": "ollama_source_dispatch",
+    "max_output_tokens": 128,
+    "model_id": "ollama/qwen3:14b",
+    "provider_model": "qwen3:14b",
+    "reasoning": {
+      "effort": "none"
+    },
+    "runtime": {
+      "keep_alive": "10m",
+      "options": {
+        "num_ctx": 8192,
+        "repeat_penalty": 1.05,
+        "seed": 686803014,
+        "temperature": 0.0,
+        "top_k": 40,
+        "top_p": 0.9
+      }
+    },
+    "schema_version": 1,
+    "seed": 686803014
+  },
+  "response": {
+    "model": "qwen3:14b",
+    "raw_text": "{\n  \"example_passes\": [],\n  \"coverage_passes\": [\n    true\n  ]\n}",
+    "received_at": "2026-07-26T03:47:23.948042+00:00",
+    "response_id": "ollama-9338ea3bfa9a9690bdac6ab3",
+    "schema_version": 1,
+    "service_tier": "local",
+    "status": "completed",
+    "usage": {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 0,
+      "input_tokens": 362,
+      "output_tokens": 22,
+      "reasoning_tokens": 0,
+      "total_tokens": 384,
+      "uncached_input_tokens": 362,
+      "visible_output_tokens": 22,
+      "web_search_calls": 0
+    }
+  },
+  "schema_version": 2,
+  "status": "passed"
+}

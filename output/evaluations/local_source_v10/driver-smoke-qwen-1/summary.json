@@ -1,0 +1,21 @@
+{
+  "all_passed": null,
+  "anki_mutation_performed": false,
+  "automatic_repair": true,
+  "counts": [
+    1
+  ],
+  "created_at": "2026-07-26T02:34:34.668153+00:00",
+  "kind": "local_source_v10_progressive_evaluation",
+  "maximum_automatic_repairs": 5,
+  "maximum_words_per_request": 5,
+  "mode": "execute_local",
+  "model": "ollama/qwen3:14b",
+  "pipeline_id": "default-english-vocabulary",
+  "schema_version": 1,
+  "session_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/driver-smoke-qwen-1",
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "stages": [],
+  "stopped_after_count": null
+}

@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"way; principle; Dao\",\"Dictionary Meaning (English)\":\"The fundamental, ineffable principle underlying the universe and all phenomena, often described as the source of all things and the guiding force of nature.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"philosophical, literary, classical\",\"Nuance (English)\":\"Implies a cosmic order that is beyond human comprehension and cannot be fully expressed in language.\"},\"additional_senses\":[{\"Translation (English)\":\"path; road\",\"Dictionary Meaning (English)\":\"A physical or metaphorical route taken by a person or thing.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"neutral, literary\",\"Nuance (English)\":\"Often used in the context of travel or journey, and may imply direction or purpose.\",\"Sentences\":[\"道遠而險，不可輕行。\",\"行者見道，問於人曰：‘此何處？’\",\"道通四海，無所不通。\",\"車馬沿道，日行百里。\"],\"Sentence Translations (English)\":[\"The road is distant and dangerous, not to be taken lightly.\",\"The traveler sees a path and asks someone: 'Where is this place?'\",\"The road connects all four seas, and nothing is inaccessible.\",\"Carriages and horses follow the road, traveling a hundred li each day.\"]}],\"occurrence_sense_indices\":[0,1]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Dao that can be spoken of is not the eternal Dao; the name that can be named is not the eternal name;\" }]}",
+  "received_at": "2026-07-26T06:53:23.524523+00:00",
+  "response_id": "ollama-cc1da9978aaab71aad614f55",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2758,
+    "output_tokens": 387,
+    "reasoning_tokens": 0,
+    "total_tokens": 3145,
+    "uncached_input_tokens": 2758,
+    "visible_output_tokens": 387,
+    "web_search_calls": 0
+  }
+}

@@ -8,11 +8,9 @@ import threading
 
 import pipeline_store
 from source_generation.jobs import GenerationJobStore
+from source_generation.model_catalog import source_model_profile
 from source_generation.models import ContextMode, SourceGenerationConfig
 from source_generation.planning import (
-    MODEL_CONTEXT_WINDOW_TOKENS,
-    MODEL_MAX_INPUT_TOKENS,
-    MODEL_MAX_OUTPUT_TOKENS,
     estimate_plan_cost,
     list_processed_source_summaries,
     load_processed_source,
@@ -23,9 +21,12 @@ from source_generation.requests import (
     build_source_request_contract,
     source_request_contract_digest,
 )
+from source_generation.translation_memory import (
+    SourceContextTranslationMemory,
+)
 
 
-SOURCE_ESTIMATE_AUTHORIZATION_SCHEMA_VERSION = 2
+SOURCE_ESTIMATE_AUTHORIZATION_SCHEMA_VERSION = 3
 
 
 def _source_example_setting(request, plan, pipeline):
@@ -52,7 +53,7 @@ def _request_protocol_version(config):
 def _estimate_response_format_arguments(config, request_contract):
     response_formats = request_contract.get(
         "response_formats_by_chunk")
-    if config.request_protocol == "v9":
+    if config.request_protocol in {"v9", "v10"}:
         return {
             "response_format": request_contract["response_format"],
             "response_formats_by_chunk": None,
@@ -68,11 +69,24 @@ def _estimate_response_format_arguments(config, request_contract):
     }
 
 
-def _estimate_authorization_fingerprint(plan, request_contract, estimate):
+def _normalise_model_runtime_snapshot(value, model):
+    source_model_profile(model)
+    if value not in (None, {}):
+        raise ValueError(
+            "OpenAI models cannot use a model-runtime snapshot.")
+    return None
+
+
+def _estimate_authorization_fingerprint(
+        plan,
+        request_contract,
+        estimate,
+        model_runtime_snapshot=None):
     payload = {
         "schema_version": SOURCE_ESTIMATE_AUTHORIZATION_SCHEMA_VERSION,
         "plan_id": plan.plan_id,
         "execution_policy": {
+            "model": plan.config.model,
             "concurrency": plan.config.concurrency,
             "request_stagger_ms": plan.config.request_stagger_ms,
             "max_transient_retries": (
@@ -80,9 +94,13 @@ def _estimate_authorization_fingerprint(plan, request_contract, estimate):
             "request_protocol": plan.config.request_protocol,
             "reasoning_effort": plan.config.reasoning_effort,
             "execution_mode": plan.config.execution_mode,
+            "automatic_repair": plan.config.automatic_repair,
+            "max_automatic_repairs": (
+                plan.config.max_automatic_repairs),
         },
         "request_contract_sha256": source_request_contract_digest(
             request_contract),
+        "model_runtime_snapshot": model_runtime_snapshot,
         # Binding the displayed cost inputs as well as request contents means
         # a local pricing/estimator update also requires fresh authorization.
         "estimate": estimate.to_dict(),
@@ -94,6 +112,53 @@ def _estimate_authorization_fingerprint(plan, request_contract, estimate):
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _normalise_translation_memory_snapshot(value, plan):
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise TypeError(
+            "The authorized translation-memory snapshot must be an object.")
+    chunks = {
+        chunk.chunk_id: chunk
+        for chunk in plan.chunks
+    }
+    if set(value) - set(chunks):
+        raise ValueError(
+            "The translation-memory snapshot contains an unknown chunk.")
+    result = {}
+    for chunk_id, raw_hits in value.items():
+        if not isinstance(raw_hits, dict):
+            raise TypeError(
+                "Translation-memory chunk hits must be an object.")
+        expected_context_ids = {
+            context.context_id
+            for context in chunks[chunk_id].contexts
+        }
+        hits = {}
+        for context_id, raw_hit in raw_hits.items():
+            if (
+                    context_id not in expected_context_ids
+                    or not isinstance(raw_hit, dict)
+                    or not isinstance(raw_hit.get("cache_key"), str)
+                    or not raw_hit["cache_key"].startswith("sctm1-")
+                    or not isinstance(raw_hit.get("translation"), str)
+                    or not raw_hit["translation"].strip()
+                    or not isinstance(
+                        raw_hit.get("translation_sha256"),
+                        str)
+                    or raw_hit["translation_sha256"]
+                    != hashlib.sha256(
+                        raw_hit["translation"].encode(
+                            "utf-8")).hexdigest()
+                    or not isinstance(raw_hit.get("entry_sha256"), str)):
+                raise ValueError(
+                    "The translation-memory snapshot does not match its "
+                    "source chunk.")
+            hits[context_id] = dict(raw_hit)
+        result[chunk_id] = hits
+    return result
 
 
 class SourceGenerationBackend:
@@ -110,10 +175,14 @@ class SourceGenerationBackend:
             *,
             corpus_root=None,
             jobs_root=None,
-            exclusion_resolver=None):
+            exclusion_resolver=None,
+            translation_memory=None):
         self.corpus_root = corpus_root
         self.jobs = GenerationJobStore(jobs_root)
         self.exclusion_resolver = exclusion_resolver
+        self.translation_memory = (
+            translation_memory
+            or SourceContextTranslationMemory())
         self._loaded_sources = {}
         self._source_lock = threading.RLock()
 
@@ -260,6 +329,9 @@ class SourceGenerationBackend:
     def estimate(self, request):
         """GUI ``source_estimator`` callback returning its expected aliases."""
         _loaded, plan = self._plan(request)
+        model_runtime_snapshot = _normalise_model_runtime_snapshot(
+            request.get("model_runtime_snapshot"),
+            plan.config.model)
         pipeline = request.get("pipeline")
         if pipeline is None:
             raise ValueError(
@@ -268,13 +340,25 @@ class SourceGenerationBackend:
             request,
             plan,
             pipeline)
+        memory_enabled = bool(
+            plan.config.automatic_repair
+            and use_source_examples
+            and plan.config.request_protocol == "v10")
+        translation_memory_by_chunk = (
+            self.translation_memory.lookup_chunks(
+                pipeline.language_key,
+                plan.chunks)
+            if memory_enabled
+            else {})
         request_contract = build_source_request_contract(
             pipeline,
             chunks=plan.chunks,
             allow_web_search=bool(request.get("allow_web_search")),
             use_source_for_example_sentences=use_source_examples,
             protocol_version=_request_protocol_version(plan.config),
-            reasoning_effort=plan.config.reasoning_effort)
+            reasoning_effort=plan.config.reasoning_effort,
+            model=plan.config.model,
+            translation_memory_enabled=memory_enabled)
         estimate = estimate_plan_cost(
             plan,
             pipeline,
@@ -284,6 +368,8 @@ class SourceGenerationBackend:
             request_protocol=plan.config.request_protocol,
             reasoning_effort=plan.config.reasoning_effort,
             execution_mode=plan.config.execution_mode,
+            translation_memory_by_chunk=(
+                translation_memory_by_chunk),
             **_estimate_response_format_arguments(
                 plan.config,
                 request_contract))
@@ -293,7 +379,8 @@ class SourceGenerationBackend:
             _estimate_authorization_fingerprint(
                 plan,
                 request_contract,
-                estimate))
+                estimate,
+                model_runtime_snapshot))
         result = estimate.to_dict()
         request_assumptions = estimate.assumptions
         largest_input = request_assumptions[
@@ -305,16 +392,17 @@ class SourceGenerationBackend:
         high_total = request_assumptions[
             "largest_request_high_total_tokens"]
         warning = None
-        if largest_input > MODEL_MAX_INPUT_TOKENS:
+        model_profile = source_model_profile(plan.config.model)
+        if largest_input > model_profile.max_input_tokens:
             warning = (
                 "The selected prompt, schema, and source payload may exceed "
                 "the model's maximum input. Reduce words per request or "
                 "source context.")
-        elif high_output > MODEL_MAX_OUTPUT_TOKENS:
+        elif high_output > model_profile.max_output_tokens:
             warning = (
                 "The selected chunk size may exceed the model's maximum "
                 "output. Reduce words per request before generation.")
-        elif high_total > MODEL_CONTEXT_WINDOW_TOKENS:
+        elif high_total > model_profile.max_context_tokens:
             warning = (
                 "The selected context and card detail may exceed the model's "
                 "context window. Reduce words per request or source context.")
@@ -341,6 +429,18 @@ class SourceGenerationBackend:
             "request_protocol": plan.config.request_protocol,
             "reasoning_effort": plan.config.reasoning_effort,
             "execution_mode": plan.config.execution_mode,
+            "model": plan.config.model,
+            "provider": model_profile.provider,
+            "local_model": model_profile.local,
+            "model_runtime_snapshot": model_runtime_snapshot,
+            "automatic_repair": plan.config.automatic_repair,
+            "max_automatic_repairs": (
+                plan.config.max_automatic_repairs),
+            "translation_memory_by_chunk": (
+                translation_memory_by_chunk),
+            "translation_memory_hit_count": sum(
+                len(hits)
+                for hits in translation_memory_by_chunk.values()),
             "largest_request_input_tokens": largest_input,
             "largest_request_output_tokens": largest_output,
             "largest_request_high_output_tokens": high_output,
@@ -355,6 +455,9 @@ class SourceGenerationBackend:
             raise PermissionError(
                 "Paid source generation requires explicit confirmation.")
         _loaded, plan = self._plan(request)
+        model_runtime_snapshot = _normalise_model_runtime_snapshot(
+            request.get("model_runtime_snapshot"),
+            plan.config.model)
         pipeline = request.get("pipeline")
         if pipeline is None:
             raise ValueError(
@@ -363,13 +466,30 @@ class SourceGenerationBackend:
             request,
             plan,
             pipeline)
+        memory_enabled = bool(
+            plan.config.automatic_repair
+            and use_source_examples
+            and plan.config.request_protocol == "v10")
+        authorized_estimate = request.get("estimate")
+        translation_memory_by_chunk = (
+            _normalise_translation_memory_snapshot(
+                (
+                    authorized_estimate.get(
+                        "translation_memory_by_chunk")
+                    if isinstance(authorized_estimate, dict)
+                    else None),
+                plan)
+            if memory_enabled
+            else {})
         request_contract = build_source_request_contract(
             pipeline,
             chunks=plan.chunks,
             allow_web_search=bool(request.get("allow_web_search")),
             use_source_for_example_sentences=use_source_examples,
             protocol_version=_request_protocol_version(plan.config),
-            reasoning_effort=plan.config.reasoning_effort)
+            reasoning_effort=plan.config.reasoning_effort,
+            model=plan.config.model,
+            translation_memory_enabled=memory_enabled)
         estimate = estimate_plan_cost(
             plan,
             pipeline,
@@ -379,14 +499,16 @@ class SourceGenerationBackend:
             request_protocol=plan.config.request_protocol,
             reasoning_effort=plan.config.reasoning_effort,
             execution_mode=plan.config.execution_mode,
+            translation_memory_by_chunk=(
+                translation_memory_by_chunk),
             **_estimate_response_format_arguments(
                 plan.config,
                 request_contract))
         expected_authorization = _estimate_authorization_fingerprint(
             plan,
             request_contract,
-            estimate)
-        authorized_estimate = request.get("estimate")
+            estimate,
+            model_runtime_snapshot)
         if (
                 plan.chunks
                 and (
@@ -404,28 +526,29 @@ class SourceGenerationBackend:
                 "model, protocol, reasoning, execution mode, or cost estimate "
                 "changed after authorization. "
                 "Recalculate the estimate and authorize the paid requests "
-                "again. No OpenAI request was made.")
+                "again. No provider request was made.")
         high_output = estimate.assumptions[
             "largest_request_high_output_tokens"]
         largest_input = estimate.assumptions[
             "largest_request_estimated_input_tokens"]
         high_total = estimate.assumptions[
             "largest_request_high_total_tokens"]
-        if largest_input > MODEL_MAX_INPUT_TOKENS:
+        model_profile = source_model_profile(plan.config.model)
+        if largest_input > model_profile.max_input_tokens:
             raise ValueError(
                 "The estimated prompt, schema, and source payload for one "
-                f"chunk can exceed {MODEL_MAX_INPUT_TOKENS:,} input tokens. "
-                "Reduce words per OpenAI request or source context.")
-        if high_output > MODEL_MAX_OUTPUT_TOKENS:
+                f"chunk can exceed {model_profile.max_input_tokens:,} input "
+                "tokens. Reduce words per request or source context.")
+        if high_output > model_profile.max_output_tokens:
             raise ValueError(
                 "The estimated response for one chunk can exceed "
-                f"{MODEL_MAX_OUTPUT_TOKENS:,} output tokens. Reduce words "
-                "per OpenAI request.")
-        if high_total > MODEL_CONTEXT_WINDOW_TOKENS:
+                f"{model_profile.max_output_tokens:,} output tokens. Reduce "
+                "words per request.")
+        if high_total > model_profile.max_context_tokens:
             raise ValueError(
                 "The estimated input and response for one chunk can exceed "
-                f"{MODEL_CONTEXT_WINDOW_TOKENS:,} total tokens. Reduce the "
-                "chunk size or context.")
+                f"{model_profile.max_context_tokens:,} total tokens. Reduce "
+                "the chunk size or context.")
         metadata = {
             "paid_confirmed_at_creation": True,
             "authorization_bypassed_for_empty_plan": (
@@ -434,6 +557,14 @@ class SourceGenerationBackend:
             "request_protocol": plan.config.request_protocol,
             "reasoning_effort": plan.config.reasoning_effort,
             "execution_mode": plan.config.execution_mode,
+            "model": plan.config.model,
+            "provider": model_profile.provider,
+            "model_runtime_snapshot": model_runtime_snapshot,
+            "automatic_repair": plan.config.automatic_repair,
+            "max_automatic_repairs": (
+                plan.config.max_automatic_repairs),
+            "translation_memory_by_chunk": (
+                translation_memory_by_chunk),
             "request_contract": request_contract,
             "estimate": {
                 **estimate.to_dict(),

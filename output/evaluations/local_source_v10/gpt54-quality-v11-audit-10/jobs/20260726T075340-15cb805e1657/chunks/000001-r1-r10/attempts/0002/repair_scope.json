@@ -1,0 +1,27 @@
+{
+  "automatic": true,
+  "base_attempt": 1,
+  "base_raw_sha256": "2a1d29e347543e682a0910a1fb69701ab470517462a2c521c1f74b27a327b868",
+  "dispatch_ordinal": 1,
+  "kind": "compact_v10_selective_repair",
+  "replace_context_ids": [],
+  "replace_ranks": [
+    1,
+    2,
+    3,
+    5,
+    10
+  ],
+  "request_context_ids": [
+    "source-context-c535f824d57f859c34ac",
+    "source-context-9d763a9d06321236e5f1"
+  ],
+  "request_ranks": [
+    1,
+    2,
+    3,
+    5,
+    10
+  ],
+  "schema_version": 1
+}

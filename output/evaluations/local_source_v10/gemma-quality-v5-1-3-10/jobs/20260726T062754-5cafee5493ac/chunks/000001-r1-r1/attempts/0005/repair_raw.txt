@@ -1,0 +1,1 @@
+{"repairs":{"p001":{"sentence":"君道何在？","translation":"Where do you say it is?"},"p002":{"sentence":"彼道其意。","translation":"He spoke his intention."}}}

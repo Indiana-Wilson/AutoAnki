@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-5b630539591aec75e7df949db33a661019430c84bdd8a607bb70123e29e5e0c2",
+  "created_at": "2026-07-26T07:54:42.760793+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "道可道，非常道，名可名，非常名；",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T07:54:42.760864+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 2,
+          "chunk_id": "000001-r1-r10",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "effective_raw_sha256": "bea3f00fe13b46dbbf2cda0dfeee052de71ca28e2b79e8d53e479a567ce310e1",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T075340-15cb805e1657",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "35a09d8a4fecaa8b5f6830694835f88c908bc39507a8f610eb408d1dbc7fb815",
+          "provider_raw_sha256": "bea3f00fe13b46dbbf2cda0dfeee052de71ca28e2b79e8d53e479a567ce310e1",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "ea149b88f6def7faee8d7015469ac8d6155f3ff15e245fe331eb89cea0e31a9e",
+          "validated_at": "2026-07-26T07:54:42.760332+00:00"
+        }
+      ],
+      "translation": "The way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "translation_sha256": "a975fef749e52d68ed5cef8a505e1c5f67cb1b74159ab8e60e66dffdb8189cd0"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"the Way\",\"Dictionary Meaning (English)\":\"the fundamental principle or process underlying the universe, often ineffable and beyond human comprehension\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"archaic philosophical\",\"Nuance (English)\":\"implied to be non-dual, unchanging, and the origin of all phenomena\"},\"additional_senses\":[]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name.\"}]}",
+  "received_at": "2026-07-26T03:47:19.219786+00:00",
+  "response_id": "ollama-044cb39b4f59937d0ecf4855",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 1987,
+    "output_tokens": 164,
+    "reasoning_tokens": 0,
+    "total_tokens": 2151,
+    "uncached_input_tokens": 1987,
+    "visible_output_tokens": 164,
+    "web_search_calls": 0
+  }
+}

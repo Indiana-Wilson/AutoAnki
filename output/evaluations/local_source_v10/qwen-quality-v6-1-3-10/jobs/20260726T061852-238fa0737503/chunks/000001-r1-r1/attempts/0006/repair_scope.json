@@ -1,0 +1,41 @@
+{
+  "automatic": true,
+  "base_attempt": 5,
+  "base_raw_sha256": "93bab2e73b1b202a26259a83dbc253cbf05dc1bc7cb2421d4cd784e4fa9d8f45",
+  "dispatch_ordinal": 5,
+  "kind": "compact_v10_example_pair_repair",
+  "schema_version": 1,
+  "target_count": 1,
+  "targets": [
+    {
+      "additional_sense_index": 0,
+      "example_index": 1,
+      "key": "p001",
+      "problem_codes": [
+        "repeated_exact_form_source_term"
+      ],
+      "problem_ids": [
+        "repeated_exact_form_source_term:d4a3f2037910657a"
+      ],
+      "replace_sentence": true,
+      "replace_translation": true,
+      "sense_fields": {
+        "Dictionary Meaning (English)": "To express or articulate something verbally.",
+        "Nuance (English)": "Often used in contexts involving communication or discourse.",
+        "Part of Speech (English)": "verb",
+        "Pronunciation (English)": "dào",
+        "Register (English)": "literary, classical",
+        "Translation (English)": "to speak; to say"
+      },
+      "sentence": "君子之道，不可道也。",
+      "sibling_sentences": [
+        "道者，言其所由也。",
+        "道其言，而人不聽。",
+        "道之以德，齊之以禮。"
+      ],
+      "source_rank": 1,
+      "term": "道",
+      "translation": "The gentleman's way cannot be spoken."
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-edbf626ae85522e800103b2686ba65384d2dd31cb64797143b9e5b233fbbf4b1",
+  "created_at": "2026-07-26T09:35:06.963300+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "故常無欲，以觀其妙，",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T09:35:06.963324+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r30",
+          "context_id": "source-context-a0437bbc6bfb969f44fb",
+          "effective_raw_sha256": "4a1ce0a55b9f39b0579506545e80ab4fda390106bb7f2578002da5fb96c3037d",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T093429-4f2acf1c0f47",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "410ac8b7378ba49f1e2527917b1947531a1095e38041fdb899bc99b4f8dd5cf8",
+          "provider_raw_sha256": "bebc34dda410fa039a334bd81762c583b30322529d7ea45ae3b81d48933c64a4",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "085f48fdd675087d33b3cab888bd192f20d198145629e116397bf8bbe4cbea65",
+          "validated_at": "2026-07-26T09:35:06.963173+00:00"
+        }
+      ],
+      "translation": "Therefore, always without desire, one can observe its subtle mystery,",
+      "translation_sha256": "b6fb44778feb98f631491ca43dc3f842e08278634ecff484007edd6ed69bd8ee"
+    }
+  ]
+}

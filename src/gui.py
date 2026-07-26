@@ -17,6 +17,10 @@ import pipeline_runner
 import pipeline_store
 import prompt_builder
 import process_text
+from source_generation.model_catalog import (
+    is_local_source_model,
+    source_model_profile,
+)
 
 
 SOURCE_CONTEXT_OPTIONS = (
@@ -63,16 +67,22 @@ SOURCE_CONTEXT_DESCRIPTIONS = {
     for key, _label, description in SOURCE_CONTEXT_OPTIONS
 }
 SOURCE_PROTOCOL_OPTIONS = (
-    ("v9", "Compact v9 (recommended)"),
+    ("v10", "Compact v10 · local-first"),
+    ("v9", "Compact v9 rollback"),
     ("v8", "Legacy v8 rollback"),
 )
 SOURCE_PROTOCOL_KEYS_BY_LABEL = {
     label: key
     for key, label in SOURCE_PROTOCOL_OPTIONS
 }
+SOURCE_PROTOCOL_ESTIMATE_LABELS = {
+    "v10": "compact v10 local-first",
+    "v9": "compact v9 rollback",
+    "v8": "legacy v8 rollback",
+}
 SOURCE_REASONING_OPTIONS = (
-    ("none", "None · lowest cost"),
-    ("low", "Low · extra deliberation"),
+    ("low", "Low · recommended"),
+    ("none", "None · lowest cost, small batches"),
 )
 SOURCE_REASONING_KEYS_BY_LABEL = {
     label: key
@@ -85,6 +95,13 @@ SOURCE_EXECUTION_OPTIONS = (
 SOURCE_EXECUTION_KEYS_BY_LABEL = {
     label: key
     for key, label in SOURCE_EXECUTION_OPTIONS
+}
+SOURCE_MODEL_OPTIONS = (
+    ("gpt-5.4-mini", "GPT-5.4 mini · proven default"),
+)
+SOURCE_MODEL_KEYS_BY_LABEL = {
+    label: key
+    for key, label in SOURCE_MODEL_OPTIONS
 }
 
 SOURCE_JOB_HEADINGS = {
@@ -1116,6 +1133,7 @@ def format_source_estimate(estimate):
     request_protocol = read("request_protocol")
     reasoning_effort = read("reasoning_effort")
     execution_mode = read("execution_mode")
+    model = read("model")
     if isinstance(assumptions, dict):
         request_protocol = (
             request_protocol
@@ -1126,12 +1144,15 @@ def format_source_estimate(estimate):
         execution_mode = (
             execution_mode
             or assumptions.get("execution_mode"))
+        model = model or assumptions.get("pricing", {}).get("model")
     mode_details = []
+    if model:
+        mode_details.append(str(model))
     if request_protocol:
         mode_details.append(
-            "compact v9"
-            if request_protocol == "v9"
-            else "legacy v8")
+            SOURCE_PROTOCOL_ESTIMATE_LABELS.get(
+                request_protocol,
+                f"protocol {request_protocol}"))
     if reasoning_effort:
         mode_details.append(
             "no reasoning"
@@ -1174,6 +1195,37 @@ def format_source_estimate(estimate):
     if cached_input:
         details.append(
             f"{int(cached_input):,} input tokens expected at cache-read rate")
+    cache_write_input = read("estimated_cache_write_input_tokens")
+    if cache_write_input:
+        details.append(
+            f"{int(cache_write_input):,} input tokens expected at "
+            "cache-write rate")
+    translation_memory_hits = read("translation_memory_hit_count")
+    if translation_memory_hits:
+        details.append(
+            f"{int(translation_memory_hits):,} exact source translations "
+            "reused locally")
+    if read("automatic_repair"):
+        reserve_aud = (
+            assumptions.get("automatic_repair_reserve_aud")
+            if isinstance(assumptions, dict)
+            else None)
+        maximum_requests = (
+            assumptions.get("automatic_repair_max_requests")
+            if isinstance(assumptions, dict)
+            else None)
+        details.append(
+            "automatic repair enabled: exact translation reuse and up to "
+            "3 additional paid micro-repair calls per failed request")
+        if reserve_aud is not None:
+            details.append(
+                "worst-case optional repair reserve "
+                f"A${float(reserve_aud):,.2f}"
+                + (
+                    f" across at most {int(maximum_requests):,} calls"
+                    if maximum_requests is not None
+                    else "")
+                + " (excluded from headline)")
     pricing_label = read("pricing_label")
     if pricing_label:
         details.append(str(pricing_label))
@@ -4091,12 +4143,15 @@ class AutoAnkiApp:
         self.source_request_stagger_ms = tk.StringVar(value="100")
         self.source_allow_web_search = tk.BooleanVar(value=False)
         self.source_use_source_examples = tk.BooleanVar(value=False)
+        self.source_model_label = tk.StringVar(
+            value=SOURCE_MODEL_OPTIONS[0][1])
         self.source_request_protocol_label = tk.StringVar(
             value=SOURCE_PROTOCOL_OPTIONS[0][1])
         self.source_reasoning_label = tk.StringVar(
             value=SOURCE_REASONING_OPTIONS[0][1])
         self.source_execution_label = tk.StringVar(
             value=SOURCE_EXECUTION_OPTIONS[0][1])
+        self.source_automatic_repair = tk.BooleanVar(value=False)
         self.source_context_label = tk.StringVar(
             value=SOURCE_CONTEXT_LABELS["sentence"])
         self.source_context_description = tk.StringVar()
@@ -4385,7 +4440,7 @@ class AutoAnkiApp:
             text=(
                 "For each word's contextual sense, use the exact selected "
                 "source passage as its sole example. Other common, disjoint "
-                "senses still receive four generated examples."
+                "senses still receive three generated examples."
             ),
             style="Muted.TLabel",
             wraplength=950).grid(
@@ -4452,7 +4507,7 @@ class AutoAnkiApp:
 
         ttk.Label(
             config,
-            text="WORDS PER OPENAI REQUEST",
+            text="WORDS PER MODEL REQUEST",
             style="FieldLabel.TLabel").grid(
                 row=9,
                 column=0,
@@ -4493,9 +4548,15 @@ class AutoAnkiApp:
             columnspan=3,
             sticky="ew",
             pady=(14, 0))
-        for column in range(3):
+        for column in range(2):
             mode_controls.columnconfigure(column, weight=1)
-        for column, (heading, variable, values, callback) in enumerate((
+        for index, (heading, variable, values, callback) in enumerate((
+                (
+                    "MODEL",
+                    self.source_model_label,
+                    tuple(label for _key, label in SOURCE_MODEL_OPTIONS),
+                    self._source_model_changed,
+                ),
                 (
                     "REQUEST PROTOCOL",
                     self.source_request_protocol_label,
@@ -4515,14 +4576,17 @@ class AutoAnkiApp:
                     self._source_execution_mode_changed,
                 ),
         )):
+            column = index % 2
+            label_row = (index // 2) * 2
             ttk.Label(
                 mode_controls,
                 text=heading,
                 style="FieldLabel.TLabel").grid(
-                    row=0,
+                    row=label_row,
                     column=column,
                     sticky="w",
-                    padx=(0 if column == 0 else 16, 8))
+                    padx=(0 if column == 0 else 16, 8),
+                    pady=(10 if label_row else 0, 0))
             selector = ttk.Combobox(
                 mode_controls,
                 textvariable=variable,
@@ -4531,7 +4595,7 @@ class AutoAnkiApp:
                 style="App.TCombobox",
                 width=29)
             selector.grid(
-                row=1,
+                row=label_row + 1,
                 column=column,
                 sticky="ew",
                 padx=(0 if column == 0 else 16, 0),
@@ -4546,13 +4610,24 @@ class AutoAnkiApp:
                 add="+")
             if heading == "REASONING":
                 self.source_reasoning_selector = selector
+            elif heading == "MODEL":
+                self.source_model_selector = selector
+            elif heading == "REQUEST PROTOCOL":
+                self.source_protocol_selector = selector
+            elif heading == "PROCESSING":
+                self.source_execution_selector = selector
 
         ttk.Label(
             config,
             text=(
-                "Compact v9 keeps strict JSON and performs exact rank and "
-                "content validation locally. Legacy v8 is retained as a "
-                "one-click rollback. Economy submits an asynchronous OpenAI "
+                "Compact v10 (recommended) keeps provider sentences plain, "
+                "adds term emphasis locally, and can discard only provably "
+                "unusable optional senses before strict validation. Compact "
+                "v9 and legacy v8 remain one-click rollbacks. GPT-5.4 mini "
+                "is the supported model. Low reasoning with the 30-word "
+                "default is the tested recommendation; None is cheaper for "
+                "small chunks, while larger chunks can omit coverage or "
+                "senses. Economy submits an asynchronous OpenAI "
                 "Batch at half token pricing; it can take up to 24 hours and "
                 "is collected from Jobs & Failures."
             ),
@@ -4564,11 +4639,38 @@ class AutoAnkiApp:
                 sticky="w",
                 pady=(7, 0))
 
+        self.source_automatic_repair_check = ttk.Checkbutton(
+            config,
+            text="Automatic repair",
+            variable=self.source_automatic_repair,
+            command=self._source_automatic_repair_changed,
+            style="Panel.TCheckbutton")
+        self.source_automatic_repair_check.grid(
+            row=12,
+            column=0,
+            columnspan=3,
+            sticky="w",
+            pady=(14, 0))
+        ttk.Label(
+            config,
+            text=(
+                "Standard processing only. Repairs replace the smallest "
+                "safe scope first, with no more than three additional paid "
+                "micro-repair calls per failed request."
+            ),
+            style="Muted.TLabel",
+            wraplength=950).grid(
+                row=13,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(5, 0))
+
         rate_controls = ttk.Frame(
             config,
             style="Panel.TFrame")
         rate_controls.grid(
-            row=12,
+            row=14,
             column=0,
             columnspan=3,
             sticky="ew",
@@ -4630,21 +4732,22 @@ class AutoAnkiApp:
             style="Muted.TLabel",
             wraplength=950)
         self.source_rate_notice_label.grid(
-                row=13,
+                row=15,
                 column=0,
                 columnspan=3,
                 sticky="w",
                 pady=(7, 0))
 
-        ttk.Checkbutton(
+        self.source_web_search_check = ttk.Checkbutton(
             config,
             text=(
                 "Allow one web search per request when the meaning is unclear"
             ),
             variable=self.source_allow_web_search,
             command=self._schedule_source_estimate,
-            style="Panel.TCheckbutton").grid(
-                row=14,
+            style="Panel.TCheckbutton")
+        self.source_web_search_check.grid(
+                row=16,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -4658,7 +4761,7 @@ class AutoAnkiApp:
             ),
             style="Muted.TLabel",
             wraplength=950).grid(
-                row=15,
+                row=17,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -4678,7 +4781,7 @@ class AutoAnkiApp:
             pady=(10, 0))
         estimate = estimate_surface.interior
         estimate.columnconfigure(0, weight=1)
-        tk.Label(
+        self.source_estimate_heading_label = tk.Label(
             estimate,
             text="ESTIMATED OPENAI COST",
             background=self.PALE,
@@ -4746,14 +4849,15 @@ class AutoAnkiApp:
                 columnspan=2,
                 sticky="w",
                 pady=(4, 12))
-        ttk.Checkbutton(
+        self.source_authorization_check = ttk.Checkbutton(
             actions,
             text=(
                 "I authorise the paid OpenAI requests shown in this estimate"
             ),
             variable=self.source_paid_authorized,
             command=self._update_source_generate_button_state,
-            style="Panel.TCheckbutton").grid(
+            style="Panel.TCheckbutton")
+        self.source_authorization_check.grid(
                 row=2,
                 column=0,
                 sticky="w")
@@ -6392,7 +6496,7 @@ class AutoAnkiApp:
                     state=tk.DISABLED)
         else:
             self.source_reasoning_label.set(
-                dict(SOURCE_REASONING_OPTIONS)["none"])
+                dict(SOURCE_REASONING_OPTIONS)["low"])
             if hasattr(self, "source_reasoning_selector"):
                 self.source_reasoning_selector.configure(
                     state="readonly")
@@ -6403,11 +6507,137 @@ class AutoAnkiApp:
         self.source_paid_authorized.set(False)
         self._schedule_source_estimate()
 
+    def _selected_source_model_key(self):
+        variable = getattr(self, "source_model_label", None)
+        label = (
+            variable.get()
+            if hasattr(variable, "get")
+            else SOURCE_MODEL_OPTIONS[0][1])
+        return SOURCE_MODEL_KEYS_BY_LABEL.get(
+            label,
+            SOURCE_MODEL_OPTIONS[0][0])
+
+    def _source_model_changed(self, _event=None):
+        model = self._selected_source_model_key()
+        profile = source_model_profile(model)
+        if profile.local:
+            protocol = getattr(
+                self,
+                "source_request_protocol_label",
+                None)
+            if hasattr(protocol, "set"):
+                protocol.set(
+                    dict(SOURCE_PROTOCOL_OPTIONS)["v10"])
+            execution = getattr(
+                self,
+                "source_execution_label",
+                None)
+            if hasattr(execution, "set"):
+                execution.set(
+                    dict(SOURCE_EXECUTION_OPTIONS)["standard"])
+            for attribute, value in (
+                    ("source_chunk_size",
+                     str(profile.recommended_chunk_size)),
+                    ("source_concurrency",
+                     str(profile.recommended_concurrency)),
+                    ("source_request_stagger_ms", "0")):
+                variable = getattr(self, attribute, None)
+                if hasattr(variable, "set"):
+                    variable.set(value)
+            web_search = getattr(
+                self,
+                "source_allow_web_search",
+                None)
+            if hasattr(web_search, "set"):
+                web_search.set(False)
+        self._sync_source_model_controls()
+        self.source_paid_authorized.set(False)
+        self._schedule_source_estimate()
+
+    def _sync_source_model_controls(self):
+        model = self._selected_source_model_key()
+        profile = source_model_profile(model)
+        local = profile.local
+        if hasattr(self, "source_protocol_selector"):
+            self.source_protocol_selector.configure(
+                state=tk.DISABLED if local else "readonly")
+        if hasattr(self, "source_execution_selector"):
+            self.source_execution_selector.configure(
+                state=tk.DISABLED if local else "readonly")
+        if hasattr(self, "source_web_search_check"):
+            self.source_web_search_check.configure(
+                state=tk.DISABLED if local else tk.NORMAL)
+        if hasattr(self, "source_automatic_repair_check"):
+            self.source_automatic_repair_check.configure(
+                text=(
+                    "Automatic repair (exact translation reuse + up to 5 "
+                    "local validation follow-ups per failed request)"
+                    if local
+                    else (
+                        "Automatic repair (exact translation reuse + up to "
+                        "3 additional paid micro-repair calls per failed "
+                        "request)")))
+        if hasattr(self, "source_authorization_check"):
+            self.source_authorization_check.configure(
+                text=(
+                    "I authorise the paid OpenAI requests shown in this "
+                    "estimate"))
+        estimate_heading = getattr(
+            self,
+            "source_estimate_heading_label",
+            None)
+        if estimate_heading is not None:
+            estimate_heading.configure(
+                text=(
+                    "LOCAL MODEL COST"
+                    if local
+                    else "ESTIMATED OPENAI COST"))
+
+    def _source_automatic_repair_changed(self):
+        automatic_variable = getattr(
+            self,
+            "source_automatic_repair",
+            None)
+        enabled = bool(
+            automatic_variable.get()
+            if hasattr(automatic_variable, "get")
+            else False)
+        mode = SOURCE_EXECUTION_KEYS_BY_LABEL.get(
+            self.source_execution_label.get())
+        if enabled and mode == "economy":
+            self.source_execution_label.set(
+                dict(SOURCE_EXECUTION_OPTIONS)["standard"])
+            self._source_execution_mode_changed()
+            return
+        self.source_paid_authorized.set(False)
+        self._schedule_source_estimate()
+
     def _source_execution_mode_changed(self, _event=None):
         mode = SOURCE_EXECUTION_KEYS_BY_LABEL.get(
             self.source_execution_label.get())
+        local = is_local_source_model(
+            self._selected_source_model_key())
+        if local and mode != "standard":
+            self.source_execution_label.set(
+                dict(SOURCE_EXECUTION_OPTIONS)["standard"])
+            mode = "standard"
         economy = mode == "economy"
-        entry_state = tk.DISABLED if economy else tk.NORMAL
+        automatic_variable = getattr(
+            self,
+            "source_automatic_repair",
+            None)
+        if (
+                economy
+                and hasattr(automatic_variable, "get")
+                and automatic_variable.get()):
+            automatic_variable.set(False)
+        if hasattr(self, "source_automatic_repair_check"):
+            self.source_automatic_repair_check.configure(
+                state=tk.DISABLED if economy else tk.NORMAL)
+        entry_state = (
+            tk.DISABLED
+            if economy or local
+            else tk.NORMAL)
         if hasattr(self, "source_concurrency_entry"):
             self.source_concurrency_entry.configure(state=entry_state)
         if hasattr(self, "source_stagger_entry"):
@@ -6421,6 +6651,14 @@ class AutoAnkiApp:
                     "results without resubmitting completed work."
                     if economy
                     else (
+                        (
+                            "Local inference is sequential to protect GPU "
+                            "and system memory. Invalid responses can use up "
+                            "to five persisted validation follow-ups without "
+                            "an API charge."
+                        )
+                        if local
+                        else
                         "The default starts eight workers, with requests "
                         "launched no faster than the stagger permits. Account "
                         "limits vary; the coordinator observes OpenAI "
@@ -6434,7 +6672,11 @@ class AutoAnkiApp:
                 text=(
                     "Submit Economy Batch"
                     if economy
-                    else "Generate and import source deck"))
+                    else (
+                        "Generate locally and import source deck"
+                        if local
+                        else "Generate and import source deck")))
+        self._sync_source_model_controls()
         self.source_paid_authorized.set(False)
         self._schedule_source_estimate()
 
@@ -7105,8 +7347,33 @@ class AutoAnkiApp:
             execution_label)
         if execution_mode is None:
             raise ValueError("Select Standard or Economy processing.")
-        if execution_mode == "economy":
-            concurrency = 1
+        model_variable = getattr(self, "source_model_label", None)
+        model_label = (
+            model_variable.get()
+            if hasattr(model_variable, "get")
+            else dict(SOURCE_MODEL_OPTIONS)["gpt-5.4-mini"])
+        model = SOURCE_MODEL_KEYS_BY_LABEL.get(model_label)
+        if model is None:
+            raise ValueError("Select a supported source-generation model.")
+        model_profile = source_model_profile(model)
+        if model_profile.local:
+            execution_mode = "standard"
+        automatic_variable = getattr(
+            self,
+            "source_automatic_repair",
+            None)
+        automatic_repair = bool(
+            automatic_variable.get()
+            if hasattr(automatic_variable, "get")
+            else False)
+        if automatic_repair and execution_mode != "standard":
+            raise ValueError(
+                "Automatic repair currently requires Standard processing.")
+        if execution_mode == "economy" or model_profile.local:
+            concurrency = (
+                model_profile.recommended_concurrency
+                if model_profile.local
+                else 1)
             request_stagger_ms = 0
         else:
             concurrency = parse_source_chunk_size(
@@ -7137,7 +7404,7 @@ class AutoAnkiApp:
         protocol_label = (
             protocol_variable.get()
             if hasattr(protocol_variable, "get")
-            else dict(SOURCE_PROTOCOL_OPTIONS)["v9"])
+            else dict(SOURCE_PROTOCOL_OPTIONS)["v10"])
         request_protocol = SOURCE_PROTOCOL_KEYS_BY_LABEL.get(
             protocol_label)
         if request_protocol is None:
@@ -7149,13 +7416,16 @@ class AutoAnkiApp:
         reasoning_label = (
             reasoning_variable.get()
             if hasattr(reasoning_variable, "get")
-            else dict(SOURCE_REASONING_OPTIONS)["none"])
+            else dict(SOURCE_REASONING_OPTIONS)["low"])
         reasoning_effort = SOURCE_REASONING_KEYS_BY_LABEL.get(
             reasoning_label)
         if reasoning_effort is None:
             raise ValueError("Select a source reasoning effort.")
         if request_protocol == "v8":
             reasoning_effort = "low"
+        if model_profile.local:
+            request_protocol = "v10"
+            reasoning_effort = "none"
         source_prefix_token_limit = None
         prefix_enabled_variable = getattr(
             self,
@@ -7216,19 +7486,27 @@ class AutoAnkiApp:
             "context_mode": context_mode,
             "concurrency": concurrency,
             "request_stagger_ms": request_stagger_ms,
-            "max_transient_retries": 3,
+            "max_transient_retries": (
+                model_profile.default_transient_retries),
+            "model": model,
             "request_protocol": request_protocol,
             "reasoning_effort": reasoning_effort,
             "execution_mode": execution_mode,
-            "allow_web_search": bool(
-                getattr(
-                    self,
-                    "source_allow_web_search",
-                    False).get()
-                if hasattr(
-                    getattr(self, "source_allow_web_search", None),
-                    "get")
-                else False),
+            "automatic_repair": automatic_repair,
+            "max_automatic_repairs": (
+                model_profile.max_automatic_repairs),
+            "allow_web_search": (
+                False
+                if model_profile.local
+                else bool(
+                    getattr(
+                        self,
+                        "source_allow_web_search",
+                        False).get()
+                    if hasattr(
+                        getattr(self, "source_allow_web_search", None),
+                        "get")
+                    else False)),
             "use_source_for_example_sentences": use_source_examples,
             "pipeline": pipelines[0] if pipelines else None,
             "pipelines": pipelines,
@@ -9840,7 +10118,7 @@ class AutoAnkiApp:
                 deck_names = (
                     anki_integration.wait_for_collection_ready(
                         client))
-            elif not client.is_available():
+            elif not client.is_available(raise_response_errors=True):
                 self.deck_result_queue.put(("unavailable", None))
                 return
             else:

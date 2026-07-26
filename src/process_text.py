@@ -28,6 +28,7 @@ SENTENCE_TRANSLATIONS_FIELD_NAME = (
 SOURCE_CONTEXT_TRANSLATIONS_KEY = "source_context_translations"
 SOURCE_CONTEXT_ID_FIELD_NAME = "context_id"
 SOURCE_CONTEXT_TRANSLATION_FIELD_NAME = "translation"
+SOURCE_OCCURRENCE_SENSE_INDICES_KEY = "occurrence_sense_indices"
 _WANG_BI_TIANDI_ZHI_SHI_CONTEXTUAL_FIELDS = {
     "Translation (English)": "beginning; origin",
     "Dictionary Meaning (English)": (
@@ -341,12 +342,6 @@ def encode_source_context_block(context_text):
         .replace(marker, marker + "0")
         .replace("|", marker + "1"))
     return templates.SOURCE_CONTEXT_BLOCK_PREFIX + encoded
-
-
-def _sentence_has_emphasized_usage(sentence):
-    return any(
-        span.strip()
-        for span in _STRONG_SPAN_PATTERN.findall(sentence))
 
 
 def _plain_sentence_item(value):
@@ -767,41 +762,9 @@ def inspect_generated_response(
                         suggestion=(
                             "Retry, edit the response, or accept this empty "
                             "field after checking the resulting card.")))
-                if field_name == "Sentences":
-                    unsupported_tags = [
-                        tag
-                        for tag in _HTML_TAG_PATTERN.findall(field)
-                        if tag.casefold() not in {
-                            "<strong>",
-                            "</strong>",
-                        }
-                    ]
-                    if unsupported_tags:
-                        problems.append(_generated_problem(
-                            "sentence_contains_unsupported_html",
-                            "Example sentence contains unsupported HTML",
-                            "Generated example sentences may contain only "
-                            "literal <strong> and </strong> tags around the "
-                            "defined usage. Other tags and tag attributes are "
-                            "not allowed.",
-                            path=_field_path(card_index, field_name),
-                            location=field_location,
-                            scope="field",
-                            overrideable=False,
-                            card_index=card_index,
-                            term=field_term,
-                            field_name=field_name,
-                            expected=(
-                                "Plain sentence text with only literal "
-                                "<strong>...</strong> markup."),
-                            actual={
-                                "unsupported_tags": unsupported_tags,
-                            },
-                            suggestion=(
-                                "Retry, or remove every other tag and every "
-                                "attribute from the strong tags."),
-                            identity=field_name))
-                elif (
+                if (
+                        field_name != "Sentences"
+                        and
                         field_name != SENTENCE_TRANSLATIONS_FIELD_NAME
                         and _HTML_TAG_PATTERN.search(field)):
                     problems.append(_generated_problem(
@@ -878,7 +841,7 @@ def inspect_generated_response(
                     for sentence in note_data["Sentences"].split("|")
                     if sentence.strip()
                 ]
-                if len(sentences) != 4:
+                if len(sentences) != 3:
                     field_location, field_term = _card_location(
                         card_index,
                         note_data,
@@ -887,7 +850,7 @@ def inspect_generated_response(
                     problems.append(_generated_problem(
                         "wrong_sentence_count",
                         "Example sentence count is wrong",
-                        "Each detailed card must contain exactly four "
+                        "Each detailed card must contain exactly three "
                         "pipe-separated example sentences.",
                         path=_field_path(card_index, "Sentences"),
                         location=field_location,
@@ -896,7 +859,7 @@ def inspect_generated_response(
                         card_index=card_index,
                         term=field_term,
                         field_name="Sentences",
-                        expected=4,
+                        expected=3,
                         actual=len(sentences),
                         suggestion=(
                             "Retry, add/remove pipe-separated sentences, or "
@@ -996,9 +959,8 @@ def inspect_generated_response(
                     problems.append(_generated_problem(
                         "sentence_translation_contains_html",
                         "An example translation contains HTML",
-                        "English example translations must be plain text; "
-                        "strong tags and other HTML belong only in the "
-                        "source-language sentence.",
+                        "English example translations must be plain text "
+                        "without HTML.",
                         path=_field_path(
                             card_index,
                             SENTENCE_TRANSLATIONS_FIELD_NAME),
@@ -1042,8 +1004,8 @@ def inspect_generated_response(
                         if reason == "exact_source_copy":
                             message = (
                                 "This English translation is an exact copy "
-                                "of its source-language sentence after "
-                                "strong emphasis markup is removed.")
+                                "of its source-language sentence after HTML "
+                                "is removed.")
                         else:
                             message = (
                                 "This field is required to be English, but "
@@ -1083,88 +1045,6 @@ def inspect_generated_response(
                                 "item_index": item_index,
                                 "reason": reason,
                             }))
-
-            if "Sentences" in string_fields:
-                sentences = [
-                    sentence.strip()
-                    for sentence in note_data["Sentences"].split("|")
-                    if sentence.strip()
-                ]
-                missing_emphasis = [
-                    index + 1
-                    for index, sentence in enumerate(sentences)
-                    if not _sentence_has_emphasized_usage(sentence)
-                ]
-                if missing_emphasis:
-                    field_location, field_term = _card_location(
-                        card_index,
-                        note_data,
-                        term_field,
-                        "Sentences")
-                    problems.append(_generated_problem(
-                        "missing_sentence_emphasis",
-                        "Defined usage is not emboldened",
-                        "Every generated example sentence must use "
-                        "<strong>...</strong> around every occurrence that "
-                        "expresses this card's particular meaning.",
-                        path=_field_path(card_index, "Sentences"),
-                        location=field_location,
-                        scope="field",
-                        overrideable=True,
-                        card_index=card_index,
-                        term=field_term,
-                        field_name="Sentences",
-                        expected=(
-                            "At least one nonempty <strong>...</strong> "
-                            "usage in every example sentence."),
-                        actual={
-                            "sentences_without_emphasis": missing_emphasis,
-                        },
-                        suggestion=(
-                            "Retry, or add strong tags around the intended "
-                            "usage in each listed sentence.")))
-
-                if pipeline.language_key.startswith("classical_chinese"):
-                    expected_term = note_data.get(term_field)
-                    unexpected_spans = []
-                    if isinstance(expected_term, str):
-                        for sentence_index, sentence in enumerate(
-                                sentences,
-                                start=1):
-                            for span in _STRONG_SPAN_PATTERN.findall(sentence):
-                                emphasized = html.unescape(
-                                    _STRONG_TAG_PATTERN.sub("", span))
-                                if emphasized == expected_term:
-                                    continue
-                                unexpected_spans.append({
-                                    "sentence": sentence_index,
-                                    "emphasized": emphasized,
-                                })
-                    if unexpected_spans:
-                        field_location, field_term = _card_location(
-                            card_index,
-                            note_data,
-                            term_field,
-                            "Sentences")
-                        problems.append(_generated_problem(
-                            "unexpected_emphasized_form",
-                            "The wrong expression is emboldened",
-                            "Classical Chinese strong tags must enclose "
-                            "exactly the card's complete term. They cannot "
-                            "include a neighbouring character or mark a "
-                            "different expression.",
-                            path=_field_path(card_index, "Sentences"),
-                            location=field_location,
-                            scope="field",
-                            overrideable=True,
-                            card_index=card_index,
-                            term=field_term,
-                            field_name="Sentences",
-                            expected=expected_term,
-                            actual=unexpected_spans,
-                            suggestion=(
-                                "Retry, or move each strong tag so it encloses "
-                                "only the complete card term.")))
 
             if required_field_set <= string_fields:
                 for card in enabled_cards:
@@ -1304,8 +1184,8 @@ def build_response_format(
         return {
             "type": "array",
             "items": {"type": "string"},
-            "minItems": 4,
-            "maxItems": 4,
+            "minItems": 3,
+            "maxItems": 3,
         }
 
     def card_schema_for(names):
@@ -1636,26 +1516,15 @@ def build_grouped_source_response_format(pipeline, chunk):
         sentence_item_schema = {
             "type": "string",
             "description": (
-                "One complete natural source-language example containing "
-                f"the exact complete requested term {surface!r} exactly "
-                f"once, as literal <strong>{surface}</strong>. Do not use "
-                "a second occurrence anywhere, including inside a "
-                "compound. Never mark only a component or substring, and "
-                "never use em or any other HTML tag."),
+                "One complete natural source-language example using the "
+                f"complete requested term {surface!r} in this sense. Use "
+                "plain text without HTML."),
         }
-        if (
-                pipeline.language_key in _UNBOUNDED_TERM_LANGUAGES
-                and len(surface) == 1):
-            escaped_surface = re.escape(surface)
-            sentence_item_schema["pattern"] = (
-                f"^[^{escaped_surface}]*"
-                f"<strong>{escaped_surface}</strong>"
-                f"[^{escaped_surface}]*$")
         properties["Sentences"] = {
             "type": "array",
             "items": sentence_item_schema,
-            "minItems": 4,
-            "maxItems": 4,
+            "minItems": 3,
+            "maxItems": 3,
         }
         properties[SENTENCE_TRANSLATIONS_FIELD_NAME] = {
             "type": "array",
@@ -1666,8 +1535,8 @@ def build_grouped_source_response_format(pipeline, chunk):
                     "source sentence at the same array position; never copy "
                     "source-language text and never include HTML."),
             },
-            "minItems": 4,
-            "maxItems": 4,
+            "minItems": 3,
+            "maxItems": 3,
         }
         return {
             "type": "object",
@@ -1747,18 +1616,69 @@ def build_grouped_source_response_format(pipeline, chunk):
     }
 
 
-def build_compact_source_response_format(pipeline):
-    """Build the fixed, rank-addressed v9 retained-source schema.
+def build_compact_source_response_format(
+        pipeline,
+        *,
+        protocol_version=9,
+        chunk=None,
+        translation_memory_enabled=False,
+        include_occurrence_sense_indices=None):
+    """Build a fixed, rank-addressed compact retained-source schema.
 
     Unlike v8's per-chunk schema, this shape contains no source ranks, terms,
     or context IDs. One frozen format can therefore serve every chunk created
     from the same generation pipeline; exact membership remains recoverable
-    from the integer rank and context_id fields.
+    from the integer rank and context_id fields. Compact v10 may additionally
+    bind the two root-array lengths to one immutable generation chunk.
     """
+    if protocol_version not in {9, 10}:
+        raise ValueError(
+            "Compact source response formats require protocol 9 or 10.")
+    if not isinstance(translation_memory_enabled, bool):
+        raise TypeError(
+            "Translation-memory schema mode must be true or false.")
+    if (
+            include_occurrence_sense_indices is not None
+            and not isinstance(include_occurrence_sense_indices, bool)):
+        raise TypeError(
+            "Occurrence-sense schema mode must be true, false, or None.")
+    if protocol_version == 9 and (
+            chunk is not None
+            or translation_memory_enabled
+            or include_occurrence_sense_indices):
+        raise ValueError(
+            "Frozen compact v9 does not support per-chunk schema bounds.")
     pipeline_store.validate_pipelines((pipeline,))
     if not pipeline_store.requires_sentences(pipeline):
         raise ValueError(
             "Compact source results require the Context card direction.")
+    word_count = None
+    context_count = None
+    if chunk is not None:
+        try:
+            words = tuple(chunk.words)
+            contexts = tuple(chunk.contexts)
+        except AttributeError as error:
+            raise TypeError(
+                "A bounded compact source response format requires a "
+                "generation chunk.") from error
+        if not words:
+            raise ValueError(
+                "A bounded compact source response format requires at least "
+                "one word.")
+        word_count = len(words)
+        context_count = len(contexts)
+    if include_occurrence_sense_indices is None:
+        include_occurrence_sense_indices = bool(
+            protocol_version == 10
+            and chunk is not None
+            and any(
+                len(getattr(word, "context_occurrences", ())) > 1
+                for word in words))
+    if include_occurrence_sense_indices and (
+            protocol_version != 10 or chunk is None):
+        raise ValueError(
+            "Occurrence-sense indices require a bounded compact v10 chunk.")
 
     term_field = pipeline_store.get_language(
         pipeline.language_key).term_field
@@ -1793,16 +1713,9 @@ def build_compact_source_response_format(pipeline):
             "type": "array",
             "items": {
                 "type": "string",
-                **(
-                    {
-                        "pattern": (
-                            r"^.*<strong>.+</strong>.*$"),
-                    }
-                    if field_name == "Sentences"
-                    else {}),
             },
-            "minItems": 4,
-            "maxItems": 4,
+            "minItems": 3,
+            "maxItems": 3,
         }
     additional_sense_schema = {
         "type": "object",
@@ -1814,15 +1727,21 @@ def build_compact_source_response_format(pipeline):
         ],
         "additionalProperties": False,
     }
+    additional_senses_schema = {
+        "type": "array",
+        "items": additional_sense_schema,
+    }
+    if protocol_version == 10:
+        additional_senses_schema.update({
+            "minItems": 0,
+            "maxItems": 8,
+        })
     term_result_schema = {
         "type": "object",
         "properties": {
             SOURCE_RANK_FIELD_NAME: {"type": "integer"},
             SOURCE_CONTEXTUAL_SENSE_KEY: contextual_sense_schema,
-            SOURCE_ADDITIONAL_SENSES_KEY: {
-                "type": "array",
-                "items": additional_sense_schema,
-            },
+            SOURCE_ADDITIONAL_SENSES_KEY: additional_senses_schema,
         },
         "required": [
             SOURCE_RANK_FIELD_NAME,
@@ -1831,6 +1750,31 @@ def build_compact_source_response_format(pipeline):
         ],
         "additionalProperties": False,
     }
+    if include_occurrence_sense_indices:
+        maximum_occurrences = max(
+            (
+                len(getattr(word, "context_occurrences", ()))
+                for word in words
+            ),
+            default=0)
+        term_result_schema["properties"][
+            SOURCE_OCCURRENCE_SENSE_INDICES_KEY] = {
+                "type": "array",
+                "description": (
+                    "One sense index for each trusted input "
+                    "context_occurrence, in input order. Zero selects "
+                    "contextual_sense; positive N selects "
+                    "additional_senses[N-1]."),
+                "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 8,
+                },
+                "minItems": 0,
+                "maxItems": maximum_occurrences,
+            }
+        term_result_schema["required"].append(
+            SOURCE_OCCURRENCE_SENSE_INDICES_KEY)
     context_translation_schema = {
         "type": "object",
         "properties": {
@@ -1843,22 +1787,38 @@ def build_compact_source_response_format(pipeline):
         ],
         "additionalProperties": False,
     }
+    term_results_schema = {
+        "type": "array",
+        "items": term_result_schema,
+    }
+    context_translations_schema = {
+        "type": "array",
+        "items": context_translation_schema,
+    }
+    if word_count is not None:
+        term_results_schema.update({
+            "minItems": word_count,
+            "maxItems": word_count,
+        })
+        context_translations_schema.update({
+            "minItems": (
+                0
+                if translation_memory_enabled
+                else context_count),
+            "maxItems": context_count,
+        })
     return {
         "type": "json_schema",
         "name": bounded_response_format_name(
-            f"autoanki_{pipeline.language_key}_compact_source_v9"),
+            f"autoanki_{pipeline.language_key}_compact_source_v"
+            f"{protocol_version}"),
         "strict": True,
         "schema": {
             "type": "object",
             "properties": {
-                SOURCE_TERM_RESULTS_KEY: {
-                    "type": "array",
-                    "items": term_result_schema,
-                },
-                SOURCE_CONTEXT_TRANSLATIONS_KEY: {
-                    "type": "array",
-                    "items": context_translation_schema,
-                },
+                SOURCE_TERM_RESULTS_KEY: term_results_schema,
+                SOURCE_CONTEXT_TRANSLATIONS_KEY: (
+                    context_translations_schema),
             },
             "required": [
                 SOURCE_TERM_RESULTS_KEY,

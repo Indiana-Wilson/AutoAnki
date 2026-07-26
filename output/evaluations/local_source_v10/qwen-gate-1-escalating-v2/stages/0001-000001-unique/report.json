@@ -1,0 +1,350 @@
+{
+  "anki_mutation_performed": false,
+  "created_at": "2026-07-26T02:49:09.783573+00:00",
+  "estimate": {
+    "estimated_cost_aud": 0.0,
+    "estimated_cost_usd": 0.0,
+    "largest_request_high_total_tokens": 3289,
+    "largest_request_input_tokens": 2608,
+    "largest_request_output_tokens": 415,
+    "local_model": true,
+    "model": "ollama/qwen3:14b",
+    "provider": "ollama",
+    "request_count": 1,
+    "request_limit_warning": null,
+    "translation_memory_hit_count": 0,
+    "word_count": 1
+  },
+  "final_validation_passed": true,
+  "job": {
+    "combined_complete": true,
+    "completed_chunk_count": 1,
+    "job_id": "20260726T024657-7f487c288a95",
+    "overall_status": "completed",
+    "path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/qwen-gate-1-escalating-v2/jobs/20260726T024657-7f487c288a95",
+    "total_chunk_count": 1
+  },
+  "kind": "local_source_v10_evaluation_stage",
+  "model": "ollama/qwen3:14b",
+  "model_runtime_snapshot": {
+    "base_url": "http://127.0.0.1:11434",
+    "digest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+    "family": "qwen3",
+    "inference_policy": {
+      "keep_alive": "10m",
+      "num_ctx": 8192,
+      "repeat_penalty": 1.05,
+      "schema_version": 1,
+      "seed_policy": "sha256(job_id,chunk_id,attempt,model_id)",
+      "temperature": 0.2,
+      "top_k": 40,
+      "top_p": 0.9
+    },
+    "model_id": "ollama/qwen3:14b",
+    "modified_at": "2026-07-26T12:26:22.798414018+10:00",
+    "ollama_version": "0.32.1",
+    "parameter_size": "14.8B",
+    "provider": "ollama",
+    "provider_model": "qwen3:14b",
+    "quantization_level": "Q4_K_M",
+    "schema_version": 1,
+    "size": 9276198565
+  },
+  "output": {
+    "additional_sense_count": 2,
+    "additional_sense_counts_by_term": {
+      "道": 2
+    },
+    "canonical_card_count": 3,
+    "exact_unique_term_coverage": true,
+    "missing_terms": [],
+    "quality_warnings": [],
+    "term_counts": {
+      "道": 3
+    },
+    "term_field": "Classical Chinese",
+    "terms_with_additional_senses": 1,
+    "terms_with_additional_senses_ratio": 1.0,
+    "unexpected_terms": [],
+    "unique_term_count": 1
+  },
+  "package_or_import_attempted": false,
+  "pipeline_id": "default-english-vocabulary",
+  "plan": {
+    "chunk_ids": [
+      "000001-r1-r1"
+    ],
+    "chunk_word_counts": [
+      1
+    ],
+    "excluded_word_count": 0,
+    "plan_id": "677f17e20d981b55f0e98724",
+    "prefix_unique_word_count": 1,
+    "ranks": [
+      1
+    ],
+    "selected_word_count": 1,
+    "source_prefix_token_count": 1,
+    "terms": [
+      "道"
+    ]
+  },
+  "provider": "ollama",
+  "schema_version": 1,
+  "selection": {
+    "expected_ranks": [
+      1
+    ],
+    "expected_terms": [
+      "道"
+    ],
+    "requested_unique_count": 1,
+    "source_prefix_token_limit": 1
+  },
+  "source": {
+    "build_id": "36a6c2bee21385f4c53ca3a5",
+    "key": "daodejing_wang_bi",
+    "language_key": "classical_chinese_wang_bi",
+    "run_path": "/home/indiana/Work/Projects/AutoAnki/output/corpora/daodejing_wang_bi/runs/36a6c2bee21385f4c53ca3a5",
+    "title": "道德經"
+  },
+  "status": "passed",
+  "unexpected_package_exists": false,
+  "usage": {
+    "attempt_count": 2,
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2180,
+    "output_tokens": 671,
+    "reasoning_tokens": 0,
+    "total_tokens": 2851,
+    "uncached_input_tokens": 2180,
+    "visible_output_tokens": 671,
+    "web_search_calls": 0
+  },
+  "validation": {
+    "automatic_repair_dispatch_count": 1,
+    "chunks": [
+      {
+        "attempt_count": 2,
+        "attempts": [
+          {
+            "artifact_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/qwen-gate-1-escalating-v2/jobs/20260726T024657-7f487c288a95/chunks/000001-r1-r1/attempts/0001",
+            "attempt": 1,
+            "automatic_repair_dispatch": null,
+            "error": {
+              "message": "For an uninflected Classical Chinese term, a generated additional-sense example must contain exactly one literal occurrence. Repetition can mix grammatical roles or senses.",
+              "status_code": null,
+              "timestamp": "2026-07-26T02:48:58.891293+00:00",
+              "transient": false,
+              "type": "GeneratedCardValidationError"
+            },
+            "local_dispatch": {
+              "dispatched_at": "2026-07-26T02:46:57.067846+00:00",
+              "kind": "ollama_source_dispatch",
+              "max_output_tokens": 2421,
+              "model_id": "ollama/qwen3:14b",
+              "provider_model": "qwen3:14b",
+              "reasoning": {
+                "effort": "none"
+              },
+              "runtime": {
+                "keep_alive": "10m",
+                "options": {
+                  "num_ctx": 8192,
+                  "repeat_penalty": 1.05,
+                  "seed": 976234333,
+                  "temperature": 0.2,
+                  "top_k": 40,
+                  "top_p": 0.9
+                }
+              },
+              "schema_version": 1,
+              "seed": 976234333
+            },
+            "local_repair": null,
+            "raw_sha256": "2440acbde21847d02102d4430c0fb1d208148636b29dfe33cea3c17b10dce293",
+            "repair_scope": null,
+            "repaired_raw_sha256": null,
+            "response": {
+              "model": "qwen3:14b",
+              "received_at": "2026-07-26T02:48:58.868806+00:00",
+              "response_id": "ollama-4c7e6d4f2f78bfd65aa73b53",
+              "service_tier": "local",
+              "status": "completed",
+              "usage": {
+                "cache_write_input_tokens": 0,
+                "cached_input_tokens": 0,
+                "input_tokens": 1869,
+                "output_tokens": 622,
+                "reasoning_tokens": 0,
+                "total_tokens": 2491,
+                "uncached_input_tokens": 1869,
+                "visible_output_tokens": 622,
+                "web_search_calls": 0
+              }
+            },
+            "validated_card_count": null,
+            "validation_problem_count": 1,
+            "validation_problems": [
+              {
+                "actual": {
+                  "occurrence_count": 2,
+                  "sentence": "君子之道，不可道也。"
+                },
+                "code": "repeated_exact_form_source_term",
+                "context_id": "source-context-c535f824d57f859c34ac",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": "Exactly one literal occurrence of 道.",
+                "field_name": "Sentences",
+                "location": "Card 3 (“道”) → Sentences → item 1",
+                "message": "For an uninflected Classical Chinese term, a generated additional-sense example must contain exactly one literal occurrence. Repetition can mix grammatical roles or senses.",
+                "overrideable": false,
+                "path": "$.term_results[0].additional_senses[1][\"Sentences\"][0]",
+                "problem_id": "repeated_exact_form_source_term:340694f7ec0ac388",
+                "scope": "field",
+                "source_rank": 1,
+                "suggestion": "Retry with one natural example containing a single target usage.",
+                "term": "道",
+                "title": "Example repeats the complete source term"
+              }
+            ]
+          },
+          {
+            "artifact_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/qwen-gate-1-escalating-v2/jobs/20260726T024657-7f487c288a95/chunks/000001-r1-r1/attempts/0002",
+            "attempt": 2,
+            "automatic_repair_dispatch": {
+              "automatic": true,
+              "dispatch_ordinal": 1,
+              "dispatched_at": "2026-07-26T02:48:58.988751+00:00",
+              "kind": "automatic_repair_dispatch",
+              "repair_kind": "example_pair",
+              "schema_version": 1
+            },
+            "error": null,
+            "local_dispatch": {
+              "dispatched_at": "2026-07-26T02:48:58.990278+00:00",
+              "kind": "ollama_source_dispatch",
+              "max_output_tokens": 1024,
+              "model_id": "ollama/qwen3:14b",
+              "provider_model": "qwen3:14b",
+              "reasoning": {
+                "effort": "none"
+              },
+              "runtime": {
+                "keep_alive": "10m",
+                "options": {
+                  "num_ctx": 8192,
+                  "repeat_penalty": 1.05,
+                  "seed": 885514629,
+                  "temperature": 0.2,
+                  "top_k": 40,
+                  "top_p": 0.9
+                }
+              },
+              "schema_version": 1,
+              "seed": 885514629
+            },
+            "local_repair": null,
+            "raw_sha256": "8fe24921556e129c9a973e8ec3e077f237f10ea2063b2f73d0e7dd16b8e954df",
+            "repair_scope": {
+              "automatic": true,
+              "base_attempt": 1,
+              "base_raw_sha256": "2440acbde21847d02102d4430c0fb1d208148636b29dfe33cea3c17b10dce293",
+              "dispatch_ordinal": 1,
+              "kind": "compact_v10_example_pair_repair",
+              "schema_version": 1,
+              "target_count": 1,
+              "targets": [
+                {
+                  "additional_sense_index": 1,
+                  "example_index": 0,
+                  "key": "p001",
+                  "problem_codes": [
+                    "repeated_exact_form_source_term"
+                  ],
+                  "problem_ids": [
+                    "repeated_exact_form_source_term:340694f7ec0ac388"
+                  ],
+                  "replace_sentence": true,
+                  "replace_translation": true,
+                  "sense_fields": {
+                    "Dictionary Meaning (English)": "To express something verbally or in writing.",
+                    "Nuance (English)": "This is a rare and archaic usage, often found in classical texts.",
+                    "Part of Speech (English)": "verb",
+                    "Pronunciation (English)": "dào",
+                    "Register (English)": "archaic, literary",
+                    "Translation (English)": "to speak; to say"
+                  },
+                  "sentence": "君子之道，不可道也。",
+                  "sibling_sentences": [
+                    "道其所見，以示於人。",
+                    "道其言，人皆信之。",
+                    "道其所思，以成文章。"
+                  ],
+                  "source_rank": 1,
+                  "term": "道",
+                  "translation": "The way of the gentleman cannot be spoken."
+                }
+              ]
+            },
+            "repaired_raw_sha256": null,
+            "response": {
+              "model": "qwen3:14b",
+              "received_at": "2026-07-26T02:49:09.706140+00:00",
+              "response_id": "ollama-47da6897e04d9e0da89ba68b",
+              "service_tier": "local",
+              "status": "completed",
+              "usage": {
+                "cache_write_input_tokens": 0,
+                "cached_input_tokens": 0,
+                "input_tokens": 311,
+                "output_tokens": 49,
+                "reasoning_tokens": 0,
+                "total_tokens": 360,
+                "uncached_input_tokens": 311,
+                "visible_output_tokens": 49,
+                "web_search_calls": 0
+              }
+            },
+            "validated_card_count": 3,
+            "validation_problem_count": 0,
+            "validation_problems": []
+          }
+        ],
+        "chunk_id": "000001-r1-r1",
+        "last_error": null,
+        "status": "succeeded"
+      }
+    ],
+    "final_problem_code_counts": {},
+    "historical_problem_code_counts": {
+      "repeated_exact_form_source_term": 1
+    },
+    "problems": [
+      {
+        "actual": {
+          "occurrence_count": 2,
+          "sentence": "君子之道，不可道也。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r1",
+        "code": "repeated_exact_form_source_term",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "Exactly one literal occurrence of 道.",
+        "field_name": "Sentences",
+        "location": "Card 3 (“道”) → Sentences → item 1",
+        "message": "For an uninflected Classical Chinese term, a generated additional-sense example must contain exactly one literal occurrence. Repetition can mix grammatical roles or senses.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[1][\"Sentences\"][0]",
+        "problem_id": "repeated_exact_form_source_term:340694f7ec0ac388",
+        "scope": "field",
+        "source_rank": 1,
+        "suggestion": "Retry with one natural example containing a single target usage.",
+        "term": "道",
+        "title": "Example repeats the complete source term"
+      }
+    ]
+  }
+}

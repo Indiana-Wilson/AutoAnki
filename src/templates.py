@@ -94,6 +94,21 @@ CARD_CSS = """.card {
   text-align: center;
 }
 
+.context-example {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65em;
+  max-width: 44em;
+}
+
+.context-term {
+  max-width: 44em;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .sentence {
   max-width: 44em;
   line-height: 1.65;
@@ -129,7 +144,10 @@ def _definition_stack():
 
 def _context_front(term_field):
     return f"""<div id="sentence-source" hidden>{{{{Sentences}}}}</div>
-<div id="sentence" class="sentence"></div>
+<div class="context-example">
+  <div class="term context-term">{{{{{term_field}}}}}</div>
+  <div id="sentence" class="sentence"></div>
+</div>
 <script>
 (function () {{
   const source = document.getElementById("sentence-source");

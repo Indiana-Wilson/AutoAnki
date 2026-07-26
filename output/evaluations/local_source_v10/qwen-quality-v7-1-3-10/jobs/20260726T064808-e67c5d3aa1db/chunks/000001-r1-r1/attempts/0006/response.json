@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"way; principle\",\"Dictionary Meaning (English)\":\"A fundamental, ineffable principle or way that underlies and governs the universe.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"philosophical, literary\",\"Nuance (English)\":\"Implies something beyond ordinary human understanding, often associated with the Daoist concept of the Dao.\"},\"additional_senses\":[{\"Translation (English)\":\"path; road\",\"Dictionary Meaning (English)\":\"A physical or metaphorical route taken by a person or thing.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"neutral, literary\",\"Nuance (English)\":\"Often used in the context of travel or journey.\",\"Sentences\":[\"道遠而險，不可輕行。\",\"此道通向山頂，宜緩步而行。\",\"行於此道，風雨無阻。\",\"古人雲：知者樂水，仁者樂山；然行道者，必先識途。\"],\"Sentence Translations (English)\":[\"The path is distant and dangerous, not to be taken lightly.\",\"This road leads to the mountain top; one should walk slowly.\",\"Travelling on this path, one is undeterred by wind and rain.\",\"Ancient people said: the wise take pleasure in water, the benevolent in mountains; yet those who travel must first know the way.\"]}],\"occurrence_sense_indices\":[0,1]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Dao that can be spoken of is not the eternal Dao; the name that can be named is not the eternal name;\" }]}",
+  "received_at": "2026-07-26T07:00:08.969068+00:00",
+  "response_id": "ollama-fa416d6beb3574d9a200750d",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2758,
+    "output_tokens": 392,
+    "reasoning_tokens": 0,
+    "total_tokens": 3150,
+    "uncached_input_tokens": 2758,
+    "visible_output_tokens": 392,
+    "web_search_calls": 0
+  }
+}

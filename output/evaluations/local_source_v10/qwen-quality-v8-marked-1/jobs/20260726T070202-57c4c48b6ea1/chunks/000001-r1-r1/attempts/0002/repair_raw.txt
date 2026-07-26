@@ -1,0 +1,12 @@
+{
+  "repairs": {
+    "p001": {
+      "sentence": "君子道其言，而行其禮。",
+      "translation": "A gentleman speaks his words and performs his rites."
+    },
+    "p002": {
+      "sentence": "夫子之道，可聞而不可見。",
+      "translation": "The master's way can be heard but not seen."
+    }
+  }
+}

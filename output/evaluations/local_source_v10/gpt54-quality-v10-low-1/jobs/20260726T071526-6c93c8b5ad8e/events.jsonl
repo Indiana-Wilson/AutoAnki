@@ -1,0 +1,4 @@
+{"attempt": null, "chunk_id": null, "job_id": "20260726T071526-6c93c8b5ad8e", "message": "Starting 1 source chunks with at most 1 concurrent requests.", "status": "running", "timestamp": "2026-07-26T07:15:26.255750+00:00"}
+{"attempt": 1, "chunk_id": "000001-r1-r1", "job_id": "20260726T071526-6c93c8b5ad8e", "message": "Requesting source chunk 1/1.", "status": "running", "timestamp": "2026-07-26T07:15:26.263794+00:00"}
+{"attempt": 1, "chunk_id": "000001-r1-r1", "job_id": "20260726T071526-6c93c8b5ad8e", "message": "Validated source chunk 1/1.", "status": "succeeded", "timestamp": "2026-07-26T07:15:32.453340+00:00"}
+{"attempt": null, "chunk_id": null, "job_id": "20260726T071526-6c93c8b5ad8e", "message": "Source generation pass finished; all completed output and failures were retained.", "status": "completed", "timestamp": "2026-07-26T07:15:32.465815+00:00"}

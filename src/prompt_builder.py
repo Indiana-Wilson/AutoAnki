@@ -37,7 +37,13 @@ def build_prompt(
         sentence_collections_as_arrays=False,
         grouped_source_examples=False,
         compact_source_examples=False,
+        compact_source_protocol=9,
         include_ending=True):
+    if (
+            compact_source_examples
+            and compact_source_protocol not in {9, 10}):
+        raise ValueError(
+            "Compact source examples require protocol 9 or 10.")
     language = pipeline_store.get_language(
         pipeline.language_key)
     components = pipeline_store.prompt_component_map(project_root)
@@ -47,7 +53,7 @@ def build_prompt(
     sections = []
 
     core_key = (
-        "core_source_v9"
+        f"core_source_v{compact_source_protocol}"
         if compact_source_examples
         else "core")
     for key in (core_key, f"languages/{language.key}"):
@@ -58,7 +64,9 @@ def build_prompt(
 
     if pipeline_store.requires_sentences(pipeline):
         if compact_source_examples:
-            key = "directions/context_arrays_v9"
+            key = (
+                f"directions/context_arrays_v"
+                f"{compact_source_protocol}")
         elif sentence_collections_as_arrays:
             key = (
                 "directions/context_arrays_v8"
@@ -82,13 +90,14 @@ def build_prompt(
                 key,
                 **shared_values))
         if include_sentence_translations:
-            key = (
-                (
-                    "directions/sentence_translation_arrays_v9"
+            if sentence_collections_as_arrays:
+                key = (
+                    f"directions/sentence_translation_arrays_v"
+                    f"{compact_source_protocol}"
                     if compact_source_examples
                     else "directions/sentence_translation_arrays")
-                if sentence_collections_as_arrays
-                else "directions/sentence_translations")
+            else:
+                key = "directions/sentence_translations"
             sections.append(_format_component(
                 _read_component(components, key),
                 key,
@@ -100,7 +109,13 @@ def build_prompt(
             field_setting.field_key)
         target_language = pipeline_store.get_language(
             field_setting.target_language_key)
-        key = f"fields/{field.key}"
+        key = (
+            "fields/dictionary_meaning_v10"
+            if (
+                compact_source_examples
+                and compact_source_protocol == 10
+                and field.key == "dictionary_meaning")
+            else f"fields/{field.key}")
         sections.append(_format_component(
             _read_component(components, key),
             key,

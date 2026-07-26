@@ -1,0 +1,42 @@
+{
+  "cards": [
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "the fundamental principle or order of the universe, often ineffable and beyond human comprehension",
+      "Nuance (English)": "implied to be transcendent, unnameable, and the source of all existence",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "philosophical, literary, classical",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+      "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+      "Translation (English)": "the Way"
+    }
+  ],
+  "chunks": [
+    {
+      "chunk_id": "000001-r1-r1",
+      "output": {
+        "cards": [
+          {
+            "Classical Chinese": "道",
+            "Dictionary Meaning (English)": "the fundamental principle or order of the universe, often ineffable and beyond human comprehension",
+            "Nuance (English)": "implied to be transcendent, unnameable, and the source of all existence",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "philosophical, literary, classical",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+            "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+            "Translation (English)": "the Way"
+          }
+        ]
+      }
+    }
+  ],
+  "complete": true,
+  "completed_chunk_count": 1,
+  "job_id": "20260726T041055-ed368e44dffd",
+  "plan_id": "677f17e20d981b55f0e98724",
+  "schema_version": 1,
+  "source_key": "daodejing_wang_bi",
+  "total_chunk_count": 1
+}

@@ -1,0 +1,13 @@
+{
+  "admissions": [
+    {
+      "cache_key": "sctm1-5b630539591aec75e7df949db33a661019430c84bdd8a607bb70123e29e5e0c2",
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "state": "usable",
+      "translation_sha256": "2c0de1b22b13ebdf52516eb835476feab0d045d9ffaeead86cd83751e749d3f6",
+      "variant_count": 1
+    }
+  ],
+  "kind": "source_context_translation_memory_admissions",
+  "schema_version": 1
+}

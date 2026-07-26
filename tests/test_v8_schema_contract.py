@@ -157,31 +157,28 @@ class GroupedSourceResponseSchemaTests(unittest.TestCase):
         self.assertNotIn("Classical Chinese", additional["properties"])
         self.assertEqual(
             additional["properties"]["Sentences"]["minItems"],
-            4)
+            3)
         self.assertEqual(
             additional["properties"]["Sentences"]["maxItems"],
-            4)
+            3)
         self.assertEqual(
             additional["properties"][
                 "Sentence Translations (English)"]["minItems"],
-            4)
+            3)
         self.assertEqual(
             additional["properties"][
                 "Sentence Translations (English)"]["maxItems"],
-            4)
+            3)
         self.assertIn(
             "never copy source-language text",
             additional["properties"][
                 "Sentence Translations (English)"]["items"]["description"])
         self.assertIn(
-            "exact complete requested term '道' exactly once",
+            "complete requested term '道'",
             additional["properties"]["Sentences"]["items"]["description"])
-        self.assertIn(
-            "including inside a compound",
-            additional["properties"]["Sentences"]["items"]["description"])
-        self.assertEqual(
-            additional["properties"]["Sentences"]["items"]["pattern"],
-            "^[^道]*<strong>道</strong>[^道]*$")
+        self.assertNotIn(
+            "pattern",
+            additional["properties"]["Sentences"]["items"])
         self.assertEqual(
             set(additional["required"]),
             set(additional["properties"]))
@@ -319,104 +316,11 @@ class VersionEightSourceContractTests(unittest.TestCase):
         self.assertIn(
             "practical method/course/teaching",
             " ".join(prompt.split()))
-        self.assertIn(
-            "FINAL SENSE-COVERAGE CHECK—MANDATORY",
-            prompt)
-        self.assertIn(
-            "omitting the common road/path or practical method/course sense",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "Never copy, paraphrase, or broaden",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "FINAL TRANSLATION-LANGUAGE CHECK—MANDATORY",
-            prompt)
-        self.assertIn(
-            "非 + 常道 or 非 + 常名",
-            prompt)
-        self.assertIn(
-            'negative copula or negative predicate "is not"',
-            " ".join(prompt.split()))
-        self.assertIn(
-            "Never define, pronounce, highlight, or exemplify only one "
-            "character",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "Never emit <em>",
-            prompt)
-        self.assertIn(
-            "Returning \"constant/enduring\", cháng, or adjective",
-            " ".join(prompt.split()))
-        self.assertIn(
-            'Return an empty "additional_senses" array for 天地',
-            " ".join(prompt.split()))
-        self.assertIn(
-            "Do not return an empty array for 可",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "after removing the one <strong>...</strong> span",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "This exact-once v8 rule overrides the general",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "GROUPED V8 TARGET RULE—THIS REPLACES THE GENERAL "
-            "REPEATED-USAGE RULE",
-            prompt)
-        self.assertNotIn(
-            "leave that other occurrence completely untagged",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "a 道 card must not use 大道",
-            " ".join(prompt.split()))
-        self.assertIn(
-            'A construction such as 未有名 ("had no name")',
-            " ".join(prompt.split()))
-        self.assertIn(
-            '以有觀<strong>無</strong> means "use being to contemplate '
-            'nonbeing"',
-            " ".join(prompt.split()))
-        self.assertIn(
-            "use 遂<strong>之</strong>郊, not the unidiomatic",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "do not use the compound 是非 anywhere",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "do not preface it with a clause such as 既告之",
-            " ".join(prompt.split()))
-        self.assertIn(
-            '"Part of Speech (English)" MUST be "negative existential verb '
-            '/ negator"',
-            " ".join(prompt.split()))
-        self.assertIn(
-            "Avoid ambiguous 可行, 可守, 可取, 可任, and 可嘉",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "never 王<strong>之</strong>於東",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "never 春<strong>始</strong>生",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "never the subjectless and ambiguous "
-            "出於此<strong>道</strong>",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "never the incoherent 告而聽<strong>之</strong>",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "never 吾欲<strong>之</strong>遠",
-            " ".join(prompt.split()))
-        self.assertIn(
-            'For 始 in 天地之始, "contextual_sense" MUST be the noun',
-            " ".join(prompt.split()))
-        self.assertIn(
-            "never 子欲<strong>之</strong>何方",
-            " ".join(prompt.split()))
-        self.assertIn(
-            'never "His fame was widely heard"',
-            " ".join(prompt.split()))
+        self.assertIn("FINAL CHECK", prompt)
+        self.assertIn("verify exact rank and context-ID coverage", prompt)
+        self.assertIn("exactly three", prompt)
+        self.assertNotIn("<strong>", prompt)
+        self.assertNotIn("emphasis", prompt.casefold())
         self.assertTrue(
             prompt.endswith("Here is the source batch JSON:\n"))
         self.assertLess(

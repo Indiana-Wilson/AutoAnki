@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-57db1abcbe7df8f31bfe9e910d92bb369c6c8b6428f7541a7218547ca01e4e01",
+  "created_at": "2026-07-26T09:35:06.978481+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "皆知善之為善，斯不善已。",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T09:35:06.978505+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-db83fa5c1feb4c99ba0b",
+          "effective_raw_sha256": "b02c026cf782352ed95e2b7726c5de1435e3ce76a0241046b2e00d2dbda897ec",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T093429-4f2acf1c0f47",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "7f60ab0c0f26332623dd320a737ef4976995d9da0c85c045e02fdcb792aad740",
+          "provider_raw_sha256": "b02c026cf782352ed95e2b7726c5de1435e3ce76a0241046b2e00d2dbda897ec",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "085f48fdd675087d33b3cab888bd192f20d198145629e116397bf8bbe4cbea65",
+          "validated_at": "2026-07-26T09:35:06.978350+00:00"
+        }
+      ],
+      "translation": "When all know good as good, there is already not-good.",
+      "translation_sha256": "9d7cd28db7aa0afc9ee1232618187b14fb3b644d9163fc9af52f47d080a48867"
+    }
+  ]
+}

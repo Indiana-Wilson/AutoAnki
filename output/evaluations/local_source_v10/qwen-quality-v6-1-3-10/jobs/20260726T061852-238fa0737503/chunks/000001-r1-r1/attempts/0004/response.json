@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\n  \"repairs\": {\n    \"p001\": {\n      \"sentence\": \"子之道，可闻而不可见。\",\n      \"translation\": \"What he says can be heard but cannot be seen.\"\n    }\n  }\n}",
+  "received_at": "2026-07-26T06:23:01.133352+00:00",
+  "response_id": "ollama-5dbca2607fda528f2fab3e36",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 416,
+    "output_tokens": 51,
+    "reasoning_tokens": 0,
+    "total_tokens": 467,
+    "uncached_input_tokens": 416,
+    "visible_output_tokens": 51,
+    "web_search_calls": 0
+  }
+}

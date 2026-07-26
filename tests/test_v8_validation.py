@@ -53,13 +53,11 @@ class GroupedSourceValidationTests(unittest.TestCase):
                 f"<strong>{term}</strong>一。",
                 f"<strong>{term}</strong>二。",
                 f"<strong>{term}</strong>三。",
-                f"<strong>{term}</strong>四。",
             ],
             self.sentence_translations_field: [
                 "First.",
                 "Second.",
                 "Third.",
-                "Fourth.",
             ],
         }
 

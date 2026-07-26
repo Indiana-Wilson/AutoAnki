@@ -1,0 +1,1298 @@
+{
+  "anki_mutation_performed": false,
+  "created_at": "2026-07-26T07:54:42.775198+00:00",
+  "estimate": {
+    "estimated_cost_aud": 0.05697204301075268,
+    "estimated_cost_usd": 0.039737999999999996,
+    "largest_request_high_total_tokens": 22755,
+    "largest_request_input_tokens": 13074,
+    "largest_request_output_tokens": 4630,
+    "local_model": false,
+    "model": "gpt-5.4-mini",
+    "provider": "openai",
+    "request_count": 1,
+    "request_limit_warning": null,
+    "translation_memory_hit_count": 0,
+    "word_count": 10
+  },
+  "final_validation_passed": true,
+  "job": {
+    "combined_complete": true,
+    "completed_chunk_count": 1,
+    "job_id": "20260726T075340-15cb805e1657",
+    "overall_status": "completed",
+    "path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/gpt54-quality-v11-audit-10/jobs/20260726T075340-15cb805e1657",
+    "total_chunk_count": 1
+  },
+  "kind": "local_source_v10_evaluation_stage",
+  "model": "gpt-5.4-mini",
+  "model_runtime_snapshot": null,
+  "output": {
+    "additional_sense_count": 9,
+    "additional_sense_counts_by_term": {
+      "之": 2,
+      "可": 1,
+      "名": 1,
+      "天地": 0,
+      "始": 1,
+      "常名": 0,
+      "常道": 0,
+      "無": 2,
+      "道": 1,
+      "非": 1
+    },
+    "canonical_card_count": 19,
+    "exact_unique_term_coverage": true,
+    "missing_terms": [],
+    "occurrence_accounting": [
+      {
+        "distinct_mapped_sense_count": 2,
+        "manual_same_sense_review": false,
+        "occurrence_count": 2,
+        "rank": 1,
+        "sense_indices": [
+          0,
+          1
+        ],
+        "term": "道"
+      },
+      {
+        "distinct_mapped_sense_count": 1,
+        "manual_same_sense_review": true,
+        "occurrence_count": 2,
+        "rank": 2,
+        "sense_indices": [
+          0,
+          0
+        ],
+        "term": "可"
+      },
+      {
+        "distinct_mapped_sense_count": 1,
+        "manual_same_sense_review": true,
+        "occurrence_count": 2,
+        "rank": 3,
+        "sense_indices": [
+          0,
+          0
+        ],
+        "term": "非"
+      },
+      {
+        "distinct_mapped_sense_count": 2,
+        "manual_same_sense_review": false,
+        "occurrence_count": 2,
+        "rank": 5,
+        "sense_indices": [
+          0,
+          1
+        ],
+        "term": "名"
+      },
+      {
+        "distinct_mapped_sense_count": 1,
+        "manual_same_sense_review": true,
+        "occurrence_count": 2,
+        "rank": 9,
+        "sense_indices": [
+          0,
+          0
+        ],
+        "term": "之"
+      }
+    ],
+    "quality_warnings": [
+      {
+        "code": "repeated_occurrences_share_one_mapped_sense",
+        "message": "One or more repeated trusted occurrences were explicitly mapped to one sense. This can be correct repetition, but requires human semantic review because deterministic validation cannot prove the usages are identical.",
+        "ranks": [
+          2,
+          3,
+          9
+        ],
+        "terms": [
+          "可",
+          "非",
+          "之"
+        ]
+      }
+    ],
+    "term_counts": {
+      "之": 3,
+      "可": 2,
+      "名": 2,
+      "天地": 1,
+      "始": 2,
+      "常名": 1,
+      "常道": 1,
+      "無": 3,
+      "道": 2,
+      "非": 2
+    },
+    "term_field": "Classical Chinese",
+    "terms_with_additional_senses": 7,
+    "terms_with_additional_senses_ratio": 0.7,
+    "unexpected_terms": [],
+    "unique_term_count": 10
+  },
+  "package_or_import_attempted": false,
+  "pipeline_id": "default-english-vocabulary",
+  "plan": {
+    "chunk_ids": [
+      "000001-r1-r10"
+    ],
+    "chunk_word_counts": [
+      10
+    ],
+    "excluded_word_count": 0,
+    "plan_id": "f0f57223e155abd26428329b",
+    "prefix_unique_word_count": 10,
+    "ranks": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "selected_word_count": 10,
+    "source_prefix_token_count": 15,
+    "terms": [
+      "道",
+      "可",
+      "非",
+      "常道",
+      "名",
+      "常名",
+      "無",
+      "天地",
+      "之",
+      "始"
+    ]
+  },
+  "provider": "openai",
+  "schema_version": 2,
+  "selection": {
+    "expected_ranks": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "expected_terms": [
+      "道",
+      "可",
+      "非",
+      "常道",
+      "名",
+      "常名",
+      "無",
+      "天地",
+      "之",
+      "始"
+    ],
+    "requested_unique_count": 10,
+    "source_prefix_token_limit": 15
+  },
+  "source": {
+    "build_id": "36a6c2bee21385f4c53ca3a5",
+    "key": "daodejing_wang_bi",
+    "language_key": "classical_chinese_wang_bi",
+    "run_path": "/home/indiana/Work/Projects/AutoAnki/output/corpora/daodejing_wang_bi/runs/36a6c2bee21385f4c53ca3a5",
+    "title": "道德經"
+  },
+  "status": "passed",
+  "unexpected_package_exists": false,
+  "usage": {
+    "attempt_count": 4,
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 25615,
+    "output_tokens": 8827,
+    "reasoning_tokens": 4073,
+    "total_tokens": 34442,
+    "uncached_input_tokens": 25615,
+    "visible_output_tokens": 4754,
+    "web_search_calls": 0
+  },
+  "validation": {
+    "automatic_repair_dispatch_count": 1,
+    "chunks": [
+      {
+        "attempt_count": 2,
+        "attempts": [
+          {
+            "artifact_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/gpt54-quality-v11-audit-10/jobs/20260726T075340-15cb805e1657/chunks/000001-r1-r10/attempts/0001",
+            "attempt": 1,
+            "automatic_repair_dispatch": null,
+            "error": {
+              "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+              "status_code": null,
+              "timestamp": "2026-07-26T07:54:16.188927+00:00",
+              "transient": false,
+              "type": "GeneratedCardValidationError"
+            },
+            "local_dispatch": null,
+            "local_repair": null,
+            "raw_sha256": "2a1d29e347543e682a0910a1fb69701ab470517462a2c521c1f74b27a327b868",
+            "repair_scope": null,
+            "repaired_raw_sha256": null,
+            "response": {
+              "model": "gpt-5.4-mini-2026-03-17",
+              "received_at": "2026-07-26T07:54:00.938097+00:00",
+              "response_id": "resp_0cba07e0a16e02b5006a65bd05feac8199ac395ecda6765356",
+              "service_tier": "default",
+              "status": "completed",
+              "usage": {
+                "cache_write_input_tokens": 0,
+                "cached_input_tokens": 0,
+                "input_tokens": 4346,
+                "output_tokens": 3218,
+                "reasoning_tokens": 380,
+                "total_tokens": 7564,
+                "uncached_input_tokens": 4346,
+                "visible_output_tokens": 2838,
+                "web_search_calls": 0
+              }
+            },
+            "semantic_audit": {
+              "audited_at": "2026-07-26T07:54:16.154188+00:00",
+              "candidate_sha256": "2a1d29e347543e682a0910a1fb69701ab470517462a2c521c1f74b27a327b868",
+              "common_sense_coverage_case_count": 10,
+              "context_translation_case_count": 2,
+              "error": null,
+              "example_case_count": 44,
+              "kind": "paid_unified_historical_quality_occurrence_coverage_audit",
+              "lexical_case_count": 21,
+              "model_id": "gpt-5.4-mini",
+              "occurrence_assignment_case_count": 15,
+              "occurrence_assignment_enabled": true,
+              "prompt_sha256": "a43d5e85230c82a228c867f62001736f895b26c0d3d03958e4ae511ddd13e1ce",
+              "request_contract_sha256": "ea149b88f6def7faee8d7015469ac8d6155f3ff15e245fe331eb89cea0e31a9e",
+              "request_sha256": "b3da5a5a616436883114b3eda470b97b6f7b4aa0501de5b60976139e6d828a57",
+              "response": {
+                "model": "gpt-5.4-mini-2026-03-17",
+                "raw_text": "{\"target_sense_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"historical_grammar_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"standalone_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"translation_fidelity_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"conservative_definition_passes\":[true,true,true,false,true,true,true,true,true,false,true,true,true,true,true,true,true,true,true,true,false],\"faithful_passes\":[true,true],\"complete_passes\":[true,true],\"natural_english_passes\":[true,true],\"occurrence_assignment_passes\":[true,false,true,true,true,true,true,true,true,true,true,true,true,true,true],\"common_sense_coverage_passes\":[true,true,true,true,true,true,true,true,true,true]}",
+                "received_at": "2026-07-26T07:54:16.141995+00:00",
+                "response_id": "resp_01214e72ebee961b006a65bd19325c819abbf87b21ea01c408",
+                "schema_version": 1,
+                "service_tier": "default",
+                "status": "completed",
+                "usage": {
+                  "cache_write_input_tokens": 0,
+                  "cached_input_tokens": 0,
+                  "input_tokens": 9246,
+                  "output_tokens": 2001,
+                  "reasoning_tokens": 1682,
+                  "total_tokens": 11247,
+                  "uncached_input_tokens": 9246,
+                  "visible_output_tokens": 319,
+                  "web_search_calls": 0
+                }
+              },
+              "response_raw_sha256": "3c6d523cf1231885e414f81b2a15a0f68f80faad947e77bb044c2e598b7f07f9",
+              "schema_version": 6,
+              "status": "failed"
+            },
+            "validated_card_count": 21,
+            "validation_problem_count": 14,
+            "validation_problems": [
+              {
+                "actual": {
+                  "aligned_translation": "The Way may be carried out.",
+                  "sentence": "道可行也。"
+                },
+                "code": "example_target_semantic_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Fit to be accepted, approved, or regarded as proper.",
+                  "part_of_speech": "adjective",
+                  "requirement": "The target occurrence expresses this card's exact lexical sense.",
+                  "term": "可",
+                  "translation": "acceptable"
+                },
+                "field_name": "Sentences",
+                "location": "Response → rank 2 → additional sense 2 → sentence 4",
+                "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+                "overrideable": false,
+                "path": "$.term_results[1].additional_senses[1][\"Sentences\"][3]",
+                "problem_id": "example_target_semantic_mismatch:93a38f070b334f64",
+                "scope": "field",
+                "source_rank": 2,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "可",
+                "title": "Example target does not express the requested sense"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "What he says is wrong.",
+                  "sentence": "其言非也。"
+                },
+                "code": "example_target_semantic_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+                  "part_of_speech": "adjective",
+                  "requirement": "The target occurrence expresses this card's exact lexical sense.",
+                  "term": "非",
+                  "translation": "wrong"
+                },
+                "field_name": "Sentences",
+                "location": "Response → rank 3 → additional sense 1 → sentence 1",
+                "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+                "overrideable": false,
+                "path": "$.term_results[2].additional_senses[0][\"Sentences\"][0]",
+                "problem_id": "example_target_semantic_mismatch:022462db29221244",
+                "scope": "field",
+                "source_rank": 3,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "非",
+                "title": "Example target does not express the requested sense"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "Between right and wrong.",
+                  "sentence": "是非之間。"
+                },
+                "code": "example_target_semantic_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+                  "part_of_speech": "adjective",
+                  "requirement": "The target occurrence expresses this card's exact lexical sense.",
+                  "term": "非",
+                  "translation": "wrong"
+                },
+                "field_name": "Sentences",
+                "location": "Response → rank 3 → additional sense 1 → sentence 2",
+                "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+                "overrideable": false,
+                "path": "$.term_results[2].additional_senses[0][\"Sentences\"][1]",
+                "problem_id": "example_target_semantic_mismatch:f362b6035a7acc5f",
+                "scope": "field",
+                "source_rank": 3,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "非",
+                "title": "Example target does not express the requested sense"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "This intention is truly wrong.",
+                  "sentence": "此意實非。"
+                },
+                "code": "example_target_semantic_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+                  "part_of_speech": "adjective",
+                  "requirement": "The target occurrence expresses this card's exact lexical sense.",
+                  "term": "非",
+                  "translation": "wrong"
+                },
+                "field_name": "Sentences",
+                "location": "Response → rank 3 → additional sense 1 → sentence 3",
+                "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+                "overrideable": false,
+                "path": "$.term_results[2].additional_senses[0][\"Sentences\"][2]",
+                "problem_id": "example_target_semantic_mismatch:0d4b17433a03d3e6",
+                "scope": "field",
+                "source_rank": 3,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "非",
+                "title": "Example target does not express the requested sense"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "Do not act contrary to ritual.",
+                  "sentence": "非禮勿動。"
+                },
+                "code": "example_target_semantic_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+                  "part_of_speech": "adjective",
+                  "requirement": "The target occurrence expresses this card's exact lexical sense.",
+                  "term": "非",
+                  "translation": "wrong"
+                },
+                "field_name": "Sentences",
+                "location": "Response → rank 3 → additional sense 1 → sentence 4",
+                "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+                "overrideable": false,
+                "path": "$.term_results[2].additional_senses[0][\"Sentences\"][3]",
+                "problem_id": "example_target_semantic_mismatch:c559e3aa9ef25ace",
+                "scope": "field",
+                "source_rank": 3,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "非",
+                "title": "Example target does not express the requested sense"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "The Way may be carried out.",
+                  "sentence": "道可行也。"
+                },
+                "code": "example_translation_fidelity_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Fit to be accepted, approved, or regarded as proper.",
+                  "part_of_speech": "adjective",
+                  "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+                  "term": "可",
+                  "translation": "acceptable"
+                },
+                "field_name": "Sentence Translations (English)",
+                "location": "Response → rank 2 → additional sense 2 → translation 4",
+                "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+                "overrideable": false,
+                "path": "$.term_results[1].additional_senses[1][\"Sentence Translations (English)\"][3]",
+                "problem_id": "example_translation_fidelity_mismatch:a0f62672c424efe0",
+                "scope": "field",
+                "source_rank": 2,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "可",
+                "title": "Example translation is not faithful"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "What he says is wrong.",
+                  "sentence": "其言非也。"
+                },
+                "code": "example_translation_fidelity_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+                  "part_of_speech": "adjective",
+                  "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+                  "term": "非",
+                  "translation": "wrong"
+                },
+                "field_name": "Sentence Translations (English)",
+                "location": "Response → rank 3 → additional sense 1 → translation 1",
+                "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+                "overrideable": false,
+                "path": "$.term_results[2].additional_senses[0][\"Sentence Translations (English)\"][0]",
+                "problem_id": "example_translation_fidelity_mismatch:1f22fddbd580ce65",
+                "scope": "field",
+                "source_rank": 3,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "非",
+                "title": "Example translation is not faithful"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "Between right and wrong.",
+                  "sentence": "是非之間。"
+                },
+                "code": "example_translation_fidelity_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+                  "part_of_speech": "adjective",
+                  "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+                  "term": "非",
+                  "translation": "wrong"
+                },
+                "field_name": "Sentence Translations (English)",
+                "location": "Response → rank 3 → additional sense 1 → translation 2",
+                "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+                "overrideable": false,
+                "path": "$.term_results[2].additional_senses[0][\"Sentence Translations (English)\"][1]",
+                "problem_id": "example_translation_fidelity_mismatch:48a167abb1f1684b",
+                "scope": "field",
+                "source_rank": 3,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "非",
+                "title": "Example translation is not faithful"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "This intention is truly wrong.",
+                  "sentence": "此意實非。"
+                },
+                "code": "example_translation_fidelity_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+                  "part_of_speech": "adjective",
+                  "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+                  "term": "非",
+                  "translation": "wrong"
+                },
+                "field_name": "Sentence Translations (English)",
+                "location": "Response → rank 3 → additional sense 1 → translation 3",
+                "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+                "overrideable": false,
+                "path": "$.term_results[2].additional_senses[0][\"Sentence Translations (English)\"][2]",
+                "problem_id": "example_translation_fidelity_mismatch:235491cb268235bf",
+                "scope": "field",
+                "source_rank": 3,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "非",
+                "title": "Example translation is not faithful"
+              },
+              {
+                "actual": {
+                  "aligned_translation": "Do not act contrary to ritual.",
+                  "sentence": "非禮勿動。"
+                },
+                "code": "example_translation_fidelity_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+                  "part_of_speech": "adjective",
+                  "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+                  "term": "非",
+                  "translation": "wrong"
+                },
+                "field_name": "Sentence Translations (English)",
+                "location": "Response → rank 3 → additional sense 1 → translation 4",
+                "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+                "overrideable": false,
+                "path": "$.term_results[2].additional_senses[0][\"Sentence Translations (English)\"][3]",
+                "problem_id": "example_translation_fidelity_mismatch:929e2ffab2f32030",
+                "scope": "field",
+                "source_rank": 3,
+                "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+                "term": "非",
+                "title": "Example translation is not faithful"
+              },
+              {
+                "actual": {
+                  "dictionary_meaning": "Indicates ability, possibility, or permission for an action to occur.",
+                  "kind": "contextual",
+                  "nuance": "In this text it marks what is possible or admissible rather than moral approval.",
+                  "part_of_speech": "auxiliary verb",
+                  "rank": 2,
+                  "register": "Classical Chinese; received Laozi/Wang Bi recension",
+                  "retained_context": "道可道，非常道，名可名，非常名；",
+                  "retained_context_translation": "The way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+                  "selected_occurrence": {
+                    "span": [
+                      1,
+                      2
+                    ],
+                    "text": "可"
+                  },
+                  "term": "可",
+                  "translation": "can"
+                },
+                "code": "lexical_definition_not_conservative",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": "One coherent, historically supported, independently useful sense of the complete term, stated without unsupported lexical or interpretive claims.",
+                "field_name": "Dictionary Meaning (English)",
+                "location": "Response → rank 2 → contextual sense",
+                "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+                "overrideable": false,
+                "path": "$.term_results[1].contextual_sense",
+                "problem_id": "lexical_definition_not_conservative:bff3b54ddace2628",
+                "scope": "card",
+                "source_rank": 2,
+                "suggestion": "Regenerate this source rank so all lexical fields, examples, and occurrence accounting remain coherent.",
+                "term": "可",
+                "title": "Lexical definition is not conservative"
+              },
+              {
+                "actual": {
+                  "dictionary_meaning": "A word or designation used to identify or describe something.",
+                  "kind": "contextual",
+                  "nuance": "Can be contrasted with the actual reality or thing named, as in discussions of naming and naming limits.",
+                  "part_of_speech": "noun",
+                  "rank": 5,
+                  "register": "Classical Chinese; received Laozi/Wang Bi recension",
+                  "retained_context": "道可道，非常道，名可名，非常名；",
+                  "retained_context_translation": "The way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+                  "selected_occurrence": {
+                    "span": [
+                      8,
+                      9
+                    ],
+                    "text": "名"
+                  },
+                  "term": "名",
+                  "translation": "name"
+                },
+                "code": "lexical_definition_not_conservative",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": "One coherent, historically supported, independently useful sense of the complete term, stated without unsupported lexical or interpretive claims.",
+                "field_name": "Dictionary Meaning (English)",
+                "location": "Response → rank 5 → contextual sense",
+                "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+                "overrideable": false,
+                "path": "$.term_results[4].contextual_sense",
+                "problem_id": "lexical_definition_not_conservative:6c0e7a7fbcd21462",
+                "scope": "card",
+                "source_rank": 5,
+                "suggestion": "Regenerate this source rank so all lexical fields, examples, and occurrence accounting remain coherent.",
+                "term": "名",
+                "title": "Lexical definition is not conservative"
+              },
+              {
+                "actual": {
+                  "dictionary_meaning": "To start an action, process, or state.",
+                  "example_pairs": [
+                    {
+                      "aligned_translation": "Now one begins to learn.",
+                      "sentence": "今始學。"
+                    },
+                    {
+                      "aligned_translation": "The teacher begins to speak.",
+                      "sentence": "師始言。"
+                    },
+                    {
+                      "aligned_translation": "The matter begins now.",
+                      "sentence": "事始於今。"
+                    },
+                    {
+                      "aligned_translation": "The people begin to be at peace.",
+                      "sentence": "民始安。"
+                    }
+                  ],
+                  "kind": "additional",
+                  "nuance": "A dynamic verbal use of the same form, not the noun 'beginning'.",
+                  "part_of_speech": "verb",
+                  "rank": 10,
+                  "register": "Classical Chinese; received Laozi/Wang Bi recension",
+                  "term": "始",
+                  "translation": "to begin"
+                },
+                "code": "lexical_definition_not_conservative",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": "One coherent, historically supported, independently useful sense of the complete term, stated without unsupported lexical or interpretive claims.",
+                "field_name": "Dictionary Meaning (English)",
+                "location": "Response → rank 10 → additional sense 1",
+                "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+                "overrideable": false,
+                "path": "$.term_results[9].additional_senses[0]",
+                "problem_id": "lexical_definition_not_conservative:dbcd49250fd9a838",
+                "scope": "card",
+                "source_rank": 10,
+                "suggestion": "Regenerate this source rank so all lexical fields, examples, and occurrence accounting remain coherent.",
+                "term": "始",
+                "title": "Lexical definition is not conservative"
+              },
+              {
+                "actual": {
+                  "assigned_sense": {
+                    "dictionary_meaning": "The course, path, or method by which something proceeds; in this text, the basic term for the Way being discussed.",
+                    "index": 0,
+                    "kind": "contextual",
+                    "nuance": "Can also point to a way of doing or speaking, not only a physical path.",
+                    "part_of_speech": "noun",
+                    "register": "Classical Chinese; received Laozi/Wang Bi recension",
+                    "translation": "way"
+                  },
+                  "full_context": "道可道，非常道，名可名，非常名；",
+                  "occurrence": {
+                    "index": 1,
+                    "selected": false,
+                    "span": [
+                      2,
+                      3
+                    ],
+                    "surface": "道"
+                  },
+                  "rank": 1,
+                  "term": "道"
+                },
+                "code": "context_occurrence_sense_assignment_mismatch",
+                "exception_type": "GeneratedCardValidationError",
+                "expected": {
+                  "assigned_sense_index": 0,
+                  "dictionary_meaning": "The course, path, or method by which something proceeds; in this text, the basic term for the Way being discussed.",
+                  "part_of_speech": "noun",
+                  "requirement": "The exact occurrence has the assigned lexical meaning and grammatical role.",
+                  "translation": "way"
+                },
+                "field_name": "occurrence_sense_indices",
+                "location": "Response → rank 1 → occurrence_sense_indices → occurrence 2",
+                "message": "The exact trusted occurrence in the retained context does not express the meaning and part of speech of the sense assigned by occurrence_sense_indices.",
+                "overrideable": false,
+                "path": "$.term_results[0].occurrence_sense_indices[1]",
+                "problem_id": "context_occurrence_sense_assignment_mismatch:67206813d7decd58",
+                "scope": "card",
+                "source_rank": 1,
+                "suggestion": "Regenerate this source rank so its sense objects and every trusted occurrence assignment agree.",
+                "term": "道",
+                "title": "Context occurrence maps to the wrong lexical sense"
+              }
+            ]
+          },
+          {
+            "artifact_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/gpt54-quality-v11-audit-10/jobs/20260726T075340-15cb805e1657/chunks/000001-r1-r10/attempts/0002",
+            "attempt": 2,
+            "automatic_repair_dispatch": {
+              "automatic": true,
+              "dispatch_ordinal": 1,
+              "dispatched_at": "2026-07-26T07:54:16.277290+00:00",
+              "kind": "automatic_repair_dispatch",
+              "repair_kind": "selective_scope",
+              "schema_version": 1
+            },
+            "error": null,
+            "local_dispatch": null,
+            "local_repair": null,
+            "raw_sha256": "bea3f00fe13b46dbbf2cda0dfeee052de71ca28e2b79e8d53e479a567ce310e1",
+            "repair_scope": {
+              "automatic": true,
+              "base_attempt": 1,
+              "base_raw_sha256": "2a1d29e347543e682a0910a1fb69701ab470517462a2c521c1f74b27a327b868",
+              "dispatch_ordinal": 1,
+              "kind": "compact_v10_selective_repair",
+              "replace_context_ids": [],
+              "replace_ranks": [
+                1,
+                2,
+                3,
+                5,
+                10
+              ],
+              "request_context_ids": [
+                "source-context-c535f824d57f859c34ac",
+                "source-context-9d763a9d06321236e5f1"
+              ],
+              "request_ranks": [
+                1,
+                2,
+                3,
+                5,
+                10
+              ],
+              "schema_version": 1
+            },
+            "repaired_raw_sha256": null,
+            "response": {
+              "model": "gpt-5.4-mini-2026-03-17",
+              "received_at": "2026-07-26T07:54:31.920529+00:00",
+              "response_id": "resp_035cfba2d9b72228006a65bd28748c8198a9348baf59209155",
+              "service_tier": "default",
+              "status": "completed",
+              "usage": {
+                "cache_write_input_tokens": 0,
+                "cached_input_tokens": 0,
+                "input_tokens": 3856,
+                "output_tokens": 2116,
+                "reasoning_tokens": 804,
+                "total_tokens": 5972,
+                "uncached_input_tokens": 3856,
+                "visible_output_tokens": 1312,
+                "web_search_calls": 0
+              }
+            },
+            "semantic_audit": {
+              "audited_at": "2026-07-26T07:54:42.691263+00:00",
+              "candidate_sha256": "bea3f00fe13b46dbbf2cda0dfeee052de71ca28e2b79e8d53e479a567ce310e1",
+              "common_sense_coverage_case_count": 10,
+              "context_translation_case_count": 2,
+              "error": null,
+              "example_case_count": 36,
+              "kind": "paid_unified_historical_quality_occurrence_coverage_audit",
+              "lexical_case_count": 19,
+              "model_id": "gpt-5.4-mini",
+              "occurrence_assignment_case_count": 15,
+              "occurrence_assignment_enabled": true,
+              "prompt_sha256": "e7a9e6709644a8d773345d12df0987dd135e934b8d5cedc9841e237ffeafe7ac",
+              "request_contract_sha256": "ea149b88f6def7faee8d7015469ac8d6155f3ff15e245fe331eb89cea0e31a9e",
+              "request_sha256": "308221d17d3e449de7b2412c993bd0becf7a4825ed736a15acbd56b81fb215fb",
+              "response": {
+                "model": "gpt-5.4-mini-2026-03-17",
+                "raw_text": "{\"target_sense_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"historical_grammar_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"standalone_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"translation_fidelity_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"conservative_definition_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"faithful_passes\":[true,true],\"complete_passes\":[true,true],\"natural_english_passes\":[true,true],\"occurrence_assignment_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"common_sense_coverage_passes\":[true,true,true,true,true,true,true,true,true,true]}",
+                "received_at": "2026-07-26T07:54:42.674516+00:00",
+                "response_id": "resp_03cc4287483a5680006a65bd383240819a80b43f6be6cbcafd",
+                "schema_version": 1,
+                "service_tier": "default",
+                "status": "completed",
+                "usage": {
+                  "cache_write_input_tokens": 0,
+                  "cached_input_tokens": 0,
+                  "input_tokens": 8167,
+                  "output_tokens": 1492,
+                  "reasoning_tokens": 1207,
+                  "total_tokens": 9659,
+                  "uncached_input_tokens": 8167,
+                  "visible_output_tokens": 285,
+                  "web_search_calls": 0
+                }
+              },
+              "response_raw_sha256": "2edf35f85cffa11755d6a9b647d6287f0335f9a0576d2c2e5c44be485f852517",
+              "schema_version": 6,
+              "status": "passed"
+            },
+            "validated_card_count": 19,
+            "validation_problem_count": 0,
+            "validation_problems": []
+          }
+        ],
+        "chunk_id": "000001-r1-r10",
+        "last_error": null,
+        "status": "succeeded"
+      }
+    ],
+    "final_problem_code_counts": {},
+    "historical_problem_code_counts": {
+      "context_occurrence_sense_assignment_mismatch": 1,
+      "example_target_semantic_mismatch": 5,
+      "example_translation_fidelity_mismatch": 5,
+      "lexical_definition_not_conservative": 3
+    },
+    "problems": [
+      {
+        "actual": {
+          "aligned_translation": "The Way may be carried out.",
+          "sentence": "道可行也。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Fit to be accepted, approved, or regarded as proper.",
+          "part_of_speech": "adjective",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "可",
+          "translation": "acceptable"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 2 → additional sense 2 → sentence 4",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[1].additional_senses[1][\"Sentences\"][3]",
+        "problem_id": "example_target_semantic_mismatch:93a38f070b334f64",
+        "scope": "field",
+        "source_rank": 2,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "可",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "actual": {
+          "aligned_translation": "What he says is wrong.",
+          "sentence": "其言非也。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+          "part_of_speech": "adjective",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "非",
+          "translation": "wrong"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 3 → additional sense 1 → sentence 1",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[2].additional_senses[0][\"Sentences\"][0]",
+        "problem_id": "example_target_semantic_mismatch:022462db29221244",
+        "scope": "field",
+        "source_rank": 3,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "非",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "actual": {
+          "aligned_translation": "Between right and wrong.",
+          "sentence": "是非之間。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+          "part_of_speech": "adjective",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "非",
+          "translation": "wrong"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 3 → additional sense 1 → sentence 2",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[2].additional_senses[0][\"Sentences\"][1]",
+        "problem_id": "example_target_semantic_mismatch:f362b6035a7acc5f",
+        "scope": "field",
+        "source_rank": 3,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "非",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "actual": {
+          "aligned_translation": "This intention is truly wrong.",
+          "sentence": "此意實非。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+          "part_of_speech": "adjective",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "非",
+          "translation": "wrong"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 3 → additional sense 1 → sentence 3",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[2].additional_senses[0][\"Sentences\"][2]",
+        "problem_id": "example_target_semantic_mismatch:0d4b17433a03d3e6",
+        "scope": "field",
+        "source_rank": 3,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "非",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "actual": {
+          "aligned_translation": "Do not act contrary to ritual.",
+          "sentence": "非禮勿動。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_target_semantic_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+          "part_of_speech": "adjective",
+          "requirement": "The target occurrence expresses this card's exact lexical sense.",
+          "term": "非",
+          "translation": "wrong"
+        },
+        "field_name": "Sentences",
+        "location": "Response → rank 3 → additional sense 1 → sentence 4",
+        "message": "The exact target occurrence does not express the additional card's requested lexical meaning and grammatical role.",
+        "overrideable": false,
+        "path": "$.term_results[2].additional_senses[0][\"Sentences\"][3]",
+        "problem_id": "example_target_semantic_mismatch:c559e3aa9ef25ace",
+        "scope": "field",
+        "source_rank": 3,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "非",
+        "title": "Example target does not express the requested sense"
+      },
+      {
+        "actual": {
+          "aligned_translation": "The Way may be carried out.",
+          "sentence": "道可行也。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_translation_fidelity_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Fit to be accepted, approved, or regarded as proper.",
+          "part_of_speech": "adjective",
+          "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+          "term": "可",
+          "translation": "acceptable"
+        },
+        "field_name": "Sentence Translations (English)",
+        "location": "Response → rank 2 → additional sense 2 → translation 4",
+        "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+        "overrideable": false,
+        "path": "$.term_results[1].additional_senses[1][\"Sentence Translations (English)\"][3]",
+        "problem_id": "example_translation_fidelity_mismatch:a0f62672c424efe0",
+        "scope": "field",
+        "source_rank": 2,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "可",
+        "title": "Example translation is not faithful"
+      },
+      {
+        "actual": {
+          "aligned_translation": "What he says is wrong.",
+          "sentence": "其言非也。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_translation_fidelity_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+          "part_of_speech": "adjective",
+          "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+          "term": "非",
+          "translation": "wrong"
+        },
+        "field_name": "Sentence Translations (English)",
+        "location": "Response → rank 3 → additional sense 1 → translation 1",
+        "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+        "overrideable": false,
+        "path": "$.term_results[2].additional_senses[0][\"Sentence Translations (English)\"][0]",
+        "problem_id": "example_translation_fidelity_mismatch:1f22fddbd580ce65",
+        "scope": "field",
+        "source_rank": 3,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "非",
+        "title": "Example translation is not faithful"
+      },
+      {
+        "actual": {
+          "aligned_translation": "Between right and wrong.",
+          "sentence": "是非之間。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_translation_fidelity_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+          "part_of_speech": "adjective",
+          "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+          "term": "非",
+          "translation": "wrong"
+        },
+        "field_name": "Sentence Translations (English)",
+        "location": "Response → rank 3 → additional sense 1 → translation 2",
+        "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+        "overrideable": false,
+        "path": "$.term_results[2].additional_senses[0][\"Sentence Translations (English)\"][1]",
+        "problem_id": "example_translation_fidelity_mismatch:48a167abb1f1684b",
+        "scope": "field",
+        "source_rank": 3,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "非",
+        "title": "Example translation is not faithful"
+      },
+      {
+        "actual": {
+          "aligned_translation": "This intention is truly wrong.",
+          "sentence": "此意實非。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_translation_fidelity_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+          "part_of_speech": "adjective",
+          "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+          "term": "非",
+          "translation": "wrong"
+        },
+        "field_name": "Sentence Translations (English)",
+        "location": "Response → rank 3 → additional sense 1 → translation 3",
+        "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+        "overrideable": false,
+        "path": "$.term_results[2].additional_senses[0][\"Sentence Translations (English)\"][2]",
+        "problem_id": "example_translation_fidelity_mismatch:235491cb268235bf",
+        "scope": "field",
+        "source_rank": 3,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "非",
+        "title": "Example translation is not faithful"
+      },
+      {
+        "actual": {
+          "aligned_translation": "Do not act contrary to ritual.",
+          "sentence": "非禮勿動。"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "example_translation_fidelity_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "dictionary_meaning": "Not right, improper, or in error; contrary to what is fitting or true.",
+          "part_of_speech": "adjective",
+          "requirement": "A complete natural English translation with no invented specific participant, object, circumstance, or modality.",
+          "term": "非",
+          "translation": "wrong"
+        },
+        "field_name": "Sentence Translations (English)",
+        "location": "Response → rank 3 → additional sense 1 → translation 4",
+        "message": "The aligned English translation omits source content, changes the target sense or grammar, or invents a substantive argument or circumstance absent from the source.",
+        "overrideable": false,
+        "path": "$.term_results[2].additional_senses[0][\"Sentence Translations (English)\"][3]",
+        "problem_id": "example_translation_fidelity_mismatch:929e2ffab2f32030",
+        "scope": "field",
+        "source_rank": 3,
+        "suggestion": "Use the bounded example repair to replace only this sentence/translation pair, then re-audit it.",
+        "term": "非",
+        "title": "Example translation is not faithful"
+      },
+      {
+        "actual": {
+          "dictionary_meaning": "Indicates ability, possibility, or permission for an action to occur.",
+          "kind": "contextual",
+          "nuance": "In this text it marks what is possible or admissible rather than moral approval.",
+          "part_of_speech": "auxiliary verb",
+          "rank": 2,
+          "register": "Classical Chinese; received Laozi/Wang Bi recension",
+          "retained_context": "道可道，非常道，名可名，非常名；",
+          "retained_context_translation": "The way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+          "selected_occurrence": {
+            "span": [
+              1,
+              2
+            ],
+            "text": "可"
+          },
+          "term": "可",
+          "translation": "can"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "lexical_definition_not_conservative",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "One coherent, historically supported, independently useful sense of the complete term, stated without unsupported lexical or interpretive claims.",
+        "field_name": "Dictionary Meaning (English)",
+        "location": "Response → rank 2 → contextual sense",
+        "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+        "overrideable": false,
+        "path": "$.term_results[1].contextual_sense",
+        "problem_id": "lexical_definition_not_conservative:bff3b54ddace2628",
+        "scope": "card",
+        "source_rank": 2,
+        "suggestion": "Regenerate this source rank so all lexical fields, examples, and occurrence accounting remain coherent.",
+        "term": "可",
+        "title": "Lexical definition is not conservative"
+      },
+      {
+        "actual": {
+          "dictionary_meaning": "A word or designation used to identify or describe something.",
+          "kind": "contextual",
+          "nuance": "Can be contrasted with the actual reality or thing named, as in discussions of naming and naming limits.",
+          "part_of_speech": "noun",
+          "rank": 5,
+          "register": "Classical Chinese; received Laozi/Wang Bi recension",
+          "retained_context": "道可道，非常道，名可名，非常名；",
+          "retained_context_translation": "The way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+          "selected_occurrence": {
+            "span": [
+              8,
+              9
+            ],
+            "text": "名"
+          },
+          "term": "名",
+          "translation": "name"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "lexical_definition_not_conservative",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "One coherent, historically supported, independently useful sense of the complete term, stated without unsupported lexical or interpretive claims.",
+        "field_name": "Dictionary Meaning (English)",
+        "location": "Response → rank 5 → contextual sense",
+        "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+        "overrideable": false,
+        "path": "$.term_results[4].contextual_sense",
+        "problem_id": "lexical_definition_not_conservative:6c0e7a7fbcd21462",
+        "scope": "card",
+        "source_rank": 5,
+        "suggestion": "Regenerate this source rank so all lexical fields, examples, and occurrence accounting remain coherent.",
+        "term": "名",
+        "title": "Lexical definition is not conservative"
+      },
+      {
+        "actual": {
+          "dictionary_meaning": "To start an action, process, or state.",
+          "example_pairs": [
+            {
+              "aligned_translation": "Now one begins to learn.",
+              "sentence": "今始學。"
+            },
+            {
+              "aligned_translation": "The teacher begins to speak.",
+              "sentence": "師始言。"
+            },
+            {
+              "aligned_translation": "The matter begins now.",
+              "sentence": "事始於今。"
+            },
+            {
+              "aligned_translation": "The people begin to be at peace.",
+              "sentence": "民始安。"
+            }
+          ],
+          "kind": "additional",
+          "nuance": "A dynamic verbal use of the same form, not the noun 'beginning'.",
+          "part_of_speech": "verb",
+          "rank": 10,
+          "register": "Classical Chinese; received Laozi/Wang Bi recension",
+          "term": "始",
+          "translation": "to begin"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "lexical_definition_not_conservative",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "One coherent, historically supported, independently useful sense of the complete term, stated without unsupported lexical or interpretive claims.",
+        "field_name": "Dictionary Meaning (English)",
+        "location": "Response → rank 10 → additional sense 1",
+        "message": "The returned lexical fields overstate, conflate, or invent a sense, import an unsupported period or component meaning, or do not cohere with the retained context/examples.",
+        "overrideable": false,
+        "path": "$.term_results[9].additional_senses[0]",
+        "problem_id": "lexical_definition_not_conservative:dbcd49250fd9a838",
+        "scope": "card",
+        "source_rank": 10,
+        "suggestion": "Regenerate this source rank so all lexical fields, examples, and occurrence accounting remain coherent.",
+        "term": "始",
+        "title": "Lexical definition is not conservative"
+      },
+      {
+        "actual": {
+          "assigned_sense": {
+            "dictionary_meaning": "The course, path, or method by which something proceeds; in this text, the basic term for the Way being discussed.",
+            "index": 0,
+            "kind": "contextual",
+            "nuance": "Can also point to a way of doing or speaking, not only a physical path.",
+            "part_of_speech": "noun",
+            "register": "Classical Chinese; received Laozi/Wang Bi recension",
+            "translation": "way"
+          },
+          "full_context": "道可道，非常道，名可名，非常名；",
+          "occurrence": {
+            "index": 1,
+            "selected": false,
+            "span": [
+              2,
+              3
+            ],
+            "surface": "道"
+          },
+          "rank": 1,
+          "term": "道"
+        },
+        "attempt": 1,
+        "chunk_id": "000001-r1-r10",
+        "code": "context_occurrence_sense_assignment_mismatch",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": {
+          "assigned_sense_index": 0,
+          "dictionary_meaning": "The course, path, or method by which something proceeds; in this text, the basic term for the Way being discussed.",
+          "part_of_speech": "noun",
+          "requirement": "The exact occurrence has the assigned lexical meaning and grammatical role.",
+          "translation": "way"
+        },
+        "field_name": "occurrence_sense_indices",
+        "location": "Response → rank 1 → occurrence_sense_indices → occurrence 2",
+        "message": "The exact trusted occurrence in the retained context does not express the meaning and part of speech of the sense assigned by occurrence_sense_indices.",
+        "overrideable": false,
+        "path": "$.term_results[0].occurrence_sense_indices[1]",
+        "problem_id": "context_occurrence_sense_assignment_mismatch:67206813d7decd58",
+        "scope": "card",
+        "source_rank": 1,
+        "suggestion": "Regenerate this source rank so its sense objects and every trusted occurrence assignment agree.",
+        "term": "道",
+        "title": "Context occurrence maps to the wrong lexical sense"
+      }
+    ]
+  }
+}

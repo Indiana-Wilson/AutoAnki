@@ -1,0 +1,92 @@
+{
+  "auditor_model": "ollama/qwen3:14b",
+  "auditor_snapshot": {
+    "base_url": "http://127.0.0.1:11434",
+    "digest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+    "family": "qwen3",
+    "inference_policy": {
+      "automatic_repair_temperature_schedule": [
+        0.2,
+        0.25,
+        0.3,
+        0.35,
+        0.4
+      ],
+      "gpu_offload_guard": "api_ps_positive_size_vram",
+      "keep_alive": "10m",
+      "num_ctx": 8192,
+      "repeat_penalty": 1.05,
+      "schema_version": 4,
+      "seed_policy": "sha256(job_id,chunk_id,attempt,model_id)",
+      "temperature": 0.2,
+      "top_k": 40,
+      "top_p": 0.9
+    },
+    "model_id": "ollama/qwen3:14b",
+    "modified_at": "2026-07-26T12:26:22.798414018+10:00",
+    "ollama_version": "0.32.1",
+    "parameter_size": "14.8B",
+    "provider": "ollama",
+    "provider_model": "qwen3:14b",
+    "quantization_level": "Q4_K_M",
+    "schema_version": 1,
+    "size": 9276198565
+  },
+  "dimensions": {
+    "context_translation": {
+      "batch_count": 1,
+      "case_count": 2,
+      "estimated_prompt_tokens_by_batch": [
+        392
+      ]
+    },
+    "example": {
+      "batch_count": 9,
+      "case_count": 36,
+      "estimated_prompt_tokens_by_batch": [
+        668,
+        664,
+        650,
+        653,
+        673,
+        659,
+        687,
+        636,
+        648
+      ]
+    },
+    "lexical": {
+      "batch_count": 5,
+      "case_count": 19,
+      "estimated_prompt_tokens_by_batch": [
+        964,
+        947,
+        976,
+        989,
+        791
+      ]
+    },
+    "occurrence_assignment": {
+      "batch_count": 4,
+      "case_count": 15,
+      "estimated_prompt_tokens_by_batch": [
+        797,
+        829,
+        825,
+        719
+      ]
+    }
+  },
+  "kind": "independent_qwen_batched_semantic_audit",
+  "language_key": "classical_chinese_wang_bi",
+  "max_cases_per_batch": 4,
+  "protocol_version": 10,
+  "schema_version": 1,
+  "source_attempt": 2,
+  "source_candidate": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/gpt54-quality-v11-audit-10/jobs/20260726T075340-15cb805e1657/chunks/000001-r1-r10/attempts/0002/raw.txt",
+  "source_candidate_sha256": "bea3f00fe13b46dbbf2cda0dfeee052de71ca28e2b79e8d53e479a567ce310e1",
+  "source_chunk_id": "000001-r1-r10",
+  "source_job_id": "20260726T075340-15cb805e1657",
+  "source_model": "gpt-5.4-mini",
+  "started_at": "2026-07-26T08:01:04.710186+00:00"
+}

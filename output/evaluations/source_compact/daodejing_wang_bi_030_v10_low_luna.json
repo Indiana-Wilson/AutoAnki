@@ -1,0 +1,1990 @@
+{
+  "additional_sense_count": 16,
+  "card_count": null,
+  "context_count": 5,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cache_write_input_aud": 0.0,
+    "cache_write_input_tokens": 0,
+    "cache_write_input_usd": 0.0,
+    "cached_input_aud": 0.0,
+    "cached_input_tokens": 0,
+    "cached_input_usd": 0.0,
+    "execution_mode": "standard",
+    "input_aud": 0.005511111111111112,
+    "input_tokens": 3844,
+    "input_usd": 0.003844,
+    "model": "gpt-5.6-luna",
+    "output_aud": 0.07609462365591398,
+    "output_tokens": 8846,
+    "output_usd": 0.053076,
+    "pricing": {
+      "cache_write_input_usd_per_million": 1.25,
+      "cached_input_usd_per_million": 0.1,
+      "input_usd_per_million": 1.0,
+      "label": "standard pricing published 2026-07-26",
+      "model": "gpt-5.6-luna",
+      "output_usd_per_million": 6.0
+    },
+    "pricing_label": "standard pricing published 2026-07-26",
+    "total_aud": 0.08160573476702508,
+    "total_tokens": 12690,
+    "total_usd": 0.05692,
+    "uncached_input_aud": 0.005511111111111112,
+    "uncached_input_tokens": 3844,
+    "uncached_input_usd": 0.003844,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-26T01:37:34.679064+00:00",
+  "local_repair_audit": {
+    "candidate_sha256": "83495c95b69e7c46799c61f30c044a2f43907234d05522fb75206ec1f6d08c3a",
+    "change_count": 14,
+    "changed": true,
+    "changes": [
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "4",
+        "path": "$.term_results[33]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "6",
+        "path": "$.term_results[35]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "8",
+        "path": "$.term_results[37]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "9",
+        "path": "$.term_results[38]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "12",
+        "path": "$.term_results[41]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "14",
+        "path": "$.term_results[43]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "15",
+        "path": "$.term_results[44]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "17",
+        "path": "$.term_results[46]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "19",
+        "path": "$.term_results[48]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "21",
+        "path": "$.term_results[50]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "22",
+        "path": "$.term_results[51]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "23",
+        "path": "$.term_results[52]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "24",
+        "path": "$.term_results[53]",
+        "rule_id": "deduplicate_identical_identity"
+      },
+      {
+        "action": "removed byte-equivalent duplicate",
+        "identity": "27",
+        "path": "$.term_results[56]",
+        "rule_id": "deduplicate_identical_identity"
+      }
+    ],
+    "kind": "compact_local_response_repair",
+    "original_sha256": "ab8e8fab504ca753ece53e6a5c00a6eecf039577173d9025be69ee05d7c7ba7f",
+    "schema_version": 1
+  },
+  "local_repair_count": 14,
+  "max_output_tokens": 71064,
+  "model": "gpt-5.6-luna",
+  "payload_estimated_tokens": 1559,
+  "prompt_estimated_tokens": 1908,
+  "protocol": "v10",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "translation": "The Way that can be spoken is not the constant Way; the name that can be named is not the constant name."
+      },
+      {
+        "context_id": "source-context-9d763a9d06321236e5f1",
+        "translation": "Without names, Heaven and earth began; with names, they are the mother of the ten thousand things."
+      },
+      {
+        "context_id": "source-context-a0437bbc6bfb969f44fb",
+        "translation": "Therefore, constantly without desire, one observes its subtlety."
+      },
+      {
+        "context_id": "source-context-a424d6ece55a7d545520",
+        "translation": "Constantly with desire, one observes its manifestations."
+      },
+      {
+        "context_id": "source-context-9a8214630e984de604cc",
+        "translation": "These two arise from the same source but have different names; together they are called mysterious."
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To express something in words or discourse.",
+            "Nuance (English)": "This verbal use contrasts with the preceding noun sense of the Way.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "dào (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "The Way that can be spoken is not the constant Way.",
+              "The sage speaks of virtue without contention.",
+              "I state its cause to the ruler.",
+              "In antiquity, people were guided through virtue."
+            ],
+            "Sentences": [
+              "道可道，非恆道。",
+              "聖人道德而不爭。",
+              "臣道其故於君。",
+              "古者道民以德。"
+            ],
+            "Translation (English)": "to speak; to state"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The underlying course or principle through which things arise and proceed, beyond complete verbal definition.",
+          "Nuance (English)": "Here it is the ineffable cosmic Way, not merely a spoken doctrine or physical road.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "dào (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary language, transmitted in the Wang Bi recension",
+          "Translation (English)": "the Way"
+        },
+        "rank": 1
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Expresses suitability or worthiness for a particular judgment or action.",
+            "Nuance (English)": "This evaluative use means that something merits approval or acceptance.",
+            "Part of Speech (English)": "Adjective",
+            "Pronunciation (English)": "kě (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "These words are worth hearing.",
+              "That man is fit for use.",
+              "This course is practicable.",
+              "The crime is not pardonable."
+            ],
+            "Sentences": [
+              "此言可聽。",
+              "其人可用。",
+              "斯道可行。",
+              "罪不可赦。"
+            ],
+            "Translation (English)": "worthy of; fit to"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates that an action is possible or can successfully be performed.",
+          "Nuance (English)": "It marks possibility rather than permission in this passage.",
+          "Part of Speech (English)": "Modal verb",
+          "Pronunciation (English)": "kě (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "can; may"
+        },
+        "rank": 2
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To judge a claim or action to be erroneous or unacceptable.",
+            "Nuance (English)": "Unlike simple negation, this use conveys criticism or rejection.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "fēi (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "The ruler rejects his statement.",
+              "Everyone condemns him.",
+              "He rejects antiquity and approves the present.",
+              "I dare not reject the former kings."
+            ],
+            "Sentences": [
+              "君非其言。",
+              "眾皆非之。",
+              "非古而是今。",
+              "臣不敢非先王。"
+            ],
+            "Translation (English)": "to deny; to reject as wrong"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Negates the following phrase or assertion.",
+          "Nuance (English)": "It is a direct classical negator, especially common before nominal or verbal predicates.",
+          "Part of Speech (English)": "Adverb",
+          "Pronunciation (English)": "fēi (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "not"
+        },
+        "rank": 3
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The enduring cosmic principle that does not change with particular descriptions or circumstances.",
+          "Nuance (English)": "常 marks permanence and constancy, not ordinary frequency.",
+          "Part of Speech (English)": "Noun phrase",
+          "Pronunciation (English)": "cháng dào (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary language",
+          "Translation (English)": "the constant Way"
+        },
+        "rank": 4
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To assign or use a verbal designation for someone or something.",
+            "Nuance (English)": "This is the verbal use of the same graph in the following phrase.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "míng (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "He names it the Way.",
+              "He names his son Ming.",
+              "It cannot be named.",
+              "I designate his offense."
+            ],
+            "Sentences": [
+              "名之曰道。",
+              "名其子曰明。",
+              "不可名也。",
+              "臣名其罪。"
+            ],
+            "Translation (English)": "to name; to designate"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A designation assigned to an entity so that it can be identified or discussed.",
+          "Nuance (English)": "The passage contrasts names with what they attempt to designate.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "míng (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary and philosophical",
+          "Translation (English)": "a name"
+        },
+        "rank": 5
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A designation that remains universally and permanently adequate to what it identifies.",
+          "Nuance (English)": "It implies a name whose adequacy is not limited by changing conditions.",
+          "Part of Speech (English)": "Noun phrase",
+          "Pronunciation (English)": "cháng míng (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary language",
+          "Translation (English)": "the constant name"
+        },
+        "rank": 6
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "States that a person or thing is absent or nonexistent in a given situation.",
+            "Nuance (English)": "This existential use focuses on absence rather than possession.",
+            "Part of Speech (English)": "Existential verb",
+            "Pronunciation (English)": "wú (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "There are no worthy men in the state.",
+              "There is no one in the mountains.",
+              "There is no Way under Heaven.",
+              "There is no master in the chamber."
+            ],
+            "Sentences": [
+              "國中無賢。",
+              "山中無人。",
+              "天下無道。",
+              "室中無主。"
+            ],
+            "Translation (English)": "there is not; does not exist"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Expresses the absence or non-possession of something.",
+          "Nuance (English)": "Here it means absence of a name, not simple negation of an action.",
+          "Part of Speech (English)": "Verb",
+          "Pronunciation (English)": "wú (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "without"
+        },
+        "rank": 7
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The encompassing cosmic order and the terrestrial world considered together.",
+          "Nuance (English)": "The pair denotes the whole natural cosmos, not merely sky and soil.",
+          "Part of Speech (English)": "Noun phrase",
+          "Pronunciation (English)": "tiān dì (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "Heaven and earth"
+        },
+        "rank": 8
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A grammatical linker marking a possessive, attributive, or nominal relationship.",
+          "Nuance (English)": "Here it links Heaven and earth to their beginning.",
+          "Part of Speech (English)": "Structural particle",
+          "Pronunciation (English)": "zhī (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "of; from; it"
+        },
+        "rank": 9
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To commence an action, process, or state.",
+            "Nuance (English)": "The verbal use denotes initiating rather than the starting point itself.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "shǐ (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "Spring begins to arrive.",
+              "The king begins governing the state.",
+              "The people begin to understand ritual.",
+              "The rain begins to fall."
+            ],
+            "Sentences": [
+              "春始至。",
+              "王始治國。",
+              "民始知禮。",
+              "雨始降。"
+            ],
+            "Translation (English)": "to begin"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The initial point from which a process or sequence starts.",
+          "Nuance (English)": "Here it is the cosmic beginning, prior to the emergence of named things.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "shǐ (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "beginning"
+        },
+        "rank": 10
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To hold, own, or be endowed with something.",
+            "Nuance (English)": "This use emphasizes possession by a subject rather than bare existence.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "yǒu (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "The people possess fields.",
+              "The ruler possesses virtue.",
+              "The state has laws.",
+              "The household has a worthy son."
+            ],
+            "Sentences": [
+              "民有田。",
+              "君有德。",
+              "國有法。",
+              "家有賢子。"
+            ],
+            "Translation (English)": "to have; to possess"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Marks the presence or existence of something, here the existence of names.",
+          "Nuance (English)": "It contrasts with 無 as presence or formed existence contrasts with absence.",
+          "Part of Speech (English)": "Existential verb",
+          "Pronunciation (English)": "yǒu (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "there is; possesses"
+        },
+        "rank": 11
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "All differentiated beings and phenomena in the manifest cosmos.",
+          "Nuance (English)": "The phrase is an idiom for the totality of created or observable things.",
+          "Part of Speech (English)": "Noun phrase",
+          "Pronunciation (English)": "wàn wù (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary",
+          "Translation (English)": "the ten thousand things"
+        },
+        "rank": 12
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To nurture, generate, or care for something in the manner of a mother.",
+            "Nuance (English)": "This verbal use is figurative and emphasizes generative care.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "mǔ (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "Heaven and earth mother the ten thousand things.",
+              "The queen mothers her people.",
+              "Virtue nurtures all under Heaven.",
+              "A loving mother cares for the orphan."
+            ],
+            "Sentences": [
+              "天地母萬物。",
+              "后母其民。",
+              "德母天下。",
+              "慈母孤兒。"
+            ],
+            "Translation (English)": "to serve as a mother; to mother"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A female parent, or metaphorically the generating source from which things arise.",
+          "Nuance (English)": "Here 母 is metaphorical: named existence generates and nourishes the ten thousand things.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "mǔ (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "mother"
+        },
+        "rank": 13
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces a conclusion or consequence drawn from what precedes.",
+          "Nuance (English)": "It marks a reasoned transition, not a temporal ‘formerly.’",
+          "Part of Speech (English)": "Conjunction",
+          "Pronunciation (English)": "gù (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "therefore"
+        },
+        "rank": 14
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates that a state or practice is maintained continuously or habitually.",
+          "Nuance (English)": "Here it modifies 無欲 and contrasts with the passage’s 有欲 observation.",
+          "Part of Speech (English)": "Adverb",
+          "Pronunciation (English)": "cháng (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "constantly"
+        },
+        "rank": 15
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To wish for or seek something as an object of inclination.",
+            "Nuance (English)": "The verbal use presents desire as an active mental impulse.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "yù (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "People desire wealth and rank.",
+              "The ruler wants to govern the people.",
+              "I want to study the Way.",
+              "Everyone wants to obtain it."
+            ],
+            "Sentences": [
+              "人欲富貴。",
+              "君欲治民。",
+              "我欲學道。",
+              "眾欲得之。"
+            ],
+            "Translation (English)": "to desire; to want"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A directed inclination toward obtaining or experiencing something.",
+          "Nuance (English)": "In Laozi, desire often means acquisitive or discriminating want that affects perception.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "yù (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "desire"
+        },
+        "rank": 16
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces the means or purpose by which the following action is performed.",
+          "Nuance (English)": "Here it links freedom from desire with the purpose of observing subtlety.",
+          "Part of Speech (English)": "Preposition",
+          "Pronunciation (English)": "yǐ (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "in order to; thereby"
+        },
+        "rank": 17
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To examine something by looking at it carefully.",
+            "Nuance (English)": "This concrete use focuses on visual examination rather than inward contemplation.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "guān (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "The ruler observes the people’s condition.",
+              "The envoy inspects the market.",
+              "The scholar examines his book.",
+              "The ruler views the water at the river."
+            ],
+            "Sentences": [
+              "王觀民情。",
+              "使者觀市。",
+              "士觀其書。",
+              "君觀水於河。"
+            ],
+            "Translation (English)": "to inspect; to view"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To attend to and discern something through deliberate contemplation.",
+          "Nuance (English)": "It suggests contemplative perception, not merely casual looking.",
+          "Part of Speech (English)": "Verb",
+          "Pronunciation (English)": "guān (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "to observe"
+        },
+        "rank": 18
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A third-person possessive or attributive pronoun referring to the previously mentioned object.",
+          "Nuance (English)": "It refers back to the Way or the object under contemplation without naming it again.",
+          "Part of Speech (English)": "Pronoun",
+          "Pronunciation (English)": "qí (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "its"
+        },
+        "rank": 19
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Marked by an extraordinary quality that inspires admiration.",
+            "Nuance (English)": "This adjectival use praises an observable quality rather than naming hidden subtlety.",
+            "Part of Speech (English)": "Adjective",
+            "Pronunciation (English)": "miào (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "This music is extraordinarily fine.",
+              "His plan is marvelous.",
+              "A masterly hand restores spring.",
+              "This writing is peerlessly beautiful."
+            ],
+            "Sentences": [
+              "此樂甚妙。",
+              "其計妙矣。",
+              "妙手回春。",
+              "斯文妙絕。"
+            ],
+            "Translation (English)": "wonderful; marvelous"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The fine, hidden character of something that is difficult to perceive directly.",
+          "Nuance (English)": "The word suggests profound subtle operation rather than ordinary cleverness.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "miào (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary",
+          "Translation (English)": "subtlety"
+        },
+        "rank": 20
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The outward limits, traces, or visible effects through which something can be perceived.",
+          "Nuance (English)": "It contrasts visible external effects with the hidden subtlety of 妙.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "jiào (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary",
+          "Translation (English)": "manifestations; boundaries"
+        },
+        "rank": 21
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Identifies the two immediately preceding realities as the subject under discussion.",
+          "Nuance (English)": "It points back deictically to the paired modes of 無 and 有.",
+          "Part of Speech (English)": "Demonstrative pronoun",
+          "Pronunciation (English)": "cǐ (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "this"
+        },
+        "rank": 22
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The number or pair consisting of two entities.",
+          "Nuance (English)": "It denotes a complementary pair rather than an undifferentiated plurality.",
+          "Part of Speech (English)": "Numeral",
+          "Pronunciation (English)": "liǎng (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "two"
+        },
+        "rank": 23
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A nominalizing particle that turns the preceding numeral phrase into a designation for persons or things.",
+          "Nuance (English)": "It makes 兩者 mean ‘the two things’.",
+          "Part of Speech (English)": "Nominalizing particle",
+          "Pronunciation (English)": "zhě (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "those; the ones"
+        },
+        "rank": 24
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Being one and the same rather than different in identity or kind.",
+            "Nuance (English)": "This adjectival use asserts identity rather than shared origin.",
+            "Part of Speech (English)": "Adjective",
+            "Pronunciation (English)": "tóng (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "The two books have the same source.",
+              "This and that are identical.",
+              "Ruler and ministers are of one mind.",
+              "The two horses are the same color."
+            ],
+            "Sentences": [
+              "二書同本。",
+              "此與彼同。",
+              "君臣同心。",
+              "兩馬同色。"
+            ],
+            "Translation (English)": "same; identical"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates that two entities share an origin or condition.",
+          "Nuance (English)": "Here it marks common origin, not identity of names or manifestations.",
+          "Part of Speech (English)": "Adverb",
+          "Pronunciation (English)": "tóng (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "together; alike"
+        },
+        "rank": 25
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To move from inside or away from a place or group.",
+            "Nuance (English)": "This concrete motion sense differs from metaphysical origination.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "chū (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "The sun comes out in the east.",
+              "The guest goes outside the gate.",
+              "The army leaves from the outskirts.",
+              "The envoy exits the city."
+            ],
+            "Sentences": [
+              "日出東方。",
+              "客出門外。",
+              "軍出於郊。",
+              "使者出城。"
+            ],
+            "Translation (English)": "to go out; to leave"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To come forth from a source or originate out of something.",
+          "Nuance (English)": "Here it describes common origination, not physical departure from a place.",
+          "Part of Speech (English)": "Verb",
+          "Pronunciation (English)": "chū (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "to arise from; to emerge"
+        },
+        "rank": 26
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Connects two sequential or related clauses or actions.",
+          "Nuance (English)": "Here it links common emergence with differing names.",
+          "Part of Speech (English)": "Conjunction",
+          "Pronunciation (English)": "ér (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "and; thereby"
+        },
+        "rank": 27
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To treat something as unusual or worthy of astonishment.",
+            "Nuance (English)": "This evaluative use expresses a reaction, not simple difference.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "yì (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "Everyone is surprised by his talent.",
+              "The ruler finds the minister’s words strange.",
+              "The villagers regard it as extraordinary.",
+              "I find this matter strange."
+            ],
+            "Sentences": [
+              "眾異其才。",
+              "君異臣言。",
+              "鄉人異之。",
+              "我異此事。"
+            ],
+            "Translation (English)": "to regard as strange; to be surprised at"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Distinct from another in designation or character.",
+          "Nuance (English)": "The difference concerns names, while origin remains shared.",
+          "Part of Speech (English)": "Adjective",
+          "Pronunciation (English)": "yì (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "different"
+        },
+        "rank": 28
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To state something verbally or present it as a proposition.",
+            "Nuance (English)": "This use reports speech or an assertion rather than assigning a designation.",
+            "Part of Speech (English)": "Verb",
+            "Pronunciation (English)": "wèi (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "Confucius speaks of benevolence.",
+              "The historian says that he was good.",
+              "Everyone says it is impossible.",
+              "I say that the ruler understands."
+            ],
+            "Sentences": [
+              "孔子謂仁。",
+              "史謂其善。",
+              "眾謂不可。",
+              "臣謂君知。"
+            ],
+            "Translation (English)": "to say; to speak of"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To designate or describe something by a particular term.",
+          "Nuance (English)": "同謂之玄 means that both are called or characterized as profound mystery.",
+          "Part of Speech (English)": "Verb",
+          "Pronunciation (English)": "wèi (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "to call; to name"
+        },
+        "rank": 29
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Having a very dark color or lacking light.",
+            "Nuance (English)": "This concrete color sense is distinct from the philosophical sense of profundity.",
+            "Part of Speech (English)": "Adjective",
+            "Pronunciation (English)": "xuán (modern Hanyu Pinyin)",
+            "Register (English)": "Classical literary",
+            "Sentence Translations (English)": [
+              "Dark clothing covers the body.",
+              "A black bird gathers in the forest.",
+              "Dark clouds obscure the sun.",
+              "A black banner is at the front."
+            ],
+            "Sentences": [
+              "玄衣蔽體。",
+              "玄鳥集林。",
+              "玄雲蔽日。",
+              "玄旗在前。"
+            ],
+            "Translation (English)": "black; dark"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Beyond ordinary understanding because its operation is deep, hidden, and difficult to define.",
+          "Nuance (English)": "It denotes profound obscurity and generative mystery, not merely intellectual difficulty.",
+          "Part of Speech (English)": "Adjective",
+          "Pronunciation (English)": "xuán (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary",
+          "Translation (English)": "mysterious; profound"
+        },
+        "rank": 30
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The underlying course or principle through which things arise and proceed, beyond complete verbal definition.",
+          "Nuance (English)": "Here it is the ineffable cosmic Way, not merely a spoken doctrine or physical road.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "dào (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary language",
+          "Translation (English)": "the Way"
+        },
+        "rank": 1
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates that an action is possible or can successfully be performed.",
+          "Nuance (English)": "It marks possibility rather than permission in this passage.",
+          "Part of Speech (English)": "Modal verb",
+          "Pronunciation (English)": "kě (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "can; may"
+        },
+        "rank": 2
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Negates the following phrase or assertion.",
+          "Nuance (English)": "It is a direct classical negator, especially common before nominal or verbal predicates.",
+          "Part of Speech (English)": "Adverb",
+          "Pronunciation (English)": "fēi (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "not"
+        },
+        "rank": 3
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The enduring cosmic principle that does not change with particular descriptions or circumstances.",
+          "Nuance (English)": "常 marks permanence and constancy, not ordinary frequency.",
+          "Part of Speech (English)": "Noun phrase",
+          "Pronunciation (English)": "cháng dào (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary language",
+          "Translation (English)": "the constant Way"
+        },
+        "rank": 4
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A designation assigned to an entity so that it can be identified or discussed.",
+          "Nuance (English)": "The passage contrasts names with what they attempt to designate.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "míng (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary and philosophical",
+          "Translation (English)": "a name"
+        },
+        "rank": 5
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A designation that remains universally and permanently adequate to what it identifies.",
+          "Nuance (English)": "It implies a name whose adequacy is not limited by changing conditions.",
+          "Part of Speech (English)": "Noun phrase",
+          "Pronunciation (English)": "cháng míng (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary language",
+          "Translation (English)": "the constant name"
+        },
+        "rank": 6
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Expresses the absence or non-possession of something.",
+          "Nuance (English)": "Here it means absence of a name, not simple negation of an action.",
+          "Part of Speech (English)": "Verb",
+          "Pronunciation (English)": "wú (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "without"
+        },
+        "rank": 7
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The encompassing cosmic order and the terrestrial world considered together.",
+          "Nuance (English)": "The pair denotes the whole natural cosmos, not merely sky and soil.",
+          "Part of Speech (English)": "Noun phrase",
+          "Pronunciation (English)": "tiān dì (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "Heaven and earth"
+        },
+        "rank": 8
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A grammatical linker marking a possessive, attributive, or nominal relationship.",
+          "Nuance (English)": "Here it links Heaven and earth to their beginning.",
+          "Part of Speech (English)": "Structural particle",
+          "Pronunciation (English)": "zhī (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "of; from; it"
+        },
+        "rank": 9
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The initial point from which a process or sequence starts.",
+          "Nuance (English)": "Here it is the cosmic beginning, prior to the emergence of named things.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "shǐ (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "beginning"
+        },
+        "rank": 10
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Marks the presence or existence of something, here the existence of names.",
+          "Nuance (English)": "It contrasts with 無 as presence or formed existence contrasts with absence.",
+          "Part of Speech (English)": "Existential verb",
+          "Pronunciation (English)": "yǒu (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "there is; possesses"
+        },
+        "rank": 11
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "All differentiated beings and phenomena in the manifest cosmos.",
+          "Nuance (English)": "The phrase is an idiom for the totality of created or observable things.",
+          "Part of Speech (English)": "Noun phrase",
+          "Pronunciation (English)": "wàn wù (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary",
+          "Translation (English)": "the ten thousand things"
+        },
+        "rank": 12
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A female parent, or metaphorically the generating source from which things arise.",
+          "Nuance (English)": "Here 母 is metaphorical: named existence generates and nourishes the ten thousand things.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "mǔ (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "mother"
+        },
+        "rank": 13
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces a conclusion or consequence drawn from what precedes.",
+          "Nuance (English)": "It marks a reasoned transition, not a temporal ‘formerly.’",
+          "Part of Speech (English)": "Conjunction",
+          "Pronunciation (English)": "gù (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "therefore"
+        },
+        "rank": 14
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates that a state or practice is maintained continuously or habitually.",
+          "Nuance (English)": "Here it modifies 無欲 and contrasts with the passage’s 有欲 observation.",
+          "Part of Speech (English)": "Adverb",
+          "Pronunciation (English)": "cháng (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "constantly"
+        },
+        "rank": 15
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A directed inclination toward obtaining or experiencing something.",
+          "Nuance (English)": "In Laozi, desire often means acquisitive or discriminating want that affects perception.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "yù (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "desire"
+        },
+        "rank": 16
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Introduces the means or purpose by which the following action is performed.",
+          "Nuance (English)": "Here it links freedom from desire with the purpose of observing subtlety.",
+          "Part of Speech (English)": "Preposition",
+          "Pronunciation (English)": "yǐ (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "in order to; thereby"
+        },
+        "rank": 17
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To attend to and discern something through deliberate contemplation.",
+          "Nuance (English)": "It suggests contemplative perception, not merely casual looking.",
+          "Part of Speech (English)": "Verb",
+          "Pronunciation (English)": "guān (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "to observe"
+        },
+        "rank": 18
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A third-person possessive or attributive pronoun referring to the previously mentioned object.",
+          "Nuance (English)": "It refers back to the Way or the object under contemplation without naming it again.",
+          "Part of Speech (English)": "Pronoun",
+          "Pronunciation (English)": "qí (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "its"
+        },
+        "rank": 19
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The fine, hidden character of something that is difficult to perceive directly.",
+          "Nuance (English)": "The word suggests profound subtle operation rather than ordinary cleverness.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "miào (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary",
+          "Translation (English)": "subtlety"
+        },
+        "rank": 20
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The outward limits, traces, or visible effects through which something can be perceived.",
+          "Nuance (English)": "It contrasts visible external effects with the hidden subtlety of 妙.",
+          "Part of Speech (English)": "Noun",
+          "Pronunciation (English)": "jiào (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary",
+          "Translation (English)": "manifestations; boundaries"
+        },
+        "rank": 21
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Identifies the two immediately preceding realities as the subject under discussion.",
+          "Nuance (English)": "It points back deictically to the paired modes of 無 and 有.",
+          "Part of Speech (English)": "Demonstrative pronoun",
+          "Pronunciation (English)": "cǐ (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "this"
+        },
+        "rank": 22
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "The number or pair consisting of two entities.",
+          "Nuance (English)": "It denotes a complementary pair rather than an undifferentiated plurality.",
+          "Part of Speech (English)": "Numeral",
+          "Pronunciation (English)": "liǎng (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "two"
+        },
+        "rank": 23
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A nominalizing particle that turns the preceding numeral phrase into a designation for persons or things.",
+          "Nuance (English)": "It makes 兩者 mean ‘the two things’.",
+          "Part of Speech (English)": "Nominalizing particle",
+          "Pronunciation (English)": "zhě (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "those; the ones"
+        },
+        "rank": 24
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Indicates that two entities share an origin or condition.",
+          "Nuance (English)": "Here it marks common origin, not identity of names or manifestations.",
+          "Part of Speech (English)": "Adverb",
+          "Pronunciation (English)": "tóng (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "together; alike"
+        },
+        "rank": 25
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To come forth from a source or originate out of something.",
+          "Nuance (English)": "Here it describes common origination, not physical departure from a place.",
+          "Part of Speech (English)": "Verb",
+          "Pronunciation (English)": "chū (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "to arise from; to emerge"
+        },
+        "rank": 26
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Connects two sequential or related clauses or actions.",
+          "Nuance (English)": "Here it links common emergence with differing names.",
+          "Part of Speech (English)": "Conjunction",
+          "Pronunciation (English)": "ér (modern Hanyu Pinyin)",
+          "Register (English)": "Classical literary",
+          "Translation (English)": "and; thereby"
+        },
+        "rank": 27
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Distinct from another in designation or character.",
+          "Nuance (English)": "The difference concerns names, while origin remains shared.",
+          "Part of Speech (English)": "Adjective",
+          "Pronunciation (English)": "yì (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "different"
+        },
+        "rank": 28
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To designate or describe something by a particular term.",
+          "Nuance (English)": "同謂之玄 means that both are called or characterized as profound mystery.",
+          "Part of Speech (English)": "Verb",
+          "Pronunciation (English)": "wèi (modern Hanyu Pinyin)",
+          "Register (English)": "Classical philosophical and literary",
+          "Translation (English)": "to call; to name"
+        },
+        "rank": 29
+      },
+      {
+        "additional_senses": [],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Beyond ordinary understanding because its operation is deep, hidden, and difficult to define.",
+          "Nuance (English)": "It denotes profound obscurity and generative mystery, not merely intellectual difficulty.",
+          "Part of Speech (English)": "Adjective",
+          "Pronunciation (English)": "xuán (modern Hanyu Pinyin)",
+          "Register (English)": "Laozi philosophical and literary",
+          "Translation (English)": "mysterious; profound"
+        },
+        "rank": 30
+      }
+    ]
+  },
+  "reasoning_effort": "low",
+  "response_id": "resp_0ca795350bd77952006a6564b5f5088198a6f59001440dd74d",
+  "response_status": "completed",
+  "schema_estimated_tokens": 519,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "target_ranks": null,
+  "term_result_count": 60,
+  "terms": [
+    {
+      "rank": 1,
+      "term": "道"
+    },
+    {
+      "rank": 2,
+      "term": "可"
+    },
+    {
+      "rank": 3,
+      "term": "非"
+    },
+    {
+      "rank": 4,
+      "term": "常道"
+    },
+    {
+      "rank": 5,
+      "term": "名"
+    },
+    {
+      "rank": 6,
+      "term": "常名"
+    },
+    {
+      "rank": 7,
+      "term": "無"
+    },
+    {
+      "rank": 8,
+      "term": "天地"
+    },
+    {
+      "rank": 9,
+      "term": "之"
+    },
+    {
+      "rank": 10,
+      "term": "始"
+    },
+    {
+      "rank": 11,
+      "term": "有"
+    },
+    {
+      "rank": 12,
+      "term": "萬物"
+    },
+    {
+      "rank": 13,
+      "term": "母"
+    },
+    {
+      "rank": 14,
+      "term": "故"
+    },
+    {
+      "rank": 15,
+      "term": "常"
+    },
+    {
+      "rank": 16,
+      "term": "欲"
+    },
+    {
+      "rank": 17,
+      "term": "以"
+    },
+    {
+      "rank": 18,
+      "term": "觀"
+    },
+    {
+      "rank": 19,
+      "term": "其"
+    },
+    {
+      "rank": 20,
+      "term": "妙"
+    },
+    {
+      "rank": 21,
+      "term": "徼"
+    },
+    {
+      "rank": 22,
+      "term": "此"
+    },
+    {
+      "rank": 23,
+      "term": "兩"
+    },
+    {
+      "rank": 24,
+      "term": "者"
+    },
+    {
+      "rank": 25,
+      "term": "同"
+    },
+    {
+      "rank": 26,
+      "term": "出"
+    },
+    {
+      "rank": 27,
+      "term": "而"
+    },
+    {
+      "rank": 28,
+      "term": "異"
+    },
+    {
+      "rank": 29,
+      "term": "謂"
+    },
+    {
+      "rank": 30,
+      "term": "玄"
+    }
+  ],
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 3844,
+    "output_tokens": 8846,
+    "reasoning_tokens": 240,
+    "total_tokens": 12690,
+    "uncached_input_tokens": 3844,
+    "visible_output_tokens": 8606,
+    "web_search_calls": 0
+  },
+  "valid": false,
+  "validation_error": {
+    "message": "Each requested rank must occur exactly once in term_results.",
+    "type": "GeneratedCardValidationError",
+    "validation_report": {
+      "accepted_problem_count": 0,
+      "all_problems_resolved": false,
+      "can_complete_with_manual_acceptance": false,
+      "can_manually_accept": false,
+      "full_retry_required": true,
+      "local_repair_applied": true,
+      "local_repair_count": 14,
+      "local_repairs": [
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "4",
+          "path": "$.term_results[33]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "6",
+          "path": "$.term_results[35]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "8",
+          "path": "$.term_results[37]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "9",
+          "path": "$.term_results[38]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "12",
+          "path": "$.term_results[41]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "14",
+          "path": "$.term_results[43]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "15",
+          "path": "$.term_results[44]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "17",
+          "path": "$.term_results[46]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "19",
+          "path": "$.term_results[48]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "21",
+          "path": "$.term_results[50]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "22",
+          "path": "$.term_results[51]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "23",
+          "path": "$.term_results[52]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "24",
+          "path": "$.term_results[53]",
+          "rule_id": "deduplicate_identical_identity"
+        },
+        {
+          "action": "removed byte-equivalent duplicate",
+          "identity": "27",
+          "path": "$.term_results[56]",
+          "rule_id": "deduplicate_identical_identity"
+        }
+      ],
+      "non_overrideable_problem_count": 17,
+      "overrideable_problem_count": 0,
+      "problem_count": 17,
+      "problems": [
+        {
+          "accepted": false,
+          "actual": 1,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 31 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[30].rank",
+          "problem_id": "duplicate_compact_source_rank:2edeec21a4e4c686",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 1
+          },
+          "scope": "response",
+          "source_rank": 1,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 2,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 32 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[31].rank",
+          "problem_id": "duplicate_compact_source_rank:6d43eaf56db1c658",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 2
+          },
+          "scope": "response",
+          "source_rank": 2,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 3,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 33 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[32].rank",
+          "problem_id": "duplicate_compact_source_rank:00c28d05f35474ad",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 3
+          },
+          "scope": "response",
+          "source_rank": 3,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 5,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 34 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[33].rank",
+          "problem_id": "duplicate_compact_source_rank:d46e326acbaa024d",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 5
+          },
+          "scope": "response",
+          "source_rank": 5,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 7,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 35 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[34].rank",
+          "problem_id": "duplicate_compact_source_rank:07419fd3b7f16cde",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 7
+          },
+          "scope": "response",
+          "source_rank": 7,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 10,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 36 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[35].rank",
+          "problem_id": "duplicate_compact_source_rank:9aeb5eee26304ec3",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 10
+          },
+          "scope": "response",
+          "source_rank": 10,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 11,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 37 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[36].rank",
+          "problem_id": "duplicate_compact_source_rank:8408519059b10d8c",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 11
+          },
+          "scope": "response",
+          "source_rank": 11,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 13,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9d763a9d06321236e5f1",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 38 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[37].rank",
+          "problem_id": "duplicate_compact_source_rank:629d932baec05b7b",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 13
+          },
+          "scope": "response",
+          "source_rank": 13,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 16,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-a0437bbc6bfb969f44fb",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 39 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[38].rank",
+          "problem_id": "duplicate_compact_source_rank:23ff141ac0d01bed",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 16
+          },
+          "scope": "response",
+          "source_rank": 16,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 18,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-a0437bbc6bfb969f44fb",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 40 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[39].rank",
+          "problem_id": "duplicate_compact_source_rank:0e2f7fc0a0338b61",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 18
+          },
+          "scope": "response",
+          "source_rank": 18,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 20,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-a0437bbc6bfb969f44fb",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 41 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[40].rank",
+          "problem_id": "duplicate_compact_source_rank:fd57be44c516c0c8",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 20
+          },
+          "scope": "response",
+          "source_rank": 20,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 25,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9a8214630e984de604cc",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 42 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[41].rank",
+          "problem_id": "duplicate_compact_source_rank:3edfb4058190b98c",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 25
+          },
+          "scope": "response",
+          "source_rank": 25,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 26,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9a8214630e984de604cc",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 43 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[42].rank",
+          "problem_id": "duplicate_compact_source_rank:b30dd05c517277bd",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 26
+          },
+          "scope": "response",
+          "source_rank": 26,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 28,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9a8214630e984de604cc",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 44 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[43].rank",
+          "problem_id": "duplicate_compact_source_rank:6c7cf029e83b85be",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 28
+          },
+          "scope": "response",
+          "source_rank": 28,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 29,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9a8214630e984de604cc",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 45 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[44].rank",
+          "problem_id": "duplicate_compact_source_rank:8e40cf62ae2591c8",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 29
+          },
+          "scope": "response",
+          "source_rank": 29,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": 30,
+          "card_index": null,
+          "card_number": null,
+          "code": "duplicate_compact_source_rank",
+          "context_id": "source-context-9a8214630e984de604cc",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": "A rank not used by an earlier item.",
+          "field_name": null,
+          "location": "Response → term_results → item 46 → rank",
+          "message": "Each requested rank must occur exactly once in term_results.",
+          "overrideable": false,
+          "path": "$.term_results[45].rank",
+          "problem_id": "duplicate_compact_source_rank:705bbe4054db3ad8",
+          "repair_target": {
+            "kind": "source_rank",
+            "source_rank": 30
+          },
+          "scope": "response",
+          "source_rank": 30,
+          "suggestion": "Retry or replace the duplicate term result.",
+          "term": null,
+          "title": "Compact response repeats a source rank"
+        },
+        {
+          "accepted": false,
+          "actual": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            1,
+            2,
+            3,
+            5,
+            7,
+            10,
+            11,
+            13,
+            16,
+            18,
+            20,
+            25,
+            26,
+            28,
+            29,
+            30
+          ],
+          "card_index": null,
+          "card_number": null,
+          "code": "compact_source_ranks_not_ascending",
+          "exception_type": "GeneratedCardValidationError",
+          "expected": [
+            1,
+            1,
+            2,
+            2,
+            3,
+            3,
+            4,
+            5,
+            5,
+            6,
+            7,
+            7,
+            8,
+            9,
+            10,
+            10,
+            11,
+            11,
+            12,
+            13,
+            13,
+            14,
+            15,
+            16,
+            16,
+            17,
+            18,
+            18,
+            19,
+            20,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            25,
+            26,
+            26,
+            27,
+            28,
+            28,
+            29,
+            29,
+            30,
+            30
+          ],
+          "field_name": null,
+          "full_retry_required": true,
+          "location": "Response → term_results",
+          "message": "term_results must be ordered by increasing rank so array positions remain deterministic.",
+          "overrideable": false,
+          "path": "$.term_results",
+          "problem_id": "compact_source_ranks_not_ascending:37457c461c3b39b4",
+          "scope": "response",
+          "suggestion": "Retry with term_results sorted by rank.",
+          "term": null,
+          "title": "Compact source ranks are not strictly ascending"
+        }
+      ],
+      "remaining_problem_count": 17,
+      "structurally_valid": false,
+      "syntax_valid": true,
+      "valid": false
+    }
+  },
+  "word_count": 30
+}

@@ -17,6 +17,7 @@ from source_generation.jobs import (
 )
 from source_generation.models import (
     AnkiExclusionSpec,
+    ContextOccurrenceSpan,
     ContextMode,
     ContextUnit,
     CostEstimate,
@@ -60,6 +61,7 @@ from source_generation.requests import (
     SOURCE_REQUEST_REASONING,
     build_source_request_contract,
     build_source_prompt,
+    compact_response_format_uses_occurrence_sense_indices,
     load_source_batch_instructions,
     load_source_web_search_instructions,
     normalise_source_request_contract,
@@ -76,6 +78,7 @@ from source_generation.requests import (
 
 __all__ = (
     "AnkiExclusionSpec",
+    "ContextOccurrenceSpan",
     "ContextMode",
     "ContextUnit",
     "CostEstimate",
@@ -108,6 +111,7 @@ __all__ = (
     "SOURCE_REQUEST_REASONING",
     "build_source_request_contract",
     "build_source_prompt",
+    "compact_response_format_uses_occurrence_sense_indices",
     "load_source_batch_instructions",
     "load_source_web_search_instructions",
     "normalise_source_request_contract",

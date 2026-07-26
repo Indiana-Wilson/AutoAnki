@@ -1,7 +1,7 @@
 Welcome to the AutoAnki repository!
 
-The purpose of this project is to automate the creation of Anki cards using the OpenAI API, as well as the
-genanki python package.
+The purpose of this project is to automate the creation of Anki cards using
+the OpenAI API together with the genanki Python package.
 
 Here's what everything does:
 
@@ -20,17 +20,19 @@ AutoAnki configuration directory the first time it runs. Prompt edits and
 generated output therefore survive application upgrades and are never written
 into PyInstaller's temporary extraction directory.
 
-src/process_text.py: Calls the OpenAI API and converts JSON responses into
-genanki packages. API responses use a strict JSON schema and are validated
-again locally before any package is written.
+src/process_text.py: Converts schema-constrained provider JSON into genanki
+packages. Responses use a strict JSON schema and are validated again locally
+before any package is written.
 
 src/templates.py: Contains fifteen registered genanki card types: three
 directions for each of English, Classical Chinese, French, Japanese, and
 Latin. Each model has stable fields for Translation, Dictionary Meaning,
-Pronunciation, Part of Speech, Register, and Nuance. Empty local model fields
+Pronunciation, Part of Speech, Register, and Nuance. Empty optional fields
 are hidden by the card template. Context models also retain an English
 translation for every example sentence and show the translation matching the
-randomly selected front example above the definitions on the back.
+randomly selected front example above the definitions on the back. The
+immutable card term appears immediately above the front example, so it remains
+visible when an inflected form cannot be matched and highlighted locally.
 
 Classical Chinese also has Ming, Warring States, early-Han Mawangdui, and
 Wang-Bi-recension input variants. These variants add period- or
@@ -83,28 +85,37 @@ deduplication and learned-word exclusion. Changing that cutoff or the words per
 request immediately updates a local, cache-aware cost estimate based on the
 exact compact payload and strict schema, shared prompt-prefix repetition,
 expected response shape, and selected card detail. The headline is the
-modelled central estimate; a wider low/high range remains visible. The
-configured `gpt-5.4-mini` price and token-limit assumptions are dated 24 July
-2026 and are not fetched live; see the detailed source-generation
-documentation before treating an estimate as current.
+modelled central estimate; a wider low/high range remains visible.
+`gpt-5.4-mini` is the supported source-generation model. OpenAI prices are
+frozen, dated, and not fetched live.
 
-New jobs default to the compact fixed-schema v9 protocol with no reasoning.
-Legacy grouped v8 remains selectable as an explicit rollback and retains its
-required low-reasoning behavior. Standard processing makes one OpenAI
-Responses request per chunk through a bounded, staggered worker pool. Economy
-processing instead submits the frozen requests as a recoverable 24-hour Batch
-at half the Standard token rates; synchronous concurrency, staggering, and
-automatic transient retries do not apply to that mode.
+New jobs default to the compact fixed-schema v10 protocol with low reasoning.
+Compact v9 and grouped v8 remain selectable as frozen rollback protocols; v8
+retains its required low-reasoning behavior. In v10, the provider returns
+plain example sentences without HTML. AutoAnki adds strong emphasis locally
+when the exact term can be matched safely; an unmatched or inflected form is
+left unchanged and remains identifiable from the term displayed above it.
+No reasoning remains available as a lower-cost option for smaller chunks.
+Standard processing dispatches each chunk directly through a bounded,
+staggered worker pool. Economy processing submits OpenAI requests as a
+recoverable 24-hour Batch at half the Standard token rates.
 
 For Standard requests, only transient connection/time-out, HTTP 429, and HTTP
 5xx failures receive bounded automatic backoff. Invalid/refused/incomplete
-JSON is retained for inspection and requires an explicitly authorized
-individual or bulk retry. When every compact-v9 problem maps safely to known
-ranks or source contexts, that retry requests only the failed identities,
-merges them into the retained response, and validates the complete result;
-unscoped failures still use a full-chunk retry. Jobs are visually grouped,
-each Deck row appears last inside its own job, and inspection separates one
-chunk's request from its response.
+JSON is retained for inspection. The optional Automatic repair checkbox also
+enables exact source-translation memory and tiny example-pair repairs: no more
+than three paid repair calls per failed OpenAI request. Paid repair changes
+only validated sentence/translation slots. Before a v10 result can fail
+validation, AutoAnki applies only conservative local normalization or deletion
+rules that cannot invent lexical content. The provider response remains
+unchanged; a changed candidate and a hash-linked rule audit are saved beside
+it. A remaining failure requires an explicitly authorized individual or bulk retry.
+When every compact-v10 or compact-v9 problem maps safely to known ranks or
+source contexts, that retry requests only the failed identities, merges them
+into the retained response, and validates the complete result; unscoped
+failures still use a full-chunk retry. Jobs are visually grouped, each Deck
+row appears last inside its own job, and inspection separates one chunk's
+request from its response.
 **View problems** identifies the exact card, field, reason, expected/actual
 value, and JSON path for each validation failure. Structurally safe content
 issues can be accepted individually with a persisted audit; malformed or
@@ -117,8 +128,8 @@ Each authorized source job saves an immutable request contract containing its
 model, fully composed prompt, strict JSON schema, request protocol, reasoning
 effort, Standard/Economy processing mode, and optional web-search access.
 Retries reuse it even if an Advanced prompt component changes later. Every
-paid response is persisted before local validation with its exact raw output,
-provider ID/status, and provider-reported input, cached-input, output,
+provider response is persisted before local validation with its exact raw
+output, provider ID/status, and provider-reported input, cached-input, output,
 reasoning, total-token, and web-search usage. The Jobs page prices that
 retained usage using the frozen Standard or Economy profile. Request chunks
 use cross-process advisory leases, preventing two AutoAnki processes from
@@ -131,11 +142,11 @@ one of that note type's fields. AutoAnki unions the visible field values from
 all rows before filtering. A newly added row copies the preceding row to make
 same-deck setups quick. Card templates are not part of this selector because
 fields belong to notes and a note type may generate several card templates
-from the same stored fields. If no new candidate remains, AutoAnki
-sends nothing to OpenAI and creates no package or deck.
+from the same stored fields. If no new candidate remains, AutoAnki sends
+nothing to the selected provider and creates no package or deck.
 
 An estimate can reuse a matching read-only Anki result briefly, but confirmed
-generation forces a fresh, ready-collection read immediately before its paid
+generation forces a fresh, ready-collection read immediately before its
 plan is saved.
 
 Prepare File is local/OpenAI-free, retains the original and extracted text,
@@ -194,7 +205,7 @@ The interface uses screen-aware sizing and DPI scaling, rounded card surfaces
 and controls, a non-tiled scrollbar, transient autosave feedback, and explicit
 busy/progress states. Clicking a non-interactive background clears transient
 focus and text highlighting. AutoAnki prevents the window from closing while
-a paid response is still being generated or imported. Card setup scrolls as
+a provider response is still being generated or imported. Card setup scrolls as
 one complete page rather than placing a nested scrollbar inside the language
 selector.
 
@@ -223,7 +234,7 @@ each card direction.
 
 Response-language menus remain available while their field is unticked. This
 lets a preferred language be prepared and saved without requesting that field;
-only ticked fields enter the OpenAI schema or generated cards.
+only ticked fields enter the response schema or generated cards.
 
 Each language tab retains its own card selections, target-deck mode,
 per-card target decks, field/language choices, and learned-word sources.
@@ -233,7 +244,7 @@ Translation must target a language other than the source language. Every other
 field may target any supported language, including the source language. For
 example, a French Dictionary Meaning can be written in French.
 
-The strict OpenAI JSON schema contains only the union of fields actually
+The strict provider JSON schema contains only the union of fields actually
 needed by the enabled cards. Identical field/language requests are requested
 once and reused. Unselected fields are omitted entirely—not returned as null.
 Context sentences are requested only when Context sentence → Meaning is
@@ -256,7 +267,7 @@ are rejected. AutoAnki asks whether to save, discard, or cancel if unsaved
 changes exist while switching components, disabling editing, or closing the
 application. Placeholders such as {source_language}, {target_language}, and
 {response_field} are filled at generation time; invalid placeholders are
-reported as a configuration failure before any paid request.
+reported as a configuration failure before any provider request.
 
 The Help tab contains the quick-start instructions, the AnkiConnect add-on
 code, remote-computer setup, and saved Anki connection fields. The API key is
@@ -272,9 +283,9 @@ Definition sections appear vertically with bold labels. All generated note
 types share a centered 20px `.card` styling rule while retaining their
 individual front/back HTML and JavaScript.
 
-On the first generation, AutoAnki asks for an OpenAI API key. The key is
-entered through a masked field and stored outside the repository in the
-current user's configuration directory. On Linux, the default location is
+On the first OpenAI generation, AutoAnki asks for an OpenAI API key. The key is entered through a
+masked field and stored outside the repository in the current user's
+configuration directory. On Linux, the default location is
 ~/.config/autoanki/openai_api_key. The directory and file use owner-only
 permissions. Use the "API key" menu to replace or forget the saved key.
 
@@ -284,16 +295,18 @@ precedence over the saved key.
 Opening the interface, inspecting a source, estimating source cost, and
 preparing a local file do not call the OpenAI card API. Manual requests start
 only after "Generate and import" is clicked. Source requests additionally
-require a completed estimate and the paid-authorization checkbox. Codex
+require a completed estimate and the provider-appropriate authorization
+checkbox. Codex
 Retrieve is a separate, explicitly authorized network action.
 
 For Manual Input, generation failure or an incomplete/refused response is
 shown without an automatic retry; a new paid request occurs only if the user
 chooses Retry. From Source adds bounded automatic retries only for transient
 connection/time-out, HTTP 429, and HTTP 5xx failures. Invalid source responses
-stop for inspection and an explicitly authorized retry. The OpenAI client's
-own retry layer is disabled in both workflows. Anki import failures retain the
-generated package and never require regenerating successful OpenAI output.
+stop for inspection unless Automatic repair was selected. Paid OpenAI
+automatic repair is limited to three tiny pair repairs. The OpenAI client's own retry
+layer is disabled in both workflows. Anki import failures retain the generated
+package and never require regenerating successful provider output.
 
 Automatic Anki import:
 
@@ -369,5 +382,6 @@ before distributing it. On Windows, settings and secrets live in
 
 This base build installs only `requirements.txt`; it does not bundle the large
 optional CKIP/PyTorch/Jieba tokenizer stack, Hugging Face model cache, Codex
-CLI, or processed Daodejing/Journey corpora. Those assets require an extended
+CLI, or processed Daodejing/Journey corpora.
+Those assets require separate installation or an extended
 packaging/distribution plan. This limitation does not affect Manual Input.

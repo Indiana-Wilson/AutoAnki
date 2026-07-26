@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"way; principle; doctrine\",\"Dictionary Meaning (English)\":\"The fundamental, ineffable principle or path of the universe, beyond human comprehension and expression.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"philosophical, classical\",\"Nuance (English)\":\"Implies transcendence, inexpressibility, and universality.\"},\"additional_senses\":[{\"Translation (English)\":\"to speak; to say\",\"Dictionary Meaning (English)\":\"To articulate or express verbally.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"verb\",\"Register (English)\":\"classical\",\"Nuance (English)\":\"Often used in the context of communication or discourse.\",\"Sentences\":[\"道者，言也。\",\"吾道不行，已矣夫！\",\"子曰：道千乘之国，敬事而信。\",\"道之以德，齐之以礼。\"],\"Sentence Translations (English)\":[\"The way is speech.\",\"My way will not be followed; it is over!\",\"The Master said: To govern a state of a thousand chariots, be reverent in your duties and trustworthy.\",\"Govern by virtue, regulate by ritual.\"]}],\"occurrence_sense_indices\":[0,1]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;\" }]}",
+  "received_at": "2026-07-26T07:09:16.536476+00:00",
+  "response_id": "ollama-43f8ee95b928984555dd37b3",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2849,
+    "output_tokens": 344,
+    "reasoning_tokens": 0,
+    "total_tokens": 3193,
+    "uncached_input_tokens": 2849,
+    "visible_output_tokens": 344,
+    "web_search_calls": 0
+  }
+}

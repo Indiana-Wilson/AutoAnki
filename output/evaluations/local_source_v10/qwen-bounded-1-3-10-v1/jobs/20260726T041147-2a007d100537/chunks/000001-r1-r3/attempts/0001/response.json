@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"the Way\",\"Dictionary Meaning (English)\":\"The fundamental principle or force underlying the universe, often described as ineffable and beyond human comprehension.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"archaic philosophical\",\"Nuance (English)\":\"Implies transcendence, mystery, and a metaphysical origin.\"},\"additional_senses\":[{\"Translation (English)\":\"to go; to travel\",\"Dictionary Meaning (English)\":\"To move from one place to another, often used in the context of physical movement or journey.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"verb\",\"Register (English)\":\"archaic literary\",\"Nuance (English)\":\"Implies a directional or purposeful motion.\",\"Sentences\":[\"人道千里，不辭辛苦。\",\"舟行水上，順流而道。\",\"師徒相隨，共赴前道。\",\"風起雲湧，道無定所。\"],\"Sentence Translations (English)\":[\"A person travels a thousand miles, not hesitating to endure hardship.\",\"The boat moves on the water, flowing with the current.\",\"The teacher and disciples follow each other, heading together toward the destination.\",\"The wind rises and clouds gather; the path has no fixed location.\"]}]},{\"rank\":2,\"contextual_sense\":{\"Translation (English)\":\"can; may\",\"Dictionary Meaning (English)\":\"Indicates possibility or ability to perform an action, often used in the context of capability or permission.\",\"Pronunciation (English)\":\"kě\",\"Part of Speech (English)\":\"auxiliary verb\",\"Register (English)\":\"archaic literary\",\"Nuance (English)\":\"Suggests a conditional or potential state of being.\"},\"additional_senses\":[]},{\"rank\":3,\"contextual_sense\":{\"Translation (English)\":\"not; is not\",\"Dictionary Meaning (English)\":\"Used to negate a statement, indicating the absence or negation of a quality or state.\",\"Pronunciation (English)\":\"fēi\",\"Part of Speech (English)\":\"adverb\",\"Register (English)\":\"archaic literary\",\"Nuance (English)\":\"Emphasizes contrast or contradiction with what is being denied.\"},\"additional_senses\":[]}],\n\"source_context_translations\":[]}",
+  "received_at": "2026-07-26T04:13:53.459822+00:00",
+  "response_id": "ollama-d370611ffe5b18a8c6298df7",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2157,
+    "output_tokens": 491,
+    "reasoning_tokens": 0,
+    "total_tokens": 2648,
+    "uncached_input_tokens": 2157,
+    "visible_output_tokens": 491,
+    "web_search_calls": 0
+  }
+}

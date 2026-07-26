@@ -1,0 +1,276 @@
+{
+  "anki_mutation_performed": false,
+  "created_at": "2026-07-26T04:10:37.955916+00:00",
+  "estimate": {
+    "assumptions": {
+      "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+      "automatic_repair_enabled": true,
+      "automatic_repair_max_requests": 5,
+      "automatic_repair_reserve_aud": 0.0,
+      "automatic_repair_reserve_basis": "conservative upper reserve if every base request uses all authorized micro-repair dispatches at up to 64 example pairs per call; excluded from headline and range",
+      "automatic_repair_reserve_input_tokens": 15200,
+      "automatic_repair_reserve_output_tokens": 4860,
+      "automatic_repair_reserve_usd": 0.0,
+      "central_cache_assumption": "the first identical prompt/schema prefix is cold and later eligible prefixes are cached; payloads and dynamic schemas remain uncached",
+      "cold_input_usd": 0.0,
+      "context_deduplication_scope": "within each request",
+      "estimate_scenarios": "empirical low/central/high response-shape assumptions; not an API guarantee",
+      "estimated_cache_write_input_tokens": 0,
+      "estimated_cached_input_tokens": 0,
+      "estimated_uncached_input_tokens": 2863,
+      "example_sentence_tokens_per_sense": 72,
+      "example_translation_tokens_per_sense": 72,
+      "execution_mode": "standard",
+      "field_output_tokens_per_sense": {
+        "dictionary_meaning": 42,
+        "nuance": 20,
+        "part_of_speech": 7,
+        "pronunciation": 10,
+        "register": 10,
+        "translation": 12
+      },
+      "high_input_assumption": "all input tokens are cold",
+      "largest_request_estimated_input_tokens": 2863,
+      "largest_request_estimated_output_tokens": 1175,
+      "largest_request_high_output_tokens": 1957,
+      "largest_request_high_total_tokens": 4820,
+      "model_context_window_tokens": 400000,
+      "model_max_input_tokens": 272000,
+      "model_max_output_tokens": 128000,
+      "output_shape": {
+        "additional_senses_include_generated_examples": true,
+        "additional_senses_per_word": {
+          "central": 1.0,
+          "high": 2.0,
+          "low": 0.5
+        },
+        "contextual_senses_include_generated_examples": false,
+        "contextual_senses_per_word": 1.0,
+        "source_context_translation_token_ratio": {
+          "central": 1.0,
+          "high": 1.5,
+          "low": 0.75
+        },
+        "source_context_translations": "one output translation per deduplicated context"
+      },
+      "output_tokens": {
+        "central": 1175,
+        "high": 1957,
+        "low": 785
+      },
+      "pricing": {
+        "cached_input_usd_per_million": null,
+        "input_usd_per_million": 0.0,
+        "label": "Local Ollama Q4_K_M · no API charge",
+        "model": "ollama/qwen3:14b",
+        "output_usd_per_million": 0.0
+      },
+      "prompt_cache_minimum_tokens": 1024,
+      "prompt_tokens_per_request": 2138,
+      "reasoning_effort": "none",
+      "reasoning_output_reserve_multiplier": 1.0,
+      "reasoning_output_reserve_multipliers": {
+        "central": 1.0,
+        "high": 1.0,
+        "low": 1.0
+      },
+      "request_protocol": "v10",
+      "response_shape": "source_contextual_lexical_plus_additional",
+      "schema_estimation_mode": "per_chunk_exact",
+      "schema_tokens_by_chunk": {
+        "000001-r1-r3": 541
+      },
+      "schema_tokens_per_request": 541,
+      "shared_cache_prefix_tokens_per_later_request": 0,
+      "token_estimator": "deterministic character-class approximation; no API call",
+      "translation_memory_hit_count": 0,
+      "translation_memory_sha256": null,
+      "usd_to_aud_rate": 1.4336917562724014,
+      "visible_output_tokens": {
+        "central": 1175,
+        "high": 1957,
+        "low": 785
+      },
+      "web_search_enabled": false,
+      "web_search_high_content_tokens_per_call": 0,
+      "web_search_high_cost_usd": 0.0,
+      "web_search_max_calls_per_request": 0,
+      "web_search_tool_usd_per_call": 0.0
+    },
+    "authorization_fingerprint": "fa5bdc4cefd97335788e3b52a9ff7f6b435c6d3b165dc6621fdfef4d66c63645",
+    "automatic_repair": true,
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "candidate_count": 3,
+    "chunk_size": 3,
+    "context_mode": "sentence",
+    "estimated_cache_write_input_tokens": 0,
+    "estimated_cache_write_input_usd": 0.0,
+    "estimated_cached_input_tokens": 0,
+    "estimated_cached_input_usd": 0.0,
+    "estimated_cost_aud": 0.0,
+    "estimated_cost_high_aud": 0.0,
+    "estimated_cost_high_usd": 0.0,
+    "estimated_cost_low_aud": 0.0,
+    "estimated_cost_low_usd": 0.0,
+    "estimated_cost_usd": 0.0,
+    "estimated_input_tokens": 2863,
+    "estimated_input_usd": 0.0,
+    "estimated_output_tokens": 1175,
+    "estimated_output_usd": 0.0,
+    "estimated_total_usd": 0.0,
+    "estimated_uncached_input_tokens": 2863,
+    "estimated_uncached_input_usd": 0.0,
+    "excluded_candidate_count": 0,
+    "execution_mode": "standard",
+    "high_total_usd": 0.0,
+    "input_tokens": 2863,
+    "largest_request_high_output_tokens": 1957,
+    "largest_request_high_total_tokens": 4820,
+    "largest_request_input_tokens": 2863,
+    "largest_request_output_tokens": 1175,
+    "local_model": true,
+    "low_total_usd": 0.0,
+    "max_automatic_repairs": 5,
+    "model": "ollama/qwen3:14b",
+    "model_runtime_snapshot": {
+      "base_url": "http://127.0.0.1:11434",
+      "digest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+      "family": "qwen3",
+      "inference_policy": {
+        "automatic_repair_temperature_schedule": [
+          0.3,
+          0.4,
+          0.5,
+          0.6,
+          0.7
+        ],
+        "keep_alive": "10m",
+        "num_ctx": 8192,
+        "repeat_penalty": 1.05,
+        "schema_version": 2,
+        "seed_policy": "sha256(job_id,chunk_id,attempt,model_id)",
+        "temperature": 0.2,
+        "top_k": 40,
+        "top_p": 0.9
+      },
+      "model_id": "ollama/qwen3:14b",
+      "modified_at": "2026-07-26T12:26:22.798414018+10:00",
+      "ollama_version": "0.32.1",
+      "parameter_size": "14.8B",
+      "provider": "ollama",
+      "provider_model": "qwen3:14b",
+      "quantization_level": "Q4_K_M",
+      "schema_version": 1,
+      "size": 9276198565
+    },
+    "original_candidate_count": 944,
+    "output_tokens": 1175,
+    "payload_tokens": 184,
+    "plan_id": "e68f2cbac5acae6d75c5eeb3",
+    "prefix_omitted_candidate_count": 941,
+    "prefix_unique_candidate_count": 3,
+    "pricing_label": "Local Ollama Q4_K_M · no API charge",
+    "prompt_tokens": 2138,
+    "provider": "ollama",
+    "reasoning_effort": "none",
+    "request_contract_sha256": "1d2b5ceb52998a0a6aef3fb530786455bb5c8a80e0fcb25d50c796a874456ca2",
+    "request_count": 1,
+    "request_limit_warning": null,
+    "request_protocol": "v10",
+    "schema_tokens": 541,
+    "source_key": "daodejing_wang_bi",
+    "source_name": "道德經",
+    "source_prefix_token_count": 4,
+    "source_prefix_token_limit": 4,
+    "translation_memory_by_chunk": {
+      "000001-r1-r3": {}
+    },
+    "translation_memory_hit_count": 0,
+    "uncached_input_tokens": 2863,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "word_count": 3
+  },
+  "final_validation_passed": null,
+  "kind": "local_source_v10_evaluation_stage",
+  "model": "ollama/qwen3:14b",
+  "model_runtime_snapshot": {
+    "base_url": "http://127.0.0.1:11434",
+    "digest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+    "family": "qwen3",
+    "inference_policy": {
+      "automatic_repair_temperature_schedule": [
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7
+      ],
+      "keep_alive": "10m",
+      "num_ctx": 8192,
+      "repeat_penalty": 1.05,
+      "schema_version": 2,
+      "seed_policy": "sha256(job_id,chunk_id,attempt,model_id)",
+      "temperature": 0.2,
+      "top_k": 40,
+      "top_p": 0.9
+    },
+    "model_id": "ollama/qwen3:14b",
+    "modified_at": "2026-07-26T12:26:22.798414018+10:00",
+    "ollama_version": "0.32.1",
+    "parameter_size": "14.8B",
+    "provider": "ollama",
+    "provider_model": "qwen3:14b",
+    "quantization_level": "Q4_K_M",
+    "schema_version": 1,
+    "size": 9276198565
+  },
+  "package_or_import_attempted": false,
+  "pipeline_id": "default-english-vocabulary",
+  "plan": {
+    "chunk_ids": [
+      "000001-r1-r3"
+    ],
+    "chunk_word_counts": [
+      3
+    ],
+    "excluded_word_count": 0,
+    "plan_id": "e68f2cbac5acae6d75c5eeb3",
+    "prefix_unique_word_count": 3,
+    "ranks": [
+      1,
+      2,
+      3
+    ],
+    "selected_word_count": 3,
+    "source_prefix_token_count": 4,
+    "terms": [
+      "道",
+      "可",
+      "非"
+    ]
+  },
+  "schema_version": 1,
+  "selection": {
+    "expected_ranks": [
+      1,
+      2,
+      3
+    ],
+    "expected_terms": [
+      "道",
+      "可",
+      "非"
+    ],
+    "requested_unique_count": 3,
+    "source_prefix_token_limit": 4
+  },
+  "source": {
+    "build_id": "36a6c2bee21385f4c53ca3a5",
+    "key": "daodejing_wang_bi",
+    "language_key": "classical_chinese_wang_bi",
+    "run_path": "/home/indiana/Work/Projects/AutoAnki/output/corpora/daodejing_wang_bi/runs/36a6c2bee21385f4c53ca3a5",
+    "title": "道德經"
+  },
+  "status": "planned"
+}

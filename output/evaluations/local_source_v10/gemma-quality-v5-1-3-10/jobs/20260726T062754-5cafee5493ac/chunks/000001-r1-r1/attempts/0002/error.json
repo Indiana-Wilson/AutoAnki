@@ -1,0 +1,101 @@
+{
+  "message": "The position of each integer must account for the matching trusted context_occurrence in input order.",
+  "status_code": null,
+  "timestamp": "2026-07-26T06:29:26.092615+00:00",
+  "transient": false,
+  "type": "GeneratedCardValidationError",
+  "validation": {
+    "accepted_problem_count": 0,
+    "all_problems_resolved": false,
+    "can_complete_with_manual_acceptance": false,
+    "can_manually_accept": false,
+    "full_retry_required": false,
+    "local_repair_applied": false,
+    "local_repair_count": 0,
+    "local_repairs": [],
+    "non_overrideable_problem_count": 3,
+    "overrideable_problem_count": 0,
+    "problem_count": 3,
+    "problems": [
+      {
+        "accepted": false,
+        "actual": 1,
+        "card_index": null,
+        "card_number": null,
+        "code": "context_occurrence_sense_count_mismatch",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": 2,
+        "field_name": "occurrence_sense_indices",
+        "location": "Response → term_results → rank 1 → occurrence_sense_indices",
+        "message": "The position of each integer must account for the matching trusted context_occurrence in input order.",
+        "overrideable": false,
+        "path": "$.term_results[0].occurrence_sense_indices",
+        "problem_id": "context_occurrence_sense_count_mismatch:24f04dacb9f71827",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "source_rank": 1,
+        "suggestion": "Repair this rank with exactly one sense index for each trusted occurrence.",
+        "term": "道",
+        "title": "Context-occurrence sense map has the wrong length"
+      },
+      {
+        "accepted": false,
+        "actual": "This [way] cannot be spoken.",
+        "card_index": 1,
+        "card_number": 2,
+        "code": "missing_exact_form_source_term",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "At least one literal occurrence of 道.",
+        "field_name": "Sentences",
+        "location": "Card 2 (“道”) → Sentences → item 2",
+        "message": "Classical Chinese does not require inflection here, so every generated additional-sense example must contain the complete requested lexical item at least once.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0][\"Sentences\"][1]",
+        "problem_id": "missing_exact_form_source_term:ba3af375c396df00",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "source_rank": 1,
+        "suggestion": "Retry with a natural example that uses the complete requested term, not only a component or synonym.",
+        "term": "道",
+        "title": "Example omits the complete source term"
+      },
+      {
+        "accepted": false,
+        "actual": "He spoke the principle. (Note: In this context, 'dao' is used as a verb meaning 'to speak/state')",
+        "card_index": 1,
+        "card_number": 2,
+        "code": "missing_exact_form_source_term",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "At least one literal occurrence of 道.",
+        "field_name": "Sentences",
+        "location": "Card 2 (“道”) → Sentences → item 4",
+        "message": "Classical Chinese does not require inflection here, so every generated additional-sense example must contain the complete requested lexical item at least once.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0][\"Sentences\"][3]",
+        "problem_id": "missing_exact_form_source_term:c9e37e60f9114c15",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "source_rank": 1,
+        "suggestion": "Retry with a natural example that uses the complete requested term, not only a component or synonym.",
+        "term": "道",
+        "title": "Example omits the complete source term"
+      }
+    ],
+    "remaining_problem_count": 3,
+    "structurally_valid": false,
+    "syntax_valid": true,
+    "valid": false
+  }
+}

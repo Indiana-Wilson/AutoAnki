@@ -217,6 +217,13 @@ class AnkiConnectClient:
     def is_local(self):
         return is_local_anki_connect_url(self.url)
 
+    def _wrong_service_message(self, detail):
+        return (
+            f"The configured address {self.url} responded, but it did not "
+            f"return an AnkiConnect response ({detail}). Another service may "
+            "be using that port; configure AnkiConnect and AutoAnki to use "
+            "the same free port.")
+
     def invoke(self, action, **params):
         payload = {
             "action": action,
@@ -236,26 +243,50 @@ class AnkiConnectClient:
                     request,
                     timeout=self.timeout) as response:
                 result = json.load(response)
+        except urllib.error.HTTPError as error:
+            server = (
+                error.headers.get("Server")
+                if error.headers is not None
+                else None)
+            detail = f"HTTP {error.code}"
+            if server:
+                detail += f" from {server}"
+            raise AnkiConnectResponseError(
+                self._wrong_service_message(detail)) from error
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            raise AnkiConnectResponseError(
+                self._wrong_service_message("invalid JSON")) from error
         except (OSError, urllib.error.URLError) as error:
             raise AnkiConnectUnavailableError(
                 "Could not connect to AnkiConnect.") from error
 
         if not isinstance(result, dict):
             raise AnkiConnectResponseError(
-                "AnkiConnect returned an invalid response.")
+                self._wrong_service_message("invalid JSON shape"))
         if "error" not in result or "result" not in result:
             raise AnkiConnectResponseError(
-                "AnkiConnect returned an incomplete response.")
+                self._wrong_service_message("incomplete JSON object"))
         if result["error"] is not None:
             raise AnkiConnectResponseError(
                 f"AnkiConnect error: {result['error']}")
         return result["result"]
 
-    def is_available(self):
+    def is_available(self, *, raise_response_errors=False):
         try:
-            return self.invoke("version") >= ANKI_CONNECT_VERSION
-        except AnkiIntegrationError:
+            version = self.invoke("version")
+        except AnkiConnectResponseError:
+            if raise_response_errors:
+                raise
             return False
+        except AnkiConnectUnavailableError:
+            return False
+        if isinstance(version, bool) or not isinstance(version, int):
+            if raise_response_errors:
+                raise AnkiConnectResponseError(
+                    self._wrong_service_message(
+                        "invalid version result"))
+            return False
+        return version >= ANKI_CONNECT_VERSION
 
 
 def get_anki_command():
@@ -383,7 +414,7 @@ def ensure_anki_running(
         timeout=STARTUP_TIMEOUT_SECONDS,
         poll_interval=POLL_INTERVAL_SECONDS,
         sleep=time.sleep):
-    if client.is_available():
+    if client.is_available(raise_response_errors=True):
         return False
 
     if getattr(client, "is_local", True) is False:
@@ -400,7 +431,7 @@ def ensure_anki_running(
         if not window_minimized:
             window_minimized = minimize_new_windows(
                 existing_window_ids)
-        if client.is_available():
+        if client.is_available(raise_response_errors=True):
             return True
         sleep(poll_interval)
 

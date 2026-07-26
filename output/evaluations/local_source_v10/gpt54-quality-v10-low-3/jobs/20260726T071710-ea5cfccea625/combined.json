@@ -1,0 +1,174 @@
+{
+  "cards": [
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "the fundamental course or principle that underlies and orders reality, conduct, or the world",
+      "Nuance (English)": "In this text it is a technical philosophical term, not an ordinary road or mere method.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "Classical Chinese, especially early philosophical text in the Laozi/Wang Bi recension",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+      "Translation (English)": "the Way"
+    },
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "a physical way or route for travel, movement, or passage",
+      "Nuance (English)": "Concrete, spatial sense rather than the philosophical one.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "The road lies ahead.|Proceed along the path.|There is a spring by the road.|The cart goes out onto the road.",
+      "Sentences": "大<strong>道</strong>在前。|循<strong>道</strong>而行。|<strong>道</strong>旁有泉。|車出<strong>道</strong>中。",
+      "Translation (English)": "road; path"
+    },
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "to speak of, state, or utter something",
+      "Nuance (English)": "Often introduces or reports speech, explanation, or description.",
+      "Part of Speech (English)": "verb",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "The minister stated the reason.|The teacher explained the ancient meaning.|He spoke of right and wrong.|The elder gave his name.",
+      "Sentences": "臣<strong>道</strong>其故。|師<strong>道</strong>古義。|彼<strong>道</strong>是非。|老者<strong>道</strong>其名。",
+      "Translation (English)": "say"
+    },
+    {
+      "Classical Chinese": "可",
+      "Dictionary Meaning (English)": "to be able to do something, or to be permitted or suitable to do it",
+      "Nuance (English)": "Here it marks potential or possibility, not approval as an adjective.",
+      "Part of Speech (English)": "modal verb",
+      "Pronunciation (English)": "kě",
+      "Register (English)": "Classical Chinese, especially the Laozi/Wang Bi recension in early philosophical prose",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S道<strong>可</strong>道，非常道，名可名，非常名；",
+      "Translation (English)": "can; may"
+    },
+    {
+      "Classical Chinese": "可",
+      "Dictionary Meaning (English)": "deserving approval, fitting, or allowed under the relevant standard",
+      "Nuance (English)": "Describes what is fit to be accepted or allowed, not mere ability.",
+      "Part of Speech (English)": "adjective",
+      "Pronunciation (English)": "kě",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "This plan is workable.|His words are acceptable.|This person is pleasant to approach.|His proposal can be followed.",
+      "Sentences": "此策<strong>可</strong>行。|其言<strong>可</strong>取。|斯人<strong>可</strong>親。|其議<strong>可</strong>從。",
+      "Translation (English)": "acceptable; permissible"
+    },
+    {
+      "Classical Chinese": "非",
+      "Dictionary Meaning (English)": "a marker of negation that denies a predicate, quality, or relation",
+      "Nuance (English)": "Used here as straightforward verbal negation, not as a noun or adjective.",
+      "Part of Speech (English)": "adverb",
+      "Pronunciation (English)": "fēi",
+      "Register (English)": "Classical Chinese, especially the Laozi/Wang Bi recension in early philosophical prose",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+      "Sentences": "S道可道，<strong>非</strong>常道，名可名，非常名；",
+      "Translation (English)": "not"
+    },
+    {
+      "Classical Chinese": "非",
+      "Dictionary Meaning (English)": "being contrary to what is right, proper, or true",
+      "Nuance (English)": "Used predicatively to judge something as erroneous or contrary to the proper way.",
+      "Part of Speech (English)": "adjective",
+      "Pronunciation (English)": "fēi",
+      "Register (English)": "Classical Chinese",
+      "Sentence Translations (English)": "That account is wrong.|Those words are mistaken.|That course is not right.|This action is not good.",
+      "Sentences": "其說<strong>非</strong>也。|是言<strong>非</strong>矣。|彼道<strong>非</strong>正。|此舉<strong>非</strong>善。",
+      "Translation (English)": "wrong; mistaken"
+    }
+  ],
+  "chunks": [
+    {
+      "chunk_id": "000001-r1-r3",
+      "output": {
+        "cards": [
+          {
+            "Classical Chinese": "道",
+            "Dictionary Meaning (English)": "the fundamental course or principle that underlies and orders reality, conduct, or the world",
+            "Nuance (English)": "In this text it is a technical philosophical term, not an ordinary road or mere method.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese, especially early philosophical text in the Laozi/Wang Bi recension",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+            "Translation (English)": "the Way"
+          },
+          {
+            "Classical Chinese": "道",
+            "Dictionary Meaning (English)": "a physical way or route for travel, movement, or passage",
+            "Nuance (English)": "Concrete, spatial sense rather than the philosophical one.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "The road lies ahead.|Proceed along the path.|There is a spring by the road.|The cart goes out onto the road.",
+            "Sentences": "大<strong>道</strong>在前。|循<strong>道</strong>而行。|<strong>道</strong>旁有泉。|車出<strong>道</strong>中。",
+            "Translation (English)": "road; path"
+          },
+          {
+            "Classical Chinese": "道",
+            "Dictionary Meaning (English)": "to speak of, state, or utter something",
+            "Nuance (English)": "Often introduces or reports speech, explanation, or description.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "The minister stated the reason.|The teacher explained the ancient meaning.|He spoke of right and wrong.|The elder gave his name.",
+            "Sentences": "臣<strong>道</strong>其故。|師<strong>道</strong>古義。|彼<strong>道</strong>是非。|老者<strong>道</strong>其名。",
+            "Translation (English)": "say"
+          },
+          {
+            "Classical Chinese": "可",
+            "Dictionary Meaning (English)": "to be able to do something, or to be permitted or suitable to do it",
+            "Nuance (English)": "Here it marks potential or possibility, not approval as an adjective.",
+            "Part of Speech (English)": "modal verb",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese, especially the Laozi/Wang Bi recension in early philosophical prose",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S道<strong>可</strong>道，非常道，名可名，非常名；",
+            "Translation (English)": "can; may"
+          },
+          {
+            "Classical Chinese": "可",
+            "Dictionary Meaning (English)": "deserving approval, fitting, or allowed under the relevant standard",
+            "Nuance (English)": "Describes what is fit to be accepted or allowed, not mere ability.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "This plan is workable.|His words are acceptable.|This person is pleasant to approach.|His proposal can be followed.",
+            "Sentences": "此策<strong>可</strong>行。|其言<strong>可</strong>取。|斯人<strong>可</strong>親。|其議<strong>可</strong>從。",
+            "Translation (English)": "acceptable; permissible"
+          },
+          {
+            "Classical Chinese": "非",
+            "Dictionary Meaning (English)": "a marker of negation that denies a predicate, quality, or relation",
+            "Nuance (English)": "Used here as straightforward verbal negation, not as a noun or adjective.",
+            "Part of Speech (English)": "adverb",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese, especially the Laozi/Wang Bi recension in early philosophical prose",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
+            "Sentences": "S道可道，<strong>非</strong>常道，名可名，非常名；",
+            "Translation (English)": "not"
+          },
+          {
+            "Classical Chinese": "非",
+            "Dictionary Meaning (English)": "being contrary to what is right, proper, or true",
+            "Nuance (English)": "Used predicatively to judge something as erroneous or contrary to the proper way.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese",
+            "Sentence Translations (English)": "That account is wrong.|Those words are mistaken.|That course is not right.|This action is not good.",
+            "Sentences": "其說<strong>非</strong>也。|是言<strong>非</strong>矣。|彼道<strong>非</strong>正。|此舉<strong>非</strong>善。",
+            "Translation (English)": "wrong; mistaken"
+          }
+        ]
+      }
+    }
+  ],
+  "complete": true,
+  "completed_chunk_count": 1,
+  "job_id": "20260726T071710-ea5cfccea625",
+  "plan_id": "e68f2cbac5acae6d75c5eeb3",
+  "schema_version": 1,
+  "source_key": "daodejing_wang_bi",
+  "total_chunk_count": 1
+}

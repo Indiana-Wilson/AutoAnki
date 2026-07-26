@@ -1,7 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -38,14 +38,31 @@ def source_request_stub():
 
 
 class SourceGenerationModeGuiTests(unittest.TestCase):
-    def test_lightweight_source_request_stubs_receive_safe_v9_defaults(self):
+    def test_model_options_do_not_offer_retired_luna(self):
+        model_ids = tuple(
+            key for key, _label in gui.SOURCE_MODEL_OPTIONS)
+
+        self.assertNotIn("gpt-5.6-luna", model_ids)
+        self.assertEqual(model_ids[0], "gpt-5.4-mini")
+
+    def test_protocol_options_put_v10_before_both_rollbacks(self):
+        self.assertEqual(
+            tuple(key for key, _label in gui.SOURCE_PROTOCOL_OPTIONS),
+            ("v10", "v9", "v8"))
+        self.assertIn("local-first", gui.SOURCE_PROTOCOL_OPTIONS[0][1])
+        self.assertIn("rollback", gui.SOURCE_PROTOCOL_OPTIONS[1][1])
+        self.assertIn("rollback", gui.SOURCE_PROTOCOL_OPTIONS[2][1])
+
+    def test_lightweight_source_request_stubs_receive_safe_v10_defaults(self):
         app = source_request_stub()
 
         request = app._source_request()
 
-        self.assertEqual(request["request_protocol"], "v9")
-        self.assertEqual(request["reasoning_effort"], "none")
+        self.assertEqual(request["request_protocol"], "v10")
+        self.assertEqual(request["reasoning_effort"], "low")
         self.assertEqual(request["execution_mode"], "standard")
+        self.assertEqual(request["model"], "gpt-5.4-mini")
+        self.assertFalse(request["automatic_repair"])
 
     def test_source_request_maps_explicit_economy_and_reasoning_choices(self):
         app = source_request_stub()
@@ -81,12 +98,41 @@ class SourceGenerationModeGuiTests(unittest.TestCase):
         app.source_paid_authorized.set.assert_called_once_with(False)
         app._schedule_source_estimate.assert_called_once_with()
 
+    def test_switching_from_v8_to_v10_restores_low_reasoning(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.source_request_protocol_label = variable(
+            dict(gui.SOURCE_PROTOCOL_OPTIONS)["v8"])
+        app.source_reasoning_label = variable(
+            dict(gui.SOURCE_REASONING_OPTIONS)["none"])
+        app.source_reasoning_selector = MagicMock()
+        app.source_paid_authorized = MagicMock()
+        app._schedule_source_estimate = MagicMock()
+
+        app._source_protocol_changed()
+        app.source_request_protocol_label.get.return_value = (
+            dict(gui.SOURCE_PROTOCOL_OPTIONS)["v10"])
+        app._source_protocol_changed()
+
+        self.assertEqual(
+            app.source_reasoning_label.set.call_args_list,
+            [
+                call(dict(gui.SOURCE_REASONING_OPTIONS)["low"]),
+                call(dict(gui.SOURCE_REASONING_OPTIONS)["low"]),
+            ])
+        self.assertEqual(
+            app.source_reasoning_selector.configure.call_args_list,
+            [
+                call(state=gui.tk.DISABLED),
+                call(state="readonly"),
+            ])
+
     def test_economy_disables_irrelevant_rate_controls_and_updates_action(self):
         app = object.__new__(gui.AutoAnkiApp)
         app.source_execution_label = variable(
             dict(gui.SOURCE_EXECUTION_OPTIONS)["economy"])
         app.source_concurrency_entry = MagicMock()
         app.source_stagger_entry = MagicMock()
+        app.source_rate_notice_label = MagicMock()
         app.source_generate_button = MagicMock()
         app.source_paid_authorized = MagicMock()
         app._schedule_source_estimate = MagicMock()
@@ -99,8 +145,23 @@ class SourceGenerationModeGuiTests(unittest.TestCase):
             state=gui.tk.DISABLED)
         app.source_generate_button.configure.assert_called_once_with(
             text="Submit Economy Batch")
+        notice = app.source_rate_notice_label.configure.call_args.kwargs["text"]
+        self.assertIn("asynchronous Batch", notice)
+        self.assertIn("do not apply", notice)
         app.source_paid_authorized.set.assert_called_once_with(False)
         app._schedule_source_estimate.assert_called_once_with()
+
+    def test_economy_request_ignores_invalid_disabled_rate_fields(self):
+        app = source_request_stub()
+        app.source_execution_label = variable(
+            dict(gui.SOURCE_EXECUTION_OPTIONS)["economy"])
+        app.source_concurrency = variable("")
+        app.source_request_stagger_ms = variable("not a number")
+
+        request = app._source_request()
+
+        self.assertEqual(request["concurrency"], 1)
+        self.assertEqual(request["request_stagger_ms"], 0)
 
     def test_estimate_shows_central_price_range_cache_and_pricing_mode(self):
         price, detail = gui.format_source_estimate({
@@ -112,15 +173,57 @@ class SourceGenerationModeGuiTests(unittest.TestCase):
             "input_tokens": 2_400,
             "output_tokens": 12_000,
             "estimated_cached_input_tokens": 1_200,
+            "estimated_cache_write_input_tokens": 300,
+            "translation_memory_hit_count": 4,
+            "model": "gpt-5.4-mini",
+            "automatic_repair": True,
+            "max_automatic_repairs": 3,
             "pricing_label": "Batch API (50% token rates)",
+            "assumptions": {
+                "request_protocol": "v10",
+                "reasoning_effort": "none",
+                "execution_mode": "economy",
+                "automatic_repair_reserve_aud": 2.50,
+                "automatic_repair_max_requests": 12,
+            },
         })
 
         self.assertEqual(price, "A$1.25 expected")
+        self.assertIn("compact v10 local-first", detail)
+        self.assertIn("gpt-5.4-mini", detail)
+        self.assertIn("no reasoning", detail)
+        self.assertIn("Economy Batch", detail)
         self.assertIn("modelled range A$0.90–A$1.80", detail)
         self.assertIn(
             "1,200 input tokens expected at cache-read rate",
             detail)
+        self.assertIn(
+            "300 input tokens expected at cache-write rate",
+            detail)
+        self.assertIn("4 exact source translations reused locally", detail)
+        self.assertIn("automatic repair enabled", detail)
+        self.assertIn(
+            "worst-case optional repair reserve A$2.50",
+            detail)
+        self.assertIn("at most 12 calls", detail)
         self.assertIn("Batch API (50% token rates)", detail)
+        self.assertNotIn("automatic transient retries", detail)
+
+    def test_estimate_names_each_protocol_without_losing_rollback_status(self):
+        for protocol, expected in (
+                ("v10", "compact v10 local-first"),
+                ("v9", "compact v9 rollback"),
+                ("v8", "legacy v8 rollback")):
+            with self.subTest(protocol=protocol):
+                _price, detail = gui.format_source_estimate({
+                    "assumptions": {
+                        "request_protocol": protocol,
+                        "reasoning_effort": "none",
+                        "execution_mode": "standard",
+                    },
+                })
+
+                self.assertIn(expected, detail)
 
 
 if __name__ == "__main__":

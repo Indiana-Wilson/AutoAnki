@@ -247,6 +247,7 @@ class EconomyBatchTests(unittest.TestCase):
                 "attempt_count": 1,
                 "input_tokens": 100,
                 "cached_input_tokens": 20,
+                "cache_write_input_tokens": 0,
                 "uncached_input_tokens": 80,
                 "output_tokens": 40,
                 "reasoning_tokens": 5,

@@ -565,27 +565,35 @@ class PromptComponentTests(unittest.TestCase):
             {
                 "core",
                 "core_source_v9",
+                "core_source_v10",
                 "ending",
                 "directions/context",
                 "directions/context_arrays",
                 "directions/context_arrays_v8",
                 "directions/context_arrays_v9",
+                "directions/context_arrays_v10",
                 "directions/context_classical_chinese",
                 "directions/context_classical_chinese_arrays",
                 "directions/sentence_translations",
                 "directions/sentence_translation_arrays",
                 "directions/sentence_translation_arrays_v9",
+                "directions/sentence_translation_arrays_v10",
                 "source/batch",
                 "source/batch_v9",
+                "source/batch_v10",
                 "source/context_examples",
                 "source/context_examples_v5",
                 "source/context_examples_v6",
                 "source/context_examples_v7",
                 "source/context_examples_v8",
                 "source/context_examples_v9",
+                "source/context_examples_v10",
+                "source/context_examples_v10_memory",
                 "source/final_checks_v8",
                 "source/final_checks_v9",
+                "source/final_checks_v10",
                 "source/web_search",
+                "fields/dictionary_meaning_v10",
                 *{
                     f"fields/{field.key}"
                     for field in pipeline_store.list_field_options()
@@ -707,46 +715,26 @@ class PromptComponentTests(unittest.TestCase):
             enabled=("context", "word_to_meaning"))
         text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
 
-        self.assertEqual(text.count("exactly four short"), 1)
+        self.assertEqual(text.count("exactly three short"), 1)
         self.assertIn(
             "grammatically appropriate inflected form",
             " ".join(text.split()))
+        self.assertNotIn("<strong>", text)
+        self.assertNotIn("emphasis", text.casefold())
         self.assertIn(
-            "wrap EVERY AND ONLY occurrence",
-            " ".join(text.split()))
-        self.assertIn("<strong>", text)
-        self.assertIn(
-            "leave that other occurrence completely untagged",
-            " ".join(text.split()))
-        self.assertIn(
-            "VALID: She <strong>ran</strong> home",
-            " ".join(text.split()))
-        self.assertIn(
-            "INVALID: <strong>She ran home.</strong>",
-            " ".join(text.split()))
-        self.assertIn(
-            "ABSOLUTE OUTPUT REQUIREMENT—NOT OPTIONAL",
-            text)
-        self.assertIn(
-            'four complete, natural English translations in the '
-            '"Sentence Translations (English)" property',
-            " ".join(text.split()))
-        self.assertIn(
-            "translation 1 must translate sentence 1",
+            'three complete, natural English translations in the '
+            '"Sentence Translations (English)" field',
             " ".join(text.split()))
 
-    def test_classical_chinese_context_has_explicit_emphasis_objects(self):
+    def test_classical_chinese_context_requests_plain_examples(self):
         pipeline = language_pipeline(
             "classical_chinese_wang_bi",
             enabled=("context",))
         text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
 
-        self.assertIn(
-            '"Sentences": "動善時。|知善時而動。|失善時則敗。|守其善時。"',
-            text)
-        self.assertIn(
-            "用兵貴<strong>善時</strong>",
-            text)
+        self.assertNotIn("<strong>", text)
+        self.assertIn("exactly three", text)
+        self.assertIn("plain text without HTML", text)
         normalized_text = " ".join(text.split())
         self.assertIn(
             "Generate a distinct set of sentences for every separate sense "

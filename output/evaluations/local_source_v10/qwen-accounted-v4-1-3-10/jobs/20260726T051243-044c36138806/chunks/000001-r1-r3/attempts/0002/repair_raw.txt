@@ -1,0 +1,8 @@
+{
+  "repairs": {
+    "p001": {
+      "sentence": "君子有所為，有所不為。",
+      "translation": "A gentleman acts in accordance with moral duty and refrains from what is not right."
+    }
+  }
+}

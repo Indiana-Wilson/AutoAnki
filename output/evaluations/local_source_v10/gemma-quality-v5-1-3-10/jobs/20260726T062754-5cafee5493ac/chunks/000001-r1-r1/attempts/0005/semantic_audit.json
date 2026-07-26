@@ -1,0 +1,241 @@
+{
+  "audited_at": "2026-07-26T06:31:08.531547+00:00",
+  "candidate_sha256": "cd584eaff12db7c3904ea82336d427174f857ddad07978e7c728e15cdbb95a3b",
+  "context_translation_batch_count": 1,
+  "context_translation_case_count": 1,
+  "context_translation_results": {
+    "complete_passes": [
+      true
+    ],
+    "faithful_passes": [
+      true
+    ],
+    "natural_english_passes": [
+      true
+    ]
+  },
+  "error": null,
+  "example_batch_count": 1,
+  "example_case_count": 4,
+  "example_results": {
+    "historical_grammar_passes": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "standalone_passes": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "target_sense_passes": [
+      false,
+      false,
+      false,
+      false
+    ],
+    "translation_fidelity_passes": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "kind": "local_batched_historical_quality_occurrence_audit",
+  "lexical_batch_count": 1,
+  "lexical_case_count": 2,
+  "lexical_definition_passes": [
+    true,
+    true
+  ],
+  "max_cases_per_batch": 4,
+  "model_id": "ollama/gemma4:12b",
+  "occurrence_assignment_batch_count": 1,
+  "occurrence_assignment_case_count": 2,
+  "occurrence_assignment_enabled": true,
+  "occurrence_assignment_passes": [
+    true,
+    false
+  ],
+  "prompt_sha256": "d2e201350b4e6d6004d65df45cc3e028589ceed5fcb69a330efdfcf30c9cdf4c",
+  "requests": [
+    {
+      "dispatched_at": "2026-07-26T06:30:52.030243+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 384,
+      "model_id": "ollama/gemma4:12b",
+      "provider_model": "gemma4:12b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 1935254196,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 1935254196
+    },
+    {
+      "dispatched_at": "2026-07-26T06:30:59.181227+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 128,
+      "model_id": "ollama/gemma4:12b",
+      "provider_model": "gemma4:12b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 1247717181,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 1247717181
+    },
+    {
+      "dispatched_at": "2026-07-26T06:31:02.184569+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 128,
+      "model_id": "ollama/gemma4:12b",
+      "provider_model": "gemma4:12b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 609322673,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 609322673
+    },
+    {
+      "dispatched_at": "2026-07-26T06:31:05.925588+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 128,
+      "model_id": "ollama/gemma4:12b",
+      "provider_model": "gemma4:12b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 1380801678,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 1380801678
+    }
+  ],
+  "responses": [
+    {
+      "model": "gemma4:12b",
+      "raw_text": "{\"target_sense_passes\":[false, false, false, false], \"historical_grammar_passes\":[true, true, true, true], \"standalone_passes\":[true, true, true, true], \"translation_fidelity_passes\":[false, false, false, false]}",
+      "received_at": "2026-07-26T06:30:59.180687+00:00",
+      "response_id": "ollama-65ecd5a2a69a48bef10c08fd",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 591,
+        "output_tokens": 59,
+        "reasoning_tokens": 0,
+        "total_tokens": 650,
+        "uncached_input_tokens": 591,
+        "visible_output_tokens": 59,
+        "web_search_calls": 0
+      }
+    },
+    {
+      "model": "gemma4:12b",
+      "raw_text": "{\"conservative_definition_passes\": [true, true]}",
+      "received_at": "2026-07-26T06:31:02.184214+00:00",
+      "response_id": "ollama-645d261955b71d216e214dc7",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 590,
+        "output_tokens": 13,
+        "reasoning_tokens": 0,
+        "total_tokens": 603,
+        "uncached_input_tokens": 590,
+        "visible_output_tokens": 13,
+        "web_search_calls": 0
+      }
+    },
+    {
+      "model": "gemma4:12b",
+      "raw_text": "{\"faithful_passes\": [true], \"complete_passes\": [true], \"natural_english_passes\": [true]}",
+      "received_at": "2026-07-26T06:31:05.925026+00:00",
+      "response_id": "ollama-2c006a905ad70505e8b7c62e",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 315,
+        "output_tokens": 27,
+        "reasoning_tokens": 0,
+        "total_tokens": 342,
+        "uncached_input_tokens": 315,
+        "visible_output_tokens": 27,
+        "web_search_calls": 0
+      }
+    },
+    {
+      "model": "gemma4:12b",
+      "raw_text": "{\"occurrence_assignment_passes\": [true, false]}",
+      "received_at": "2026-07-26T06:31:08.531466+00:00",
+      "response_id": "ollama-225b745154a680f81639ff67",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 513,
+        "output_tokens": 13,
+        "reasoning_tokens": 0,
+        "total_tokens": 526,
+        "uncached_input_tokens": 513,
+        "visible_output_tokens": 13,
+        "web_search_calls": 0
+      }
+    }
+  ],
+  "schema_version": 5,
+  "status": "failed"
+}

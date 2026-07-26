@@ -1,0 +1,131 @@
+{
+  "chunk_id": "000002-r6-r10",
+  "contexts": [
+    {
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "end_offset": 16,
+      "mode": "sentence",
+      "section_ids": [
+        "daodejing_wang_bi:chapter:001"
+      ],
+      "sentence_ids": [
+        "daodejing_wang_bi:chapter:001:sentence:00001"
+      ],
+      "start_offset": 0,
+      "text": "道可道，非常道，名可名，非常名；",
+      "word_ranks": [
+        6
+      ]
+    },
+    {
+      "context_id": "source-context-9d763a9d06321236e5f1",
+      "end_offset": 34,
+      "mode": "sentence",
+      "section_ids": [
+        "daodejing_wang_bi:chapter:001"
+      ],
+      "sentence_ids": [
+        "daodejing_wang_bi:chapter:001:sentence:00002"
+      ],
+      "start_offset": 18,
+      "text": "無名，天地之始，有名，萬物之母。",
+      "word_ranks": [
+        7,
+        8,
+        9,
+        10
+      ]
+    }
+  ],
+  "end_rank": 10,
+  "index": 2,
+  "start_rank": 6,
+  "total": 2,
+  "words": [
+    {
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "end_offset": 15,
+      "normalized": "常名",
+      "occurrence_locator": {
+        "after": "；",
+        "before": "道可道，非常道，名可名，非",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "道可道，非常道，名可名，非⟪TARGET⟫常名⟪/TARGET⟫；",
+        "target": "常名"
+      },
+      "rank": 6,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00001",
+      "start_offset": 13,
+      "surface": "常名"
+    },
+    {
+      "context_id": "source-context-9d763a9d06321236e5f1",
+      "end_offset": 19,
+      "normalized": "無",
+      "occurrence_locator": {
+        "after": "名，天地之始，有名，萬物之母。",
+        "before": "",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "⟪TARGET⟫無⟪/TARGET⟫名，天地之始，有名，萬物之母。",
+        "target": "無"
+      },
+      "rank": 7,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00002",
+      "start_offset": 18,
+      "surface": "無"
+    },
+    {
+      "context_id": "source-context-9d763a9d06321236e5f1",
+      "end_offset": 23,
+      "normalized": "天地",
+      "occurrence_locator": {
+        "after": "之始，有名，萬物之母。",
+        "before": "無名，",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "無名，⟪TARGET⟫天地⟪/TARGET⟫之始，有名，萬物之母。",
+        "target": "天地"
+      },
+      "rank": 8,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00002",
+      "start_offset": 21,
+      "surface": "天地"
+    },
+    {
+      "context_id": "source-context-9d763a9d06321236e5f1",
+      "end_offset": 24,
+      "normalized": "之",
+      "occurrence_locator": {
+        "after": "始，有名，萬物之母。",
+        "before": "無名，天地",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "無名，天地⟪TARGET⟫之⟪/TARGET⟫始，有名，萬物之母。",
+        "target": "之"
+      },
+      "rank": 9,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00002",
+      "start_offset": 23,
+      "surface": "之"
+    },
+    {
+      "context_id": "source-context-9d763a9d06321236e5f1",
+      "end_offset": 25,
+      "normalized": "始",
+      "occurrence_locator": {
+        "after": "，有名，萬物之母。",
+        "before": "無名，天地之",
+        "literal_match_ordinal": 1,
+        "marked_excerpt": "無名，天地之⟪TARGET⟫始⟪/TARGET⟫，有名，萬物之母。",
+        "target": "始"
+      },
+      "rank": 10,
+      "section_id": "daodejing_wang_bi:chapter:001",
+      "sentence_id": "daodejing_wang_bi:chapter:001:sentence:00002",
+      "start_offset": 24,
+      "surface": "始"
+    }
+  ]
+}

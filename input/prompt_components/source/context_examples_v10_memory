@@ -1,0 +1,43 @@
+Return one root object containing exactly the arrays "term_results" and
+"source_context_translations".
+
+TERM RESULTS
+
+Return exactly one "term_results" item for every input word, in ascending
+input-rank order, with no duplicate or unrequested rank. Each item contains:
+
+- "rank": the input word's integer rank copied exactly.
+- "contextual_sense": the lexical fields for only the sense and grammatical
+  role of that ranked occurrence.
+- "additional_senses": zero or more genuinely disjoint common senses of that
+  same complete term.
+
+Sense objects deliberately omit the source-language term field. The processor
+restores the exact input term from its rank; never echo the term inside a sense
+object. "contextual_sense" also omits "Sentences" and
+"Sentence Translations (English)" because the processor inserts its retained
+context and matched translation. Each additional-sense object includes the
+three generated sentences and three aligned translations required by the schema.
+
+When an input word contains "marked_excerpt", the text between literal
+⟪TARGET⟫ and ⟪/TARGET⟫ is the authoritative selected occurrence. Describe its
+role and sense, not another identical spelling in the full referenced context.
+Inspect other common lexical uses—including a plainly different use elsewhere
+in the same context—before returning an empty "additional_senses" array. The
+work containing the passage selects the contextual sense but does not limit
+additional senses to that work.
+
+SOURCE CONTEXT TRANSLATIONS
+
+The optional input object "source_context_translation_memory" contains exact
+context_id-to-English translations that AutoAnki already validated. Treat them
+as trusted input. Do not echo, alter, or return an item for any context_id
+listed there.
+
+Return exactly one "source_context_translations" item for every input context
+whose context_id is not in "source_context_translation_memory", with no
+duplicate or unrequested context ID. The array must be empty when every context
+has a remembered translation. Copy each remaining "context_id" exactly and put
+one complete, natural English translation of the entire context in
+"translation". Translate a shared context only once. The translation must be
+one plain JSON string with no |, HTML, or source-only text.

@@ -1,0 +1,37 @@
+{
+  "all_passed": true,
+  "anki_mutation_performed": false,
+  "automatic_repair": true,
+  "complete": true,
+  "completed_stage_count": 1,
+  "completion_state": "completed",
+  "counts": [
+    1
+  ],
+  "created_at": "2026-07-26T07:13:45.648893+00:00",
+  "kind": "local_source_v10_progressive_evaluation",
+  "maximum_automatic_repairs": 3,
+  "maximum_words_per_request": 30,
+  "mode": "execute_openai",
+  "model": "gpt-5.4-mini",
+  "pipeline_id": "default-english-vocabulary",
+  "requested_stage_count": 1,
+  "schema_version": 2,
+  "session_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/gpt54-quality-v10-1",
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "source_display_name": "Daodejing [Wang Bi]",
+  "stages": [
+    {
+      "job_id": "20260726T071345-6a52aa905854",
+      "passed": true,
+      "report_path": "/home/indiana/Work/Projects/AutoAnki/output/evaluations/local_source_v10/gpt54-quality-v10-1/stages/0001-000001-unique/report.json",
+      "requested_unique_count": 1,
+      "source_prefix_token_limit": 1,
+      "stage_number": 1,
+      "status": "passed"
+    }
+  ],
+  "stopped_after_count": null,
+  "updated_at": "2026-07-26T07:13:54.958980+00:00"
+}

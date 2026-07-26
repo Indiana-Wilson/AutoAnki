@@ -1,0 +1,241 @@
+{
+  "audited_at": "2026-07-26T06:50:10.694341+00:00",
+  "candidate_sha256": "dc7ac54e761d733c50194f5340b441526de523488f191baf7df1309fbfdff0d9",
+  "context_translation_batch_count": 1,
+  "context_translation_case_count": 1,
+  "context_translation_results": {
+    "complete_passes": [
+      true
+    ],
+    "faithful_passes": [
+      true
+    ],
+    "natural_english_passes": [
+      true
+    ]
+  },
+  "error": null,
+  "example_batch_count": 1,
+  "example_case_count": 4,
+  "example_results": {
+    "historical_grammar_passes": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "standalone_passes": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "target_sense_passes": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "translation_fidelity_passes": [
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "kind": "local_batched_historical_quality_occurrence_audit",
+  "lexical_batch_count": 1,
+  "lexical_case_count": 2,
+  "lexical_definition_passes": [
+    true,
+    false
+  ],
+  "max_cases_per_batch": 4,
+  "model_id": "ollama/qwen3:14b",
+  "occurrence_assignment_batch_count": 1,
+  "occurrence_assignment_case_count": 2,
+  "occurrence_assignment_enabled": true,
+  "occurrence_assignment_passes": [
+    false,
+    false
+  ],
+  "prompt_sha256": "9e6fc6e37123959ebb75f21b4d2c39b14769bce64b77fca7a9fe673b9a938b07",
+  "requests": [
+    {
+      "dispatched_at": "2026-07-26T06:49:38.625147+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 384,
+      "model_id": "ollama/qwen3:14b",
+      "provider_model": "qwen3:14b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 944546517,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 944546517
+    },
+    {
+      "dispatched_at": "2026-07-26T06:49:56.432086+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 128,
+      "model_id": "ollama/qwen3:14b",
+      "provider_model": "qwen3:14b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 1226290797,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 1226290797
+    },
+    {
+      "dispatched_at": "2026-07-26T06:50:00.176392+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 128,
+      "model_id": "ollama/qwen3:14b",
+      "provider_model": "qwen3:14b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 491157724,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 491157724
+    },
+    {
+      "dispatched_at": "2026-07-26T06:50:06.343699+00:00",
+      "kind": "ollama_source_dispatch",
+      "max_output_tokens": 128,
+      "model_id": "ollama/qwen3:14b",
+      "provider_model": "qwen3:14b",
+      "reasoning": {
+        "effort": "none"
+      },
+      "runtime": {
+        "keep_alive": "10m",
+        "options": {
+          "num_ctx": 8192,
+          "repeat_penalty": 1.05,
+          "seed": 2074687482,
+          "temperature": 0.0,
+          "top_k": 40,
+          "top_p": 0.9
+        }
+      },
+      "schema_version": 1,
+      "seed": 2074687482
+    }
+  ],
+  "responses": [
+    {
+      "model": "qwen3:14b",
+      "raw_text": "{\n  \"target_sense_passes\": [\n    true,\n    true,\n    true,\n    true\n  ],\n  \"historical_grammar_passes\": [\n    true,\n    true,\n    true,\n    true\n  ],\n  \"standalone_passes\": [\n    true,\n    true,\n    true,\n    true\n  ],\n  \"translation_fidelity_passes\": [\n    true,\n    true,\n    true,\n    true\n  ]\n}",
+      "received_at": "2026-07-26T06:49:56.431250+00:00",
+      "response_id": "ollama-a44156226a5b72960b52779a",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 592,
+        "output_tokens": 95,
+        "reasoning_tokens": 0,
+        "total_tokens": 687,
+        "uncached_input_tokens": 592,
+        "visible_output_tokens": 95,
+        "web_search_calls": 0
+      }
+    },
+    {
+      "model": "qwen3:14b",
+      "raw_text": "{\"conservative_definition_passes\": [true, false]}",
+      "received_at": "2026-07-26T06:50:00.175943+00:00",
+      "response_id": "ollama-eb39478a97ea196d2552c7df",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 600,
+        "output_tokens": 13,
+        "reasoning_tokens": 0,
+        "total_tokens": 613,
+        "uncached_input_tokens": 600,
+        "visible_output_tokens": 13,
+        "web_search_calls": 0
+      }
+    },
+    {
+      "model": "qwen3:14b",
+      "raw_text": "{\n  \"faithful_passes\": [true],\n  \"complete_passes\": [true],\n  \"natural_english_passes\": [true]\n}",
+      "received_at": "2026-07-26T06:50:06.342915+00:00",
+      "response_id": "ollama-84f2115a5a9f477986f1fae5",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 306,
+        "output_tokens": 33,
+        "reasoning_tokens": 0,
+        "total_tokens": 339,
+        "uncached_input_tokens": 306,
+        "visible_output_tokens": 33,
+        "web_search_calls": 0
+      }
+    },
+    {
+      "model": "qwen3:14b",
+      "raw_text": "{\n  \"occurrence_assignment_passes\": [\n    false,\n    false\n  ]\n}",
+      "received_at": "2026-07-26T06:50:10.694257+00:00",
+      "response_id": "ollama-a405ae2a116543b36b1c9fca",
+      "schema_version": 1,
+      "service_tier": "local",
+      "status": "completed",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 503,
+        "output_tokens": 20,
+        "reasoning_tokens": 0,
+        "total_tokens": 523,
+        "uncached_input_tokens": 503,
+        "visible_output_tokens": 20,
+        "web_search_calls": 0
+      }
+    }
+  ],
+  "schema_version": 5,
+  "status": "failed"
+}

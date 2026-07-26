@@ -1,0 +1,108 @@
+{
+  "cards": [
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "The fundamental principle or force underlying the universe, often described as ineffable and beyond human comprehension.",
+      "Nuance (English)": "Implies transcendence, mystery, and a metaphysical origin.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "archaic philosophical",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+      "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+      "Translation (English)": "the Way"
+    },
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "To move from one place to another, often used in the context of physical movement or journey.",
+      "Nuance (English)": "Implies a directional or purposeful motion.",
+      "Part of Speech (English)": "verb",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "archaic literary",
+      "Sentence Translations (English)": "A person travels a thousand miles, not hesitating to endure hardship.|The boat moves on the water, flowing with the current.|The teacher and disciples follow each other, heading together toward the destination.|The wind rises and clouds gather; the path has no fixed location.",
+      "Sentences": "人<strong>道</strong>千里，不辭辛苦。|舟行水上，順流而<strong>道</strong>。|師徒相隨，共赴前<strong>道</strong>。|風起雲湧，<strong>道</strong>無定所。",
+      "Translation (English)": "to go; to travel"
+    },
+    {
+      "Classical Chinese": "可",
+      "Dictionary Meaning (English)": "Indicates possibility or ability to perform an action, often used in the context of capability or permission.",
+      "Nuance (English)": "Suggests a conditional or potential state of being.",
+      "Part of Speech (English)": "auxiliary verb",
+      "Pronunciation (English)": "kě",
+      "Register (English)": "archaic literary",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+      "Sentences": "S道<strong>可</strong>道，非常道，名可名，非常名；",
+      "Translation (English)": "can; may"
+    },
+    {
+      "Classical Chinese": "非",
+      "Dictionary Meaning (English)": "Used to negate a statement, indicating the absence or negation of a quality or state.",
+      "Nuance (English)": "Emphasizes contrast or contradiction with what is being denied.",
+      "Part of Speech (English)": "adverb",
+      "Pronunciation (English)": "fēi",
+      "Register (English)": "archaic literary",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+      "Sentences": "S道可道，<strong>非</strong>常道，名可名，非常名；",
+      "Translation (English)": "not; is not"
+    }
+  ],
+  "chunks": [
+    {
+      "chunk_id": "000001-r1-r3",
+      "output": {
+        "cards": [
+          {
+            "Classical Chinese": "道",
+            "Dictionary Meaning (English)": "The fundamental principle or force underlying the universe, often described as ineffable and beyond human comprehension.",
+            "Nuance (English)": "Implies transcendence, mystery, and a metaphysical origin.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "archaic philosophical",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+            "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+            "Translation (English)": "the Way"
+          },
+          {
+            "Classical Chinese": "道",
+            "Dictionary Meaning (English)": "To move from one place to another, often used in the context of physical movement or journey.",
+            "Nuance (English)": "Implies a directional or purposeful motion.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "archaic literary",
+            "Sentence Translations (English)": "A person travels a thousand miles, not hesitating to endure hardship.|The boat moves on the water, flowing with the current.|The teacher and disciples follow each other, heading together toward the destination.|The wind rises and clouds gather; the path has no fixed location.",
+            "Sentences": "人<strong>道</strong>千里，不辭辛苦。|舟行水上，順流而<strong>道</strong>。|師徒相隨，共赴前<strong>道</strong>。|風起雲湧，<strong>道</strong>無定所。",
+            "Translation (English)": "to go; to travel"
+          },
+          {
+            "Classical Chinese": "可",
+            "Dictionary Meaning (English)": "Indicates possibility or ability to perform an action, often used in the context of capability or permission.",
+            "Nuance (English)": "Suggests a conditional or potential state of being.",
+            "Part of Speech (English)": "auxiliary verb",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "archaic literary",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+            "Sentences": "S道<strong>可</strong>道，非常道，名可名，非常名；",
+            "Translation (English)": "can; may"
+          },
+          {
+            "Classical Chinese": "非",
+            "Dictionary Meaning (English)": "Used to negate a statement, indicating the absence or negation of a quality or state.",
+            "Nuance (English)": "Emphasizes contrast or contradiction with what is being denied.",
+            "Part of Speech (English)": "adverb",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "archaic literary",
+            "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+            "Sentences": "S道可道，<strong>非</strong>常道，名可名，非常名；",
+            "Translation (English)": "not; is not"
+          }
+        ]
+      }
+    }
+  ],
+  "complete": true,
+  "completed_chunk_count": 1,
+  "job_id": "20260726T041147-2a007d100537",
+  "plan_id": "e68f2cbac5acae6d75c5eeb3",
+  "schema_version": 1,
+  "source_key": "daodejing_wang_bi",
+  "total_chunk_count": 1
+}

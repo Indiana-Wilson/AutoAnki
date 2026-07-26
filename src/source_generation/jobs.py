@@ -45,6 +45,8 @@ MANUAL_VALIDATION_FILE_NAME = "manual_validation.json"
 MANUAL_VALIDATION_SCHEMA_VERSION = 1
 RESPONSE_RECORD_FILE_NAME = "response.json"
 RESPONSE_RECORD_SCHEMA_VERSION = 1
+LOCAL_REPAIR_FILE_NAME = "local_repair.json"
+REPAIRED_RAW_FILE_NAME = "repaired_raw.txt"
 
 
 def _utc_now():
@@ -624,18 +626,68 @@ class GenerationJobStore:
     def write_raw(self, attempt_path, raw_text):
         _atomic_write_text(Path(attempt_path) / "raw.txt", raw_text)
 
-    def write_response(self, attempt_path, response):
+    def write_response(self, attempt_path, response, *, write_raw=True):
         """Persist the paid response envelope before compatibility artifacts."""
         if not isinstance(response, PaidResponse):
             raise TypeError("A PaidResponse is required.")
+        if not isinstance(write_raw, bool):
+            raise TypeError("Paid-response raw persistence must be boolean.")
         record = response.to_record()
         _atomic_write_json(
             Path(attempt_path) / RESPONSE_RECORD_FILE_NAME,
             record)
-        self.write_raw(attempt_path, response.raw_text)
+        if write_raw:
+            self.write_raw(attempt_path, response.raw_text)
         return record
 
+    @staticmethod
+    def _write_local_repair_artifacts(attempt_path, value):
+        audit = getattr(value, "local_repair_audit", None)
+        effective_raw_text = getattr(value, "effective_raw_text", None)
+        if (
+                not isinstance(audit, dict)
+                or not isinstance(effective_raw_text, str)):
+            return
+        attempt_path = Path(attempt_path)
+        raw_path = attempt_path / "raw.txt"
+        if not raw_path.is_file():
+            raise ValueError(
+                "A locally repaired response has no immutable raw artifact.")
+        original_sha256 = hashlib.sha256(
+            raw_path.read_bytes()).hexdigest()
+        candidate_sha256 = hashlib.sha256(
+            effective_raw_text.encode("utf-8")).hexdigest()
+        changed = audit.get("changed")
+        if (
+                not isinstance(changed, bool)
+                or audit.get("original_sha256") != original_sha256
+                or audit.get("candidate_sha256") != candidate_sha256
+                or (
+                    changed is False
+                    and original_sha256 != candidate_sha256)):
+            raise ValueError(
+                "Local-repair hashes do not match the retained response.")
+        repaired_path = attempt_path / REPAIRED_RAW_FILE_NAME
+        audit_path = attempt_path / LOCAL_REPAIR_FILE_NAME
+        if changed is not True:
+            # Revalidation can reuse an existing attempt after a crash or an
+            # Economy Batch collection interruption. Do not leave derived
+            # artifacts from an older repair beside a currently unchanged
+            # response.
+            repaired_path.unlink(missing_ok=True)
+            audit_path.unlink(missing_ok=True)
+            return
+        _atomic_write_text(
+            repaired_path,
+            effective_raw_text)
+        _atomic_write_json(
+            audit_path,
+            audit)
+
     def write_validated(self, attempt_path, value):
+        self._write_local_repair_artifacts(
+            attempt_path,
+            value)
         _atomic_write_json(Path(attempt_path) / "validated.json", value)
 
     def write_error(self, attempt_path, error, *, transient):
@@ -650,6 +702,9 @@ class GenerationJobStore:
         validation = getattr(error, "validation_report", None)
         if isinstance(validation, dict):
             value["validation"] = validation
+        self._write_local_repair_artifacts(
+            attempt_path,
+            error)
         _atomic_write_json(Path(attempt_path) / "error.json", value)
         return value
 
@@ -665,6 +720,9 @@ class GenerationJobStore:
         validation = getattr(error, "validation_report", None)
         if isinstance(validation, dict):
             value["validation"] = validation
+        self._write_local_repair_artifacts(
+            attempt_path,
+            error)
         _atomic_write_json(
             Path(attempt_path) / "recovery_error.json",
             value)
@@ -996,6 +1054,18 @@ class GenerationJobStore:
                 record = {"attempt": int(attempt_path.name)}
                 for name, filename in (
                         ("raw_text", "raw.txt"),
+                        ("repaired_raw_text", REPAIRED_RAW_FILE_NAME),
+                        ("local_repair", LOCAL_REPAIR_FILE_NAME),
+                        ("repair_scope", "repair_scope.json"),
+                        (
+                            "automatic_repair_dispatch",
+                            "automatic_repair_dispatch.json"),
+                        (
+                            "translation_memory_admissions",
+                            "translation_memory_admissions.json"),
+                        (
+                            "translation_memory_error",
+                            "translation_memory_error.json"),
                         ("response", RESPONSE_RECORD_FILE_NAME),
                         ("validated", "validated.json"),
                         ("error", "error.json"),
@@ -1006,7 +1076,7 @@ class GenerationJobStore:
                         continue
                     record[name] = (
                         path.read_text(encoding="utf-8")
-                        if name == "raw_text"
+                        if name in {"raw_text", "repaired_raw_text"}
                         else _read_json(path))
                 attempts.append(record)
         return {
@@ -1026,6 +1096,7 @@ class GenerationJobStore:
             "attempt_count": 0,
             "input_tokens": 0,
             "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
             "uncached_input_tokens": 0,
             "output_tokens": 0,
             "reasoning_tokens": 0,
@@ -1059,6 +1130,7 @@ class GenerationJobStore:
                 for key in (
                         "input_tokens",
                         "cached_input_tokens",
+                        "cache_write_input_tokens",
                         "uncached_input_tokens",
                         "output_tokens",
                         "reasoning_tokens",

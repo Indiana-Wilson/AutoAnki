@@ -1,0 +1,41 @@
+{
+  "automatic": true,
+  "base_attempt": 1,
+  "base_raw_sha256": "65977079ca63463fe641a1c66207fafb0733739ca226750d04c635705115b868",
+  "dispatch_ordinal": 1,
+  "kind": "compact_v10_example_pair_repair",
+  "schema_version": 1,
+  "target_count": 1,
+  "targets": [
+    {
+      "additional_sense_index": 0,
+      "example_index": 2,
+      "key": "p001",
+      "problem_codes": [
+        "repeated_exact_form_source_term"
+      ],
+      "problem_ids": [
+        "repeated_exact_form_source_term:04a65f335f07537a"
+      ],
+      "replace_sentence": true,
+      "replace_translation": true,
+      "sense_fields": {
+        "Dictionary Meaning (English)": "A moral or logical obligation to perform an action.",
+        "Nuance (English)": "Implies a normative expectation rather than mere ability.",
+        "Part of Speech (English)": "verb",
+        "Pronunciation (English)": "kě",
+        "Register (English)": "formal",
+        "Translation (English)": "ought; should"
+      },
+      "sentence": "君子可讓，小人不可讓。",
+      "sibling_sentences": [
+        "可為，則為之。",
+        "不可為，則止之。",
+        "可言，則言之。"
+      ],
+      "source_rank": 2,
+      "term": "可",
+      "translation": "A gentleman may yield, but a petty person may not yield."
+    }
+  ]
+}

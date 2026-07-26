@@ -1,0 +1,164 @@
+{
+  "additional_sense_count": 3,
+  "card_count": 4,
+  "context_count": 1,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cached_input_aud": 0.0,
+    "cached_input_tokens": 0,
+    "cached_input_usd": 0.0,
+    "execution_mode": "standard",
+    "input_aud": 0.002172043010752688,
+    "input_tokens": 2020,
+    "input_usd": 0.001515,
+    "model": "gpt-5.4-mini",
+    "output_aud": 0.005283870967741936,
+    "output_tokens": 819,
+    "output_usd": 0.0036855,
+    "pricing": {
+      "cached_input_usd_per_million": 0.075,
+      "input_usd_per_million": 0.75,
+      "label": "standard pricing published 2026-07-24",
+      "model": "gpt-5.4-mini",
+      "output_usd_per_million": 4.5
+    },
+    "pricing_label": "standard pricing published 2026-07-24",
+    "total_aud": 0.007455913978494624,
+    "total_tokens": 2839,
+    "total_usd": 0.0052005,
+    "uncached_input_aud": 0.002172043010752688,
+    "uncached_input_tokens": 2020,
+    "uncached_input_usd": 0.001515,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-25T15:25:38.709966+00:00",
+  "local_repair_audit": {
+    "candidate_sha256": "e6e54eabab8ea823ed270c7e8b848c8d2e56593de324831708b13f4765aee4b7",
+    "change_count": 0,
+    "changed": false,
+    "changes": [],
+    "kind": "compact_local_response_repair",
+    "original_sha256": "e6e54eabab8ea823ed270c7e8b848c8d2e56593de324831708b13f4765aee4b7",
+    "schema_version": 1
+  },
+  "local_repair_count": 0,
+  "max_output_tokens": 8192,
+  "model": "gpt-5.4-mini",
+  "payload_estimated_tokens": 88,
+  "prompt_estimated_tokens": 1883,
+  "protocol": "v10",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "translation": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name."
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "The fundamental course, principle, or order of reality; the central Daoist notion of the ultimate way things are and should proceed.",
+            "Nuance (English)": "Often refers to an ineffable, governing principle rather than a specific road or method.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; received Laozi text and broader pre-Qin usage",
+            "Sentence Translations (English)": [
+              "The great Way can be followed; it is not made by human effort.",
+              "The sage keeps to the Way and does not dare to go before the world.",
+              "Few know the Way, but many trust it.",
+              "The Way lies within heaven and earth, pervading everywhere."
+            ],
+            "Sentences": [
+              "大道可行，非人為也。",
+              "聖人守道，不敢為天下先。",
+              "知道者寡，信道者眾。",
+              "道在天地之中，無所不貫。"
+            ],
+            "Translation (English)": "the Way"
+          },
+          {
+            "Dictionary Meaning (English)": "A physical road, path, or route of travel.",
+            "Nuance (English)": "Refers to an actual route rather than an abstract principle.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; common in received pre-Qin and Han usage",
+            "Sentence Translations (English)": [
+              "There was a road ahead, and travelers had to go by it.",
+              "The road was blocked, so carriages and horses all stopped.",
+              "The guest asked the official about the road.",
+              "At dusk he crossed a mountain path, where wind and snow were severe."
+            ],
+            "Sentences": [
+              "前有道，行者必由之。",
+              "塞道不通，車馬皆止。",
+              "客問道於吏。",
+              "暮過山道，風雪甚急。"
+            ],
+            "Translation (English)": "road; path"
+          },
+          {
+            "Dictionary Meaning (English)": "A method, procedure, or means by which something is done or achieved.",
+            "Nuance (English)": "Focuses on an effective course of action rather than moral principle or literal road.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese; broader pre-Qin and Han usage",
+            "Sentence Translations (English)": [
+              "A well-governed state has a method; a chaotic state has none.",
+              "By learning the ancients' method, one can accomplish things.",
+              "Its method is easy to understand, so the crowd follows it.",
+              "In military affairs, the key method lies in judging the right moment."
+            ],
+            "Sentences": [
+              "治國有道，亂國無道。",
+              "學古人之道，可以成事。",
+              "其道易知，故眾人從之。",
+              "兵家之道，貴在審機。"
+            ],
+            "Translation (English)": "method; way of doing"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "To express something in words or discourse, or to treat it as an object of verbal explanation. In this line it is the first 道, used verbally before 道 as a noun.",
+          "Nuance (English)": "Takes an object and refers to verbal articulation rather than the Dao as a substantive principle.",
+          "Part of Speech (English)": "verb",
+          "Pronunciation (English)": "dào",
+          "Register (English)": "Classical Chinese; received Laozi text as transmitted with Wang Bi commentary",
+          "Translation (English)": "speak of; describe"
+        },
+        "rank": 1
+      }
+    ]
+  },
+  "reasoning_effort": "none",
+  "response_id": "resp_0146450ec6e348f4006a64d56cc3e081978909a34ffbb1e67e",
+  "response_status": "completed",
+  "schema_estimated_tokens": 519,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "target_ranks": null,
+  "term_result_count": 1,
+  "terms": [
+    {
+      "rank": 1,
+      "term": "道"
+    }
+  ],
+  "usage": {
+    "cached_input_tokens": 0,
+    "input_tokens": 2020,
+    "output_tokens": 819,
+    "reasoning_tokens": 0,
+    "total_tokens": 2839,
+    "uncached_input_tokens": 2020,
+    "visible_output_tokens": 819,
+    "web_search_calls": 0
+  },
+  "valid": true,
+  "validation_error": null,
+  "word_count": 1
+}

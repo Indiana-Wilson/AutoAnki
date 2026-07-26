@@ -1,0 +1,258 @@
+{
+  "additional_sense_count": 6,
+  "card_count": 9,
+  "context_count": 1,
+  "cost": {
+    "aud_exchange_rate": "RBA AUD/USD 0.6975 at 2026-07-24 16:00 AEST",
+    "cached_input_aud": 0.00019268817204301077,
+    "cached_input_tokens": 1792,
+    "cached_input_usd": 0.00013440000000000001,
+    "execution_mode": "standard",
+    "input_aud": 0.0005604301075268817,
+    "input_tokens": 2134,
+    "input_usd": 0.0003909,
+    "model": "gpt-5.4-mini",
+    "output_aud": 0.008393548387096774,
+    "output_tokens": 1301,
+    "output_usd": 0.0058545,
+    "pricing": {
+      "cached_input_usd_per_million": 0.075,
+      "input_usd_per_million": 0.75,
+      "label": "standard pricing published 2026-07-24",
+      "model": "gpt-5.4-mini",
+      "output_usd_per_million": 4.5
+    },
+    "pricing_label": "standard pricing published 2026-07-24",
+    "total_aud": 0.008953978494623656,
+    "total_tokens": 3435,
+    "total_usd": 0.0062454,
+    "uncached_input_aud": 0.00036774193548387097,
+    "uncached_input_tokens": 342,
+    "uncached_input_usd": 0.0002565,
+    "usd_to_aud_rate": 1.4336917562724014,
+    "web_search_aud": 0.0,
+    "web_search_calls": 0,
+    "web_search_usd": 0.0
+  },
+  "created_at": "2026-07-25T15:25:53.072857+00:00",
+  "local_repair_audit": {
+    "candidate_sha256": "af2677c5332b9b79b733d05ab558da4be40466b308cdc83e222dd384f4368c01",
+    "change_count": 0,
+    "changed": false,
+    "changes": [],
+    "kind": "compact_local_response_repair",
+    "original_sha256": "af2677c5332b9b79b733d05ab558da4be40466b308cdc83e222dd384f4368c01",
+    "schema_version": 1
+  },
+  "local_repair_count": 0,
+  "max_output_tokens": 8192,
+  "model": "gpt-5.4-mini",
+  "payload_estimated_tokens": 184,
+  "prompt_estimated_tokens": 1883,
+  "protocol": "v10",
+  "raw_response": {
+    "source_context_translations": [
+      {
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "translation": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name."
+      }
+    ],
+    "term_results": [
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "To utter words or express something in speech.",
+            "Nuance (English)": "Used with what is spoken or stated, often in elevated philosophical prose.",
+            "Part of Speech (English)": "verb",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese, Laozi/Wang Bi recension",
+            "Sentence Translations (English)": [
+              "Everyone says it is good.",
+              "The sage does not speak its name.",
+              "I heard it and spoke of it.",
+              "What is spoken of is inexhaustible, and words are few."
+            ],
+            "Sentences": [
+              "人皆道善。",
+              "聖人不道其名。",
+              "吾聞而道之。",
+              "道之不盡，言亦少。"
+            ],
+            "Translation (English)": "say; speak"
+          },
+          {
+            "Dictionary Meaning (English)": "A physical road, path, or route for travel.",
+            "Nuance (English)": "Concrete sense distinct from the philosophical usage.",
+            "Part of Speech (English)": "noun",
+            "Pronunciation (English)": "dào",
+            "Register (English)": "Classical Chinese, literary",
+            "Sentence Translations (English)": [
+              "He traveled on the road.",
+              "There is a path ahead to follow.",
+              "He was lost on a forked road.",
+              "The road is narrow, and the cart cannot pass."
+            ],
+            "Sentences": [
+              "行於道。",
+              "前有道可循。",
+              "迷於岐道。",
+              "道狹車不得過。"
+            ],
+            "Translation (English)": "road; path"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A fundamental course, path, or guiding principle; in this context, the ultimate Way that can be spoken of but is not the constant, absolute Way.",
+          "Nuance (English)": "Often refers to the cosmic principle or normative way, not just a physical road.",
+          "Part of Speech (English)": "noun",
+          "Pronunciation (English)": "dào",
+          "Register (English)": "Classical Chinese, Laozi/Wang Bi recension",
+          "Translation (English)": "the Way"
+        },
+        "rank": 1
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "Having the ability or capacity to do something.",
+            "Nuance (English)": "Describes inherent capability rather than permission.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese, literary",
+            "Sentence Translations (English)": [
+              "The man is capable of service.",
+              "Though his strength is small, his mind can be focused.",
+              "If it can last, then it lasts.",
+              "This wood can be made into a boat."
+            ],
+            "Sentences": [
+              "其人可用。",
+              "力雖少，心可專。",
+              "可久則久。",
+              "此木可作舟。"
+            ],
+            "Translation (English)": "able; capable"
+          },
+          {
+            "Dictionary Meaning (English)": "Indicating that something is fit, acceptable, or deserving of a certain treatment or response.",
+            "Nuance (English)": "Used for evaluation or approval, not mere possibility.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "kě",
+            "Register (English)": "Classical Chinese, literary",
+            "Sentence Translations (English)": [
+              "This matter is acceptable.",
+              "His words are worth hearing.",
+              "The Way can be upheld and not abandoned.",
+              "This plan is feasible."
+            ],
+            "Sentences": [
+              "此事可取。",
+              "其言可聽。",
+              "道可守而不可廢。",
+              "此策可行。"
+            ],
+            "Translation (English)": "worthy of; suitable for"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "Expressing possibility, capability, or permissibility.",
+          "Nuance (English)": "In this text, marks what can be done or uttered, without implying obligation.",
+          "Part of Speech (English)": "auxiliary verb",
+          "Pronunciation (English)": "kě",
+          "Register (English)": "Classical Chinese, Laozi/Wang Bi recension",
+          "Translation (English)": "can; may"
+        },
+        "rank": 2
+      },
+      {
+        "additional_senses": [
+          {
+            "Dictionary Meaning (English)": "A prefix-like negative element forming contrast or denial before a noun or adjective.",
+            "Nuance (English)": "Used in fixed contrasts and philosophical oppositions.",
+            "Part of Speech (English)": "bound morpheme",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese, literary",
+            "Sentence Translations (English)": [
+              "Look not at what is improper.",
+              "An application that is not of the Way.",
+              "A goodness that is not conventional goodness.",
+              "Not the work of a single day."
+            ],
+            "Sentences": [
+              "非禮勿視。",
+              "非道之用。",
+              "非善之善。",
+              "非一日之功。"
+            ],
+            "Translation (English)": "non-; un-"
+          },
+          {
+            "Dictionary Meaning (English)": "Indicating that something is not right, not true, or not correct.",
+            "Nuance (English)": "Judges a statement or action as erroneous rather than merely negative.",
+            "Part of Speech (English)": "adjective",
+            "Pronunciation (English)": "fēi",
+            "Register (English)": "Classical Chinese, literary",
+            "Sentence Translations (English)": [
+              "That statement is wrong.",
+              "His plan is in fact mistaken.",
+              "He knew it was wrong and corrected it.",
+              "Right and wrong are not yet clear."
+            ],
+            "Sentences": [
+              "彼說非也。",
+              "其計實非。",
+              "知非而改。",
+              "是非未明。"
+            ],
+            "Translation (English)": "wrong; mistaken"
+          }
+        ],
+        "contextual_sense": {
+          "Dictionary Meaning (English)": "A negative marker used to deny, negate, or form a contrastive opposite.",
+          "Nuance (English)": "Often pairs with a following noun or predicate to deny identity or validity, not merely to negate a verb.",
+          "Part of Speech (English)": "adverb",
+          "Pronunciation (English)": "fēi",
+          "Register (English)": "Classical Chinese, Laozi/Wang Bi recension",
+          "Translation (English)": "not; non-"
+        },
+        "rank": 3
+      }
+    ]
+  },
+  "reasoning_effort": "none",
+  "response_id": "resp_0c594f477d1ac59d006a64d57913a081969d8def1cc703147d",
+  "response_status": "completed",
+  "schema_estimated_tokens": 519,
+  "schema_version": 1,
+  "source": "daodejing_wang_bi",
+  "source_build_id": "36a6c2bee21385f4c53ca3a5",
+  "target_ranks": null,
+  "term_result_count": 3,
+  "terms": [
+    {
+      "rank": 1,
+      "term": "道"
+    },
+    {
+      "rank": 2,
+      "term": "可"
+    },
+    {
+      "rank": 3,
+      "term": "非"
+    }
+  ],
+  "usage": {
+    "cached_input_tokens": 1792,
+    "input_tokens": 2134,
+    "output_tokens": 1301,
+    "reasoning_tokens": 0,
+    "total_tokens": 3435,
+    "uncached_input_tokens": 342,
+    "visible_output_tokens": 1301,
+    "web_search_calls": 0
+  },
+  "valid": true,
+  "validation_error": null,
+  "word_count": 3
+}

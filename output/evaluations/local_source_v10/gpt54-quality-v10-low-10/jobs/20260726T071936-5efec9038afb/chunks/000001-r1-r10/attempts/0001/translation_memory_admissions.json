@@ -1,0 +1,20 @@
+{
+  "admissions": [
+    {
+      "cache_key": "sctm1-5b630539591aec75e7df949db33a661019430c84bdd8a607bb70123e29e5e0c2",
+      "context_id": "source-context-c535f824d57f859c34ac",
+      "state": "usable",
+      "translation_sha256": "a0a8fc5e1ccdd11f3dbe5dbc9901d1383dc799538339eec8e8d68ca81cff66fe",
+      "variant_count": 1
+    },
+    {
+      "cache_key": "sctm1-210daacf39bdf60f1eccac70e372d253dd80b7193d6c3551f494c14a5b94444e",
+      "context_id": "source-context-9d763a9d06321236e5f1",
+      "state": "usable",
+      "translation_sha256": "57682d6bed15b86348b680c24f8854d7cafa3fc0493f783bd96a9cd10e9a9848",
+      "variant_count": 1
+    }
+  ],
+  "kind": "source_context_translation_memory_admissions",
+  "schema_version": 1
+}

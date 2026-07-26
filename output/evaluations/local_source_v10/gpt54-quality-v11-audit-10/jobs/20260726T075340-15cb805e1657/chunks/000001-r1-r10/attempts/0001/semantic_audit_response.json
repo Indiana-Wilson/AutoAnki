@@ -1,0 +1,20 @@
+{
+  "model": "gpt-5.4-mini-2026-03-17",
+  "raw_text": "{\"target_sense_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"historical_grammar_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"standalone_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"translation_fidelity_passes\":[true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],\"conservative_definition_passes\":[true,true,true,false,true,true,true,true,true,false,true,true,true,true,true,true,true,true,true,true,false],\"faithful_passes\":[true,true],\"complete_passes\":[true,true],\"natural_english_passes\":[true,true],\"occurrence_assignment_passes\":[true,false,true,true,true,true,true,true,true,true,true,true,true,true,true],\"common_sense_coverage_passes\":[true,true,true,true,true,true,true,true,true,true]}",
+  "received_at": "2026-07-26T07:54:16.141995+00:00",
+  "response_id": "resp_01214e72ebee961b006a65bd19325c819abbf87b21ea01c408",
+  "schema_version": 1,
+  "service_tier": "default",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 9246,
+    "output_tokens": 2001,
+    "reasoning_tokens": 1682,
+    "total_tokens": 11247,
+    "uncached_input_tokens": 9246,
+    "visible_output_tokens": 319,
+    "web_search_calls": 0
+  }
+}

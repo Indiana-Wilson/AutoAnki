@@ -360,8 +360,8 @@ from corpus preparation:
 2. inspect the ordered candidate vocabulary and retained contexts;
 3. select no context, the current sentence, current plus neighbouring
    sentences, or the complete span covered by each generation chunk;
-4. select compact v9 or rollback-compatible legacy v8, no/low reasoning, and
-   Standard or Economy processing;
+4. select default compact v10 or the frozen compact-v9/grouped-v8 rollbacks,
+   no/low reasoning, and Standard or Economy processing;
 5. vary the words per request and see the cache-aware
    prompt/schema/context/card-detail cost estimate update;
 6. optionally omit exact visible field values from the union of the source
@@ -374,17 +374,21 @@ makes one OpenAI request per generation chunk through a bounded, staggered
 worker pool. Economy mode submits the frozen request bodies as one recoverable
 24-hour Batch at half the Standard token rates. Paid responses and exact
 provider-reported token usage are retained before local validation, completed
-chunks are not repeated, and invalid model output requires a manually
-authorized retry. A Standard compact-v9 retry can selectively regenerate
-safely identified failed ranks/contexts; otherwise it falls back to the
-complete chunk. A fully validated run is imported as
+chunks are not repeated, and compact v10 first applies conservative,
+hash-audited local repairs to a separate candidate without overwriting the
+provider response. The provider supplies plain example sentences; AutoAnki
+adds exact-match emphasis locally and displays the immutable term above the
+sentence when no literal match exists. Remaining invalid output requires a
+manually authorized retry. A Standard compact-v10 or compact-v9 retry can
+selectively regenerate safely identified failed ranks/contexts; otherwise it
+falls back to the complete chunk. A fully validated run is imported as
 `Vocabulary from <source>` and that final deck is not moved, emptied, or
 deleted.
 
 See [From Source generation](source_generation.md) for the complete UI, cost,
 rate-limit, recovery, Anki exclusion, local-file, and Codex retrieval
 contract. Its saved job contract freezes the composed prompt, strict schema,
-model, compact-v9/legacy-v8 protocol, no/low reasoning effort,
+model, compact-v10/compact-v9/grouped-v8 protocol, no/low reasoning effort,
 Standard/Economy processing mode, and optional web-search access so a retry
 cannot change when an Advanced component is edited. Cost estimation, corpus
 preparation, and the automated test suite do not call the OpenAI card API.

@@ -6,9 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from corpus_pipeline.models import CorpusVocabularyView
+from source_generation.model_catalog import (
+    DEFAULT_SOURCE_MODEL,
+    SUPPORTED_SOURCE_MODELS,
+    source_model_profile,
+)
 
 
 SOURCE_GENERATION_SCHEMA_VERSION = 1
+MAX_AUTOMATIC_REPAIR_ATTEMPTS = 3
 OCCURRENCE_LOCATOR_WINDOW_CHARS = 24
 OCCURRENCE_TARGET_OPEN = "⟪TARGET⟫"
 OCCURRENCE_TARGET_CLOSE = "⟪/TARGET⟫"
@@ -109,9 +115,12 @@ class SourceGenerationConfig:
     concurrency: int = 8
     request_stagger_ms: int = 100
     max_transient_retries: int = 3
-    request_protocol: str = "v9"
-    reasoning_effort: str = "none"
+    model: str = DEFAULT_SOURCE_MODEL
+    request_protocol: str = "v10"
+    reasoning_effort: str = "low"
     execution_mode: str = "standard"
+    automatic_repair: bool = False
+    max_automatic_repairs: int = MAX_AUTOMATIC_REPAIR_ATTEMPTS
     excluded_words: tuple[str, ...] = ()
     exclude_anki: AnkiExclusionSpec | None = None
     anki_exclusions: tuple[AnkiExclusionSpec, ...] = ()
@@ -150,10 +159,17 @@ class SourceGenerationConfig:
             raise ValueError(
                 "Transient retry count must be between 0 and 20.")
         if (
-                not isinstance(self.request_protocol, str)
-                or self.request_protocol not in {"v8", "v9"}):
+                not isinstance(self.model, str)
+                or self.model not in SUPPORTED_SOURCE_MODELS):
             raise ValueError(
-                'Source request protocol must be either "v8" or "v9".')
+                "Source model must be one of: "
+                + ", ".join(sorted(SUPPORTED_SOURCE_MODELS))
+                + ".")
+        if (
+                not isinstance(self.request_protocol, str)
+                or self.request_protocol not in {"v8", "v9", "v10"}):
+            raise ValueError(
+                'Source request protocol must be "v8", "v9", or "v10".')
         if (
                 not isinstance(self.reasoning_effort, str)
                 or self.reasoning_effort not in {"none", "low"}):
@@ -165,6 +181,47 @@ class SourceGenerationConfig:
             raise ValueError(
                 'Source execution mode must be either "standard" or '
                 '"economy".')
+        if not isinstance(self.automatic_repair, bool):
+            raise ValueError(
+                "Automatic repair must be enabled or disabled.")
+        model_profile = source_model_profile(self.model)
+        maximum_automatic_repairs = model_profile.max_automatic_repairs
+        if (
+                model_profile.local
+                and self.automatic_repair
+                and self.max_automatic_repairs
+                == MAX_AUTOMATIC_REPAIR_ATTEMPTS):
+            object.__setattr__(
+                self,
+                "max_automatic_repairs",
+                maximum_automatic_repairs)
+        if (
+                isinstance(self.max_automatic_repairs, bool)
+                or not isinstance(self.max_automatic_repairs, int)
+                or not 0 <= self.max_automatic_repairs
+                <= maximum_automatic_repairs):
+            raise ValueError(
+                "Automatic repairs must be between 0 and "
+                f"{maximum_automatic_repairs} for the selected model.")
+        if self.automatic_repair and self.execution_mode != "standard":
+            raise ValueError(
+                "Automatic paid repair currently requires Standard "
+                "processing.")
+        if (
+                model_profile.local
+                and self.request_protocol != "v10"):
+            raise ValueError(
+                "Local source models require request protocol v10.")
+        if (
+                model_profile.local
+                and self.reasoning_effort != "none"):
+            raise ValueError(
+                "Local source models require reasoning effort none.")
+        if (
+                model_profile.local
+                and self.execution_mode != "standard"):
+            raise ValueError(
+                "Local source models require Standard processing.")
         if (
                 self.request_protocol == "v8"
                 and self.reasoning_effort != "low"):
@@ -226,7 +283,7 @@ class SourceGenerationConfig:
         if request_protocol is None and value.get("protocol_version") is not None:
             request_protocol = f'v{value["protocol_version"]}'
         if request_protocol is None:
-            request_protocol = "v9"
+            request_protocol = "v10"
         return cls(
             source_key=source_key,
             run_path=(
@@ -243,13 +300,18 @@ class SourceGenerationConfig:
             max_transient_retries=value.get(
                 "max_transient_retries",
                 3),
+            model=value.get("model", DEFAULT_SOURCE_MODEL),
             request_protocol=request_protocol,
             reasoning_effort=value.get(
                 "reasoning_effort",
-                "none"),
+                "low"),
             execution_mode=value.get(
                 "execution_mode",
                 value.get("processing_mode", "standard")),
+            automatic_repair=value.get("automatic_repair", False),
+            max_automatic_repairs=value.get(
+                "max_automatic_repairs",
+                MAX_AUTOMATIC_REPAIR_ATTEMPTS),
             excluded_words=tuple(value.get("excluded_words", ())),
             exclude_anki=AnkiExclusionSpec.from_mapping(
                 exclusion_value),
@@ -358,6 +420,44 @@ class OccurrenceLocator:
 
 
 @dataclass(frozen=True)
+class ContextOccurrenceSpan:
+    """One complete tokenizer occurrence, relative to a retained context."""
+
+    start_offset: int
+    end_offset: int
+    surface: str
+
+    def __post_init__(self):
+        if (
+                isinstance(self.start_offset, bool)
+                or not isinstance(self.start_offset, int)
+                or self.start_offset < 0
+                or isinstance(self.end_offset, bool)
+                or not isinstance(self.end_offset, int)
+                or self.end_offset <= self.start_offset):
+            raise ValueError(
+                "A context occurrence requires a non-empty non-negative "
+                "offset span.")
+        if not isinstance(self.surface, str) or not self.surface:
+            raise ValueError(
+                "A context occurrence requires a non-empty surface.")
+        if len(self.surface) != self.end_offset - self.start_offset:
+            raise ValueError(
+                "A context occurrence surface must match its offset width.")
+
+    @classmethod
+    def from_mapping(cls, value):
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, dict):
+            raise TypeError("A context occurrence must be an object.")
+        return cls(**value)
+
+    def to_dict(self):
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class GenerationWord:
     """A ranked source word pointing to, but not repeating, its context."""
 
@@ -373,6 +473,7 @@ class GenerationWord:
     start_offset: int | None = None
     end_offset: int | None = None
     occurrence_locator: OccurrenceLocator | None = None
+    context_occurrences: tuple[ContextOccurrenceSpan, ...] = ()
 
     def __post_init__(self):
         if (
@@ -385,9 +486,21 @@ class GenerationWord:
                 "occurrence_locator",
                 OccurrenceLocator.from_mapping(
                     self.occurrence_locator))
+        if not isinstance(self.context_occurrences, (tuple, list)):
+            raise TypeError(
+                "Source context occurrences must be a sequence.")
+        object.__setattr__(
+            self,
+            "context_occurrences",
+            tuple(
+                ContextOccurrenceSpan.from_mapping(value)
+                for value in self.context_occurrences))
 
     def to_dict(self):
-        return asdict(self)
+        value = asdict(self)
+        if not self.context_occurrences:
+            value.pop("context_occurrences")
+        return value
 
 
 @dataclass(frozen=True)
@@ -587,9 +700,15 @@ class Pricing:
     output_usd_per_million: float
     label: str = "standard"
     cached_input_usd_per_million: float | None = None
+    cache_write_input_usd_per_million: float | None = None
 
     def to_dict(self):
-        return asdict(self)
+        result = asdict(self)
+        # Keep estimates compact when a provider has no distinct cache-write
+        # price class.
+        if self.cache_write_input_usd_per_million is None:
+            result.pop("cache_write_input_usd_per_million")
+        return result
 
 
 @dataclass(frozen=True)
@@ -605,10 +724,12 @@ class CostEstimate:
     schema_tokens: int
     estimated_input_tokens: int
     estimated_cached_input_tokens: int
+    estimated_cache_write_input_tokens: int
     estimated_uncached_input_tokens: int
     estimated_output_tokens: int
     estimated_input_usd: float
     estimated_cached_input_usd: float
+    estimated_cache_write_input_usd: float
     estimated_uncached_input_usd: float
     estimated_output_usd: float
     estimated_total_usd: float
@@ -632,6 +753,10 @@ class CostEstimate:
     @property
     def cached_input_tokens(self):
         return self.estimated_cached_input_tokens
+
+    @property
+    def cache_write_input_tokens(self):
+        return self.estimated_cache_write_input_tokens
 
     @property
     def uncached_input_tokens(self):
@@ -667,6 +792,7 @@ class CostEstimate:
             "candidate_count": self.candidate_count,
             "input_tokens": self.input_tokens,
             "cached_input_tokens": self.cached_input_tokens,
+            "cache_write_input_tokens": self.cache_write_input_tokens,
             "uncached_input_tokens": self.uncached_input_tokens,
             "output_tokens": self.output_tokens,
             "estimated_cost_usd": self.estimated_cost_usd,

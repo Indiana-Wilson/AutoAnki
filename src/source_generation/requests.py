@@ -6,10 +6,14 @@ import json
 import pipeline_store
 import prompt_builder
 from response_schema import bounded_response_format_name
+from source_generation.models import (
+    DEFAULT_SOURCE_MODEL,
+    SUPPORTED_SOURCE_MODELS,
+)
 
 
-SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION = 9
-SOURCE_REQUEST_MODEL = "gpt-5.4-mini"
+SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION = 10
+SOURCE_REQUEST_MODEL = DEFAULT_SOURCE_MODEL
 SOURCE_REQUEST_REASONING = {"effort": "low"}
 _SUPPORTED_FROZEN_SOURCE_REASONING = (
     SOURCE_REQUEST_REASONING,
@@ -18,200 +22,10 @@ _SUPPORTED_FROZEN_SOURCE_REASONING = (
 _SOURCE_BATCH_MARKER = "Here is the source batch JSON:"
 # This affects only the hard response ceiling, not the expected-cost estimate.
 # A compact request can contain an unusually polysemous group even when its
-# word count is small. A larger v9 ceiling prevents a paid response ending
+# word count is small. A larger compact-protocol ceiling prevents a paid response ending
 # incomplete while the model is still assembling otherwise valid JSON. This
 # is only a hard limit and does not inflate the expected-cost estimate.
 _V9_OUTPUT_LIMIT_MULTIPLIER = 3.0
-_WANG_BI_OPENING_CONTEXT = (
-    "道可道，非常道，名可名，非常名；")
-_WANG_BI_ORIGIN_CONTEXT = (
-    "無名，天地之始，有名，萬物之母。")
-_WANG_BI_PURPOSE_CONTEXT = (
-    "故常無欲，以觀其妙，")
-_WANG_BI_LIMIT_CONTEXT = (
-    "常有欲，以觀其徼；")
-_WANG_BI_TWO_CONTEXT = (
-    "此兩者，同出而異名，同謂之玄。")
-_WANG_BI_BEAUTY_CONTEXT = (
-    "天下皆知美之為美，斯惡已。")
-_WANG_BI_REFUSAL_CONTEXT = (
-    "行不言之教；萬物作焉而不辭，生而不有，為而不恃，")
-_WANG_BI_CREDIT_CONTEXT = (
-    "功成而弗居。")
-_WANG_BI_DISCOURSE_CONTEXT = (
-    "夫唯弗居，是以不去。")
-_WANG_BI_DESIRE_CONTEXT = (
-    "不尚賢，使民不爭；不貴難得之貨，使民不為盜；"
-    "不見可欲，使民心不亂。")
-_WANG_BI_WISE_CONTEXT = (
-    "使夫智者不敢為也。")
-_WANG_BI_EMPTY_CONTEXT = (
-    "道沖而用之或不盈，淵兮似萬物之宗；挫其銳，解其紛，"
-    "和其光，同其塵，湛兮似或存。")
-_WANG_BI_COMPACT_HINTS = {
-    "道": (
-        "The selected first 道 is the abstract noun “Way”, not the verb. "
-        "Set Part of Speech (English) to “noun”. "
-        "Keep concrete road/path, practical method/course/teaching, and "
-        "speak/state as separate common additional senses. In generated "
-        "examples, the tagged 道 must be the sentence's only literal 道."),
-    "可": (
-        "The selected 可 is modal “can/be able to”. "
-        "Set Part of Speech (English) to “modal verb”. "
-        "Keep evaluative worthy/fit/acceptable and transitive approve/consent "
-        "as separate additional senses. Evaluative examples must not be "
-        "modal 可 followed by another verb. Prefer an unambiguous predicate "
-        "such as 此議誠<strong>可</strong>也; never use 不可 or any other "
-        "untagged 可."),
-    "非": (
-        "Parse 非常道 as 非 + 常道: selected 非 is the negative predicate "
-        "“is not”, never the later compound 非常. Set Part of Speech (English) "
-        "to “negative copula / negative predicate”. Keep genuinely separate "
-        "wrong/incorrect or criticize uses apart; never use 是非 in examples."
-    ),
-    "常道": (
-        "Treat 常道 as the complete noun phrase “constant/enduring Way”, "
-        "pronounced cháng dào; label it “noun phrase”. Never define or "
-        "exemplify bare 常. It normally has no disjoint additional lexical "
-        "sense."),
-    "名": (
-        "The selected first 名 is the noun “name”. "
-        "Set Part of Speech (English) to “noun”. "
-        "Keep the verb name/designate and noun reputation/fame as separate "
-        "common "
-        "additional senses; verbal examples must actually perform naming."),
-    "常名": (
-        "Treat 常名 as the complete noun phrase “constant/enduring name”, "
-        "pronounced cháng míng; label it “noun phrase”. Never define or "
-        "exemplify bare 常. It normally has no disjoint additional lexical "
-        "sense."),
-    "無": (
-        "Selected 無 in 無名 means “without; lacking” and is a negative "
-        "existential verb / negator; use that exact part-of-speech label, not "
-        "“adjective”. A nominal philosophical "
-        "nonbeing/nothingness use may be a separate additional sense."),
-    "天地": (
-        "Selected 天地 is the single binomial “heaven and earth; natural "
-        "world/cosmos” and is a noun. Those English phrasings are equivalents, "
-        "not separate lexical senses; normally return no additional sense."),
-    "之": (
-        "Selected 之 in 天地之始 is the structural particle “of”. "
-        "Set Part of Speech (English) to “structural particle”. "
-        "Keep the object pronoun him/her/it/them and motion verb go to as "
-        "separate "
-        "additional senses, with grammatical examples."),
-    "始": (
-        "Selected 始 in 天地之始 is the noun “beginning; origin”, not a verb. "
-        "Set Part of Speech (English) to “noun”. "
-        "Keep the verb begin/start as a separate additional sense whose "
-        "examples express actual inception."),
-    "有": (
-        "Selected 有 in 有名 is possessive/attributive, not existential "
-        "“there is”. Set Translation (English) exactly to “having a name; "
-        "named”, Pronunciation (English) to “yǒu”, and Part of Speech "
-        "(English) to “verb”. A possessive "
-        "paraphrase would duplicate the contextual sense; only a genuinely "
-        "existential use may be separate. Never write 有<strong>有</strong>."),
-    "以": (
-        "Selected 以 in 以觀其妙 is purposive, not instrumental "
-        "“with/by means of”. Set Translation (English) exactly to “in order "
-        "to; so as to”, Pronunciation (English) to “yǐ”, and Part of Speech "
-        "(English) to “conjunction”. Keep a genuinely "
-        "instrumental use separate."),
-    "徼": (
-        "Selected 徼 is the outward limit or manifestation. Set Translation "
-        "(English) exactly to “outward manifestation; outer limit”, "
-        "Pronunciation (English) to “jiào”, and Part of Speech (English) to "
-        "“noun”. Do not substitute the jiǎo verb “seek” for the contextual "
-        "sense; if included separately, its examples and pronunciation must "
-        "remain distinct. Never write 徼<strong>徼</strong>."),
-    "者": (
-        "Selected 者 after 此兩 forms a referential noun phrase. Set "
-        "Translation (English) exactly to “the two (things)”, Pronunciation "
-        "(English) to “zhě”, and Part of Speech (English) to “nominalizing "
-        "particle”. Do not mislabel it as a plural marker, lexical person, or "
-        "create a duplicate nominalizer sense."),
-    "美": (
-        "Selected first 美 in 知美之為美 is nominal, not an adjective "
-        "modifying another noun. Set Translation (English) exactly to "
-        "“beauty; the beautiful”, Pronunciation (English) to “měi”, and Part "
-        "of Speech (English) to “noun”. Keep the "
-        "adjectival use separate."),
-    "為": (
-        "Selected 為 in 美之為美 is predicative/classificatory. Set "
-        "Translation (English) exactly to “to be regarded as; to constitute”, "
-        "Pronunciation (English) to “wéi”, and Part of Speech (English) to "
-        "“verb”. Do not flatten it to the "
-        "generic verb do/make; that may be a separate sense."),
-    "惡": (
-        "Selected 惡 opposed to 美 is nominal. Set Translation (English) "
-        "exactly to “ugliness; the ugly”, Pronunciation (English) to “è”, and "
-        "Part of Speech (English) to “noun”. Do not reduce it to moral evil. "
-        "Keep the verb hate/dislike, read "
-        "wù, as a separate sense."),
-    "辭": (
-        "Selected 辭 in 萬物作焉而不辭 is refusal—not words, explanation, "
-        "silence, or refusal to speak. Set Translation (English) exactly to "
-        "“to decline; to refuse”, Pronunciation (English) to “cí”, and Part "
-        "of Speech (English) to “verb”. "
-        "Noun wording and leave-taking uses may be separate."),
-    "居": (
-        "Selected 居 in 功成而弗居 concerns not claiming the achievement. Set "
-        "Translation (English) exactly to “to claim or appropriate credit”, "
-        "Pronunciation (English) to “jū”, and Part of Speech (English) to "
-        "“verb”. Literal dwell/reside or occupy "
-        "senses must be kept separate."),
-    "夫": (
-        "Selected sentence-initial 夫 in 夫唯 is a discourse particle. Set "
-        "Translation (English) exactly to “now; indeed; as for”, "
-        "Pronunciation (English) to “fú”, and Part of Speech (English) to "
-        "“discourse particle”. It is not the noun man/husband fū, "
-        "which may be a separate sense."),
-    "見": (
-        "Selected 見 in 不見可欲 is causative/transitive. Set Translation "
-        "(English) exactly to “to display; to show”, Pronunciation (English) "
-        "to “xiàn”, and Part of Speech (English) to “verb”. It is not "
-        "“see/perceive” jiàn; keep that and "
-        "any intransitive appear/be-seen use separate."),
-    "民心": (
-        "Treat the whole term 民心 as the collective inner state of the "
-        "people. Set Translation (English) exactly to “the people's hearts "
-        "and minds”, Pronunciation (English) to “mín xīn”, and Part of Speech "
-        "(English) to “noun phrase”. Never omit 民, define generic mind, or "
-        "split the characters; normally no additional lexical sense applies."),
-    "智者": (
-        "Treat the whole term 智者 as people characterized by wisdom or "
-        "cleverness. Set Translation (English) exactly to “wise or clever "
-        "people”, Pronunciation (English) to “zhì zhě”, and Part of Speech "
-        "(English) to “noun phrase”. Never read 智 as zhī or split off 者; "
-        "normally no additional lexical sense applies."),
-    "沖": (
-        "Selected 沖 in 道沖 describes functional emptiness. Set Translation "
-        "(English) exactly to “empty; hollow; open”, Pronunciation (English) "
-        "to “chōng”, and Part of Speech (English) to “stative verb / "
-        "adjective”. Never claim it means fill/full—that idea belongs to 盈 "
-        "in this sentence. A genuine rush/surge use may be separate."),
-}
-_WANG_BI_COMPACT_CONTEXT_TERMS = {
-    _WANG_BI_OPENING_CONTEXT: {
-        "道", "可", "非", "常道", "名", "常名",
-    },
-    _WANG_BI_ORIGIN_CONTEXT: {
-        "無", "天地", "之", "始", "有",
-    },
-    _WANG_BI_PURPOSE_CONTEXT: {"以"},
-    _WANG_BI_LIMIT_CONTEXT: {"徼"},
-    _WANG_BI_TWO_CONTEXT: {"者"},
-    _WANG_BI_BEAUTY_CONTEXT: {"美", "為", "惡"},
-    _WANG_BI_REFUSAL_CONTEXT: {"辭"},
-    _WANG_BI_CREDIT_CONTEXT: {"居"},
-    _WANG_BI_DISCOURSE_CONTEXT: {"夫"},
-    _WANG_BI_DESIRE_CONTEXT: {"見", "民心"},
-    _WANG_BI_WISE_CONTEXT: {"智者"},
-    _WANG_BI_EMPTY_CONTEXT: {"沖"},
-}
-
-
 SOURCE_BATCH_INSTRUCTIONS = """
 The supplied source batch is a JSON object. Define every term in its "words"
 array and do not add terms that are absent from that array. Each word points to
@@ -263,6 +77,26 @@ def load_source_batch_instructions(project_root=None):
 def load_source_v9_batch_instructions(project_root=None):
     """Load the compact source-batch suffix used only by v9."""
     component_key = "source/batch_v9"
+    component = pipeline_store.prompt_component_map(
+        project_root).get(component_key)
+    if component is None:
+        raise prompt_builder.PromptComponentError(
+            f'Required prompt component "{component_key}" was not found.')
+    try:
+        text = component.path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise prompt_builder.PromptComponentError(
+            f'Could not read prompt component "{component_key}": '
+            f"{error}") from error
+    if not text:
+        raise prompt_builder.PromptComponentError(
+            f'Prompt component "{component_key}" cannot be empty.')
+    return text
+
+
+def load_source_v10_batch_instructions(project_root=None):
+    """Load the compact source-batch suffix used only by v10."""
+    component_key = "source/batch_v10"
     component = pipeline_store.prompt_component_map(
         project_root).get(component_key)
     if component is None:
@@ -339,17 +173,46 @@ def load_source_v9_final_checks(project_root=None):
     return text
 
 
+def load_source_v10_final_checks(project_root=None):
+    """Load the compact final checks used only by v10 source requests."""
+    component_key = "source/final_checks_v10"
+    component = pipeline_store.prompt_component_map(
+        project_root).get(component_key)
+    if component is None:
+        raise prompt_builder.PromptComponentError(
+            f'Required prompt component "{component_key}" was not found.')
+    try:
+        text = component.path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise prompt_builder.PromptComponentError(
+            f'Could not read prompt component "{component_key}": '
+            f"{error}") from error
+    if not text:
+        raise prompt_builder.PromptComponentError(
+            f'Prompt component "{component_key}" cannot be empty.')
+    return text
+
+
 def _source_batch_prompt(
         project_root=None,
         *,
         use_grouped_source_results,
-        use_compact_source_results):
+        use_compact_source_results,
+        compact_source_protocol=9):
     """Keep protocol-specific checks next to the final payload marker."""
     if use_grouped_source_results and use_compact_source_results:
         raise ValueError(
-            "A source prompt cannot use both v8 and v9 result protocols.")
+            "A source prompt cannot use grouped and compact result protocols.")
+    if (
+            use_compact_source_results
+            and compact_source_protocol not in {9, 10}):
+        raise ValueError(
+            "Compact source results require protocol 9 or 10.")
     batch = (
-        load_source_v9_batch_instructions(project_root).strip()
+        (
+            load_source_v10_batch_instructions(project_root).strip()
+            if compact_source_protocol == 10
+            else load_source_v9_batch_instructions(project_root).strip())
         if use_compact_source_results
         else load_source_batch_instructions(project_root).strip())
     if (
@@ -362,7 +225,10 @@ def _source_batch_prompt(
             f'{_SOURCE_BATCH_MARKER!r}.')
     prefix = batch[:-len(_SOURCE_BATCH_MARKER)].rstrip()
     final_checks = (
-        load_source_v9_final_checks(project_root)
+        (
+            load_source_v10_final_checks(project_root)
+            if compact_source_protocol == 10
+            else load_source_v9_final_checks(project_root))
         if use_compact_source_results
         else load_source_v8_final_checks(project_root))
     return (
@@ -380,10 +246,23 @@ def load_source_context_example_instructions(
         split_source_context_cards=False,
         use_occurrence_locators=False,
         use_grouped_source_results=False,
-        use_compact_source_results=False):
+        use_compact_source_results=False,
+        compact_source_protocol=9,
+        translation_memory_enabled=False):
     """Load guidance for using retained source text as the card example."""
+    if (
+            use_compact_source_results
+            and compact_source_protocol not in {9, 10}):
+        raise ValueError(
+            "Compact source results require protocol 9 or 10.")
     component_key = (
-        "source/context_examples_v9"
+        "source/context_examples_v10_memory"
+        if (
+            use_compact_source_results
+            and compact_source_protocol == 10
+            and translation_memory_enabled)
+        else (
+        f"source/context_examples_v{compact_source_protocol}"
         if use_compact_source_results
         else (
             "source/context_examples_v8"
@@ -397,7 +276,7 @@ def load_source_context_example_instructions(
                     else (
                         "source/context_examples_v5"
                         if use_context_translation_map
-                        else "source/context_examples")))))
+                        else "source/context_examples"))))))
     component = pipeline_store.prompt_component_map(
         project_root).get(component_key)
     if component is None:
@@ -426,8 +305,15 @@ def build_source_prompt(
         split_source_context_cards=None,
         use_occurrence_locators=None,
         use_grouped_source_results=False,
-        use_compact_source_results=False):
+        use_compact_source_results=False,
+        compact_source_protocol=9,
+        translation_memory_enabled=False):
     """Compose Card Setup's minimum prompt plus source-batch instructions."""
+    if (
+            use_compact_source_results
+            and compact_source_protocol not in {9, 10}):
+        raise ValueError(
+            "Compact source results require protocol 9 or 10.")
     if sentence_collections_as_arrays is None:
         sentence_collections_as_arrays = require_sentence_translations
     if split_source_context_cards is None:
@@ -449,6 +335,7 @@ def build_source_prompt(
                 use_grouped_source_results),
             compact_source_examples=(
                 use_compact_source_results),
+            compact_source_protocol=compact_source_protocol,
             include_ending=False)
         + "\n")
     if allow_web_search:
@@ -471,14 +358,18 @@ def build_source_prompt(
                 use_grouped_source_results=(
                     use_grouped_source_results),
                 use_compact_source_results=(
-                    use_compact_source_results))
+                    use_compact_source_results),
+                compact_source_protocol=compact_source_protocol,
+                translation_memory_enabled=(
+                    translation_memory_enabled))
             + "\n")
     return (
         prompt
         + _source_batch_prompt(
             project_root,
             use_grouped_source_results=use_grouped_source_results,
-            use_compact_source_results=use_compact_source_results)
+            use_compact_source_results=use_compact_source_results,
+            compact_source_protocol=compact_source_protocol)
         + "\n")
 
 
@@ -605,6 +496,7 @@ def normalise_source_request_contract(value):
             6,
             7,
             8,
+            9,
             SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION}:
         raise ValueError("Unsupported source request contract version.")
     model = value.get("model")
@@ -692,10 +584,18 @@ def normalise_source_request_contract(value):
                 raise ValueError(
                     "Grouped source response format IDs must exactly match "
                     "the chunk output-limit IDs.")
+        elif (
+                schema_version == 10
+                and uses_source_examples
+                and normalised_formats_by_chunk):
+            if set(normalised_formats_by_chunk) != set(chunk_limits):
+                raise ValueError(
+                    "Compact v10 response format IDs must exactly match "
+                    "the chunk output-limit IDs.")
         elif normalised_formats_by_chunk:
             raise ValueError(
-                "Only grouped v8 source contracts may contain per-chunk "
-                "response formats.")
+                "Only grouped v8 and compact v10 source contracts may "
+                "contain per-chunk response formats.")
         if any(
                 normalised_formats_by_chunk[chunk_id]
                 is not response_formats_by_chunk[chunk_id]
@@ -775,19 +675,49 @@ def source_request_uses_grouped_source_results(value):
 
 
 def source_request_uses_compact_source_results(value):
-    """Return whether a contract uses the fixed compact v9 source schema."""
+    """Return whether a contract uses a fixed compact source schema."""
     contract = normalise_source_request_contract(value)
     return (
-        contract["schema_version"] == 9
+        contract["schema_version"] in {9, 10}
         and bool(contract.get("require_sentence_translations", False))
         and bool(contract.get("use_source_for_example_sentences", False)))
 
 
-def _source_prompt_cache_key(composed_prompt, response_format):
+def compact_response_format_uses_occurrence_sense_indices(value):
+    """Detect frozen per-occurrence accounting from a compact JSON schema."""
+    if not isinstance(value, dict):
+        return False
+    schema = value.get("schema")
+    if not isinstance(schema, dict):
+        return False
+    root_properties = schema.get("properties")
+    if not isinstance(root_properties, dict):
+        return False
+    term_results = root_properties.get("term_results")
+    if not isinstance(term_results, dict):
+        return False
+    items = term_results.get("items")
+    if not isinstance(items, dict):
+        return False
+    item_properties = items.get("properties")
+    return (
+        isinstance(item_properties, dict)
+        and "occurrence_sense_indices" in item_properties)
+
+
+def _source_prompt_cache_key(
+        composed_prompt,
+        response_format,
+        *,
+        model=SOURCE_REQUEST_MODEL,
+        protocol_version=9):
     """Return a stable routing key shared by requests with one fixed prefix."""
+    if protocol_version not in {9, 10}:
+        raise ValueError(
+            "Compact source prompt caches require protocol 9 or 10.")
     encoded = json.dumps(
         {
-            "model": SOURCE_REQUEST_MODEL,
+            "model": model,
             "composed_prompt": composed_prompt,
             "response_format": response_format,
         },
@@ -796,7 +726,7 @@ def _source_prompt_cache_key(composed_prompt, response_format):
         separators=(",", ":"),
     ).encode("utf-8")
     return (
-        "autoanki-source-v9-"
+        f"autoanki-source-v{protocol_version}-"
         + hashlib.sha256(encoded).hexdigest()[:32])
 
 
@@ -809,7 +739,9 @@ def build_source_request_contract(
         use_source_for_example_sentences=False,
         require_sentence_translations=True,
         protocol_version=SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION,
-        reasoning_effort="low"):
+        reasoning_effort="low",
+        model=SOURCE_REQUEST_MODEL,
+        translation_memory_enabled=False):
     """Freeze every mutable input used to construct an OpenAI source call."""
     # Imported lazily so source planning remains usable without importing the
     # OpenAI-facing module until a paid job is explicitly created.
@@ -830,12 +762,26 @@ def build_source_request_contract(
     if len(chunk_ids) != len(set(chunk_ids)):
         raise ValueError(
             "Source request chunk identifiers must be unique.")
-    if protocol_version not in {8, 9}:
+    if protocol_version not in {8, 9, 10}:
         raise ValueError(
-            "Source request protocol_version must be 8 or 9.")
+            "Source request protocol_version must be 8, 9, or 10.")
     if reasoning_effort not in {"none", "low"}:
         raise ValueError(
             'Source request reasoning_effort must be "none" or "low".')
+    if model not in SUPPORTED_SOURCE_MODELS:
+        raise ValueError(
+            "Unsupported source-generation model: "
+            f"{model!r}.")
+    if not isinstance(translation_memory_enabled, bool):
+        raise TypeError(
+            "Translation-memory request mode must be true or false.")
+    if translation_memory_enabled and not (
+            protocol_version == 10
+            and use_source_for_example_sentences
+            and require_sentence_translations):
+        raise ValueError(
+            "Translation-memory request mode requires compact v10 source "
+            "examples.")
     if protocol_version == 8 and reasoning_effort != "low":
         raise ValueError(
             'Frozen v8 source requests require reasoning effort "low".')
@@ -849,13 +795,13 @@ def build_source_request_contract(
         require_sentence_translations
         and use_source_for_example_sentences
         and protocol_version == 8)
-    uses_v9_compact_results = (
+    uses_compact_results = (
         require_sentence_translations
         and use_source_for_example_sentences
-        and protocol_version == 9)
+        and protocol_version in {9, 10})
     effective_reasoning_effort = (
         reasoning_effort
-        if protocol_version == 9
+        if protocol_version in {9, 10}
         else "low")
     composed_prompt = build_source_prompt(
         pipeline,
@@ -872,10 +818,14 @@ def build_source_request_contract(
             require_sentence_translations
             and use_source_for_example_sentences),
         use_grouped_source_results=uses_v8_grouped_results,
-        use_compact_source_results=uses_v9_compact_results)
+        use_compact_source_results=uses_compact_results,
+        compact_source_protocol=protocol_version,
+        translation_memory_enabled=translation_memory_enabled)
     response_format = (
-        process_text.build_compact_source_response_format(pipeline)
-        if uses_v9_compact_results
+        process_text.build_compact_source_response_format(
+            pipeline,
+            protocol_version=protocol_version)
+        if uses_compact_results
         else process_text.build_response_format(
             pipeline,
             optional_fields=(
@@ -897,7 +847,7 @@ def build_source_request_contract(
             protocol_version
             if require_sentence_translations
             else 3),
-        "model": SOURCE_REQUEST_MODEL,
+        "model": model,
         "composed_prompt": composed_prompt,
         "response_format": response_format,
         "reasoning": {
@@ -925,7 +875,7 @@ def build_source_request_contract(
                             1.50
                             * (
                                 _V9_OUTPUT_LIMIT_MULTIPLIER
-                                if protocol_version == 9
+                                if protocol_version in {9, 10}
                                 else (
                                     LOW_REASONING_OUTPUT_RESERVE_MULTIPLIER
                                     if effective_reasoning_effort == "low"
@@ -939,14 +889,27 @@ def build_source_request_contract(
             chunk.chunk_id: (
                 process_text.build_grouped_source_response_format(
                     pipeline,
-                    chunk))
+                    chunk)
+                if uses_v8_grouped_results
+                else process_text.build_compact_source_response_format(
+                    pipeline,
+                    protocol_version=protocol_version,
+                    chunk=chunk,
+                    translation_memory_enabled=(
+                        translation_memory_enabled)))
             for chunk in chunks
-            if uses_v8_grouped_results
+            if (
+                uses_v8_grouped_results
+                or (
+                    uses_compact_results
+                    and protocol_version == 10))
         }
-        if protocol_version == 9:
+        if protocol_version in {9, 10}:
             contract["prompt_cache_key"] = _source_prompt_cache_key(
                 composed_prompt,
-                response_format)
+                response_format,
+                model=model,
+                protocol_version=protocol_version)
     return normalise_source_request_contract(contract)
 
 
@@ -962,7 +925,11 @@ def source_request_contract_digest(value):
     return hashlib.sha256(encoded).hexdigest()
 
 
-def render_chunk_input(chunk, *, protocol_version=8):
+def render_chunk_input(
+        chunk,
+        *,
+        protocol_version=8,
+        source_context_translation_memory=None):
     """Serialize one source payload using its frozen protocol shape."""
     if (
             isinstance(protocol_version, bool)
@@ -971,13 +938,17 @@ def render_chunk_input(chunk, *, protocol_version=8):
             or protocol_version > SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION):
         raise ValueError("Unsupported source request payload protocol.")
     payload = chunk.request_payload()
-    if protocol_version == 9:
+    if protocol_version in {9, 10}:
         contexts_by_id = {
             context.get("context_id"): context.get("text")
             for context in payload.get("contexts", ())
             if isinstance(context, dict)
         }
         compact_words = []
+        generation_words_by_rank = {
+            generation_word.rank: generation_word
+            for generation_word in chunk.words
+        }
         for word in payload.get("words", ()):
             compact_word = {
                 "rank": word.get("rank"),
@@ -991,22 +962,47 @@ def render_chunk_input(chunk, *, protocol_version=8):
                 else None)
             if isinstance(marked_excerpt, str) and marked_excerpt:
                 compact_word["marked_excerpt"] = marked_excerpt
-            context_text = contexts_by_id.get(
-                word.get("context_id"))
-            term = word.get("term")
-            if term in _WANG_BI_COMPACT_CONTEXT_TERMS.get(
-                    context_text,
-                    ()):
-                compact_word["quality_hint"] = (
-                    _WANG_BI_COMPACT_HINTS[term]
-                    + " Every generated example must contain exactly one "
-                    f"literal <strong>{term}</strong> and no untagged "
-                    f"{term}.")
+            generation_word = generation_words_by_rank.get(
+                word.get("rank"))
+            if (
+                    protocol_version == 10
+                    and generation_word is not None
+                    and generation_word.context_occurrences):
+                compact_word["context_occurrences"] = [
+                    {
+                        "span": [
+                            occurrence.start_offset,
+                            occurrence.end_offset,
+                        ],
+                        "surface": occurrence.surface,
+                    }
+                    for occurrence in generation_word.context_occurrences
+                ]
             compact_words.append(compact_word)
         payload = {
             "words": compact_words,
             "contexts": payload.get("contexts", []),
         }
+        if source_context_translation_memory:
+            if protocol_version != 10:
+                raise ValueError(
+                    "Translation-memory payloads require protocol v10.")
+            expected_ids = set(contexts_by_id)
+            memory = {}
+            for context_id, hit in (
+                    source_context_translation_memory.items()):
+                translation = (
+                    hit.get("translation")
+                    if isinstance(hit, dict)
+                    else hit)
+                if (
+                        context_id not in expected_ids
+                        or not isinstance(translation, str)
+                        or not translation.strip()):
+                    raise ValueError(
+                        "Translation memory does not match the source chunk.")
+                memory[context_id] = translation
+            payload["source_context_translation_memory"] = memory
     return json.dumps(
         payload,
         ensure_ascii=False,

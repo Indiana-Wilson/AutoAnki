@@ -1,0 +1,20 @@
+{
+  "model": "gemma4:12b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"The Way\",\"Dictionary Meaning (English)\":\"The fundamental principle, path, or underlying essence of the universe and the cosmos.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"Noun\",\"Register (English)\":\"Philosophical/Metaphysical (Laozi)\",\"Nuance (English)\":\"In this context, it refers to the ultimate, ineffable reality or the underlying principle of existence.\"},\"additional_senses\":[{\"Translation (English)\":\"path; road\",\"Dictionary Meaning (English)\":\"A physical path, road, or way for traveling.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"Noun\",\"Register (English)\":\"Common/Literary\",\"Nuance (English)\":\"Refers to a physical route or thoroughfare.\",\"Sentences\":[\"此道通向南方。\",\"This road leads toward the south.\",\"山中有一条古道。\",\"There is an ancient path in the mountains.\\\",\\\"路徑極長，難以通行。\\\",\\\"The road is very long and difficult to travel.\\\",\\\"此道在城外延伸。\\\",\\\"This road extends outside the city.\\\"\"],\"Sentence Translations (English)\":[\"This road leads toward the south.\",\"There is an ancient path in the mountains.\",\"The road is very long and difficult to travel.\",\"This road extends outside the city.\"]}], \"occurrence_sense_indices\": [0]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Dao that can be told is not the constant Dao; the name that can be named is not the constant name.\"}]}",
+  "received_at": "2026-07-26T06:31:48.662913+00:00",
+  "response_id": "ollama-4c164434f1a7b833bed65c5d",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2703,
+    "output_tokens": 379,
+    "reasoning_tokens": 0,
+    "total_tokens": 3082,
+    "uncached_input_tokens": 2703,
+    "visible_output_tokens": 379,
+    "web_search_calls": 0
+  }
+}

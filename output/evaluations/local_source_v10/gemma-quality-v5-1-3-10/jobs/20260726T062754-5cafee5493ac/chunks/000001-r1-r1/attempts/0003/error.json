@@ -1,0 +1,134 @@
+{
+  "message": "The position of each integer must account for the matching trusted context_occurrence in input order.",
+  "status_code": null,
+  "timestamp": "2026-07-26T06:30:06.298907+00:00",
+  "transient": false,
+  "type": "GeneratedCardValidationError",
+  "validation": {
+    "accepted_problem_count": 0,
+    "all_problems_resolved": false,
+    "can_complete_with_manual_acceptance": false,
+    "can_manually_accept": false,
+    "full_retry_required": false,
+    "local_repair_applied": false,
+    "local_repair_count": 0,
+    "local_repairs": [],
+    "non_overrideable_problem_count": 3,
+    "overrideable_problem_count": 1,
+    "problem_count": 4,
+    "problems": [
+      {
+        "accepted": false,
+        "actual": 1,
+        "card_index": null,
+        "card_number": null,
+        "code": "context_occurrence_sense_count_mismatch",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": 2,
+        "field_name": "occurrence_sense_indices",
+        "location": "Response → term_results → rank 1 → occurrence_sense_indices",
+        "message": "The position of each integer must account for the matching trusted context_occurrence in input order.",
+        "overrideable": false,
+        "path": "$.term_results[0].occurrence_sense_indices",
+        "problem_id": "context_occurrence_sense_count_mismatch:24f04dacb9f71827",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "source_rank": 1,
+        "suggestion": "Repair this rank with exactly one sense index for each trusted occurrence.",
+        "term": "道",
+        "title": "Context-occurrence sense map has the wrong length"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "blank_translation_positions": [
+            1
+          ]
+        },
+        "card_index": 1,
+        "card_number": 2,
+        "code": "blank_sentence_translation",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "Non-blank translations for every example sentence.",
+        "field_name": "Sentence Translations (English)",
+        "location": "Card 2 (“道”) → Sentence Translations (English)",
+        "message": "Every example sentence needs a non-blank English translation in the same position.",
+        "overrideable": true,
+        "path": "$.term_results[0].additional_senses[0][\"Sentence Translations (English)\"]",
+        "problem_id": "blank_sentence_translation:042adf33406b383e",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "source_rank": 1,
+        "suggestion": "Retry, or fill each listed translation before packaging.",
+        "term": "道",
+        "title": "An example translation is blank"
+      },
+      {
+        "accepted": false,
+        "actual": {
+          "reason": "exact_source_copy",
+          "source_sentence": "This road leads to the south.",
+          "translation": "This road leads to the south."
+        },
+        "card_index": 1,
+        "card_number": 2,
+        "code": "sentence_translation_not_english",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "A plain English translation of source item 2.",
+        "field_name": "Sentence Translations (English)",
+        "location": "Card 2 (“道”) → Sentence Translations (English) → item 2",
+        "message": "This English translation is an exact copy of its source-language sentence after strong emphasis markup is removed.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0][\"Sentence Translations (English)\"][1]",
+        "problem_id": "sentence_translation_not_english:d3dc7d3413dd54a7",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "source_rank": 1,
+        "suggestion": "Retry or replace this item with an English translation of the aligned source sentence.",
+        "term": "道",
+        "title": "Example translation is not English"
+      },
+      {
+        "accepted": false,
+        "actual": "This road leads to the south.",
+        "card_index": 1,
+        "card_number": 2,
+        "code": "missing_exact_form_source_term",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "At least one literal occurrence of 道.",
+        "field_name": "Sentences",
+        "location": "Card 2 (“道”) → Sentences → item 2",
+        "message": "Classical Chinese does not require inflection here, so every generated additional-sense example must contain the complete requested lexical item at least once.",
+        "overrideable": false,
+        "path": "$.term_results[0].additional_senses[0][\"Sentences\"][1]",
+        "problem_id": "missing_exact_form_source_term:ba3af375c396df00",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 1
+        },
+        "scope": "field",
+        "source_rank": 1,
+        "suggestion": "Retry with a natural example that uses the complete requested term, not only a component or synonym.",
+        "term": "道",
+        "title": "Example omits the complete source term"
+      }
+    ],
+    "remaining_problem_count": 4,
+    "structurally_valid": false,
+    "syntax_valid": true,
+    "valid": false
+  }
+}

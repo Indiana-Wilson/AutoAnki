@@ -1,0 +1,59 @@
+{
+  "cards": [
+    {
+      "Classical Chinese": "常名",
+      "Dictionary Meaning (English)": "A name that is permanent, unchanging, and essential to the nature of something; a true or ultimate designation.",
+      "Nuance (English)": "Implies a name that transcends temporal and conventional limitations.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "cháng míng",
+      "Register (English)": "archaic literary",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+      "Sentences": "S道可道，非常道，名可名，非<strong>常名</strong>；",
+      "Translation (English)": "eternal name"
+    },
+    {
+      "Classical Chinese": "無",
+      "Dictionary Meaning (English)": "The state of not existing or lacking form; the void or emptiness prior to creation.",
+      "Nuance (English)": "Used in contrast with 'being' to denote the primordial condition before differentiation.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "wú",
+      "Register (English)": "archaic literary",
+      "Sentence Translations (English)": "Non-being is the beginning of heaven and earth; being is the mother of all things.",
+      "Sentences": "S<strong>無</strong>名，天地之始，有名，萬物之母。",
+      "Translation (English)": "non-being, absence"
+    },
+    {
+      "Classical Chinese": "天地",
+      "Dictionary Meaning (English)": "The cosmos; the physical world; the universe as a whole.",
+      "Nuance (English)": "Refers to the totality of existence, often used in cosmological or philosophical contexts.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "tiān dì",
+      "Register (English)": "archaic literary",
+      "Sentence Translations (English)": "Non-being is the beginning of heaven and earth; being is the mother of all things.",
+      "Sentences": "S無名，<strong>天地</strong>之始，有名，萬物之母。",
+      "Translation (English)": "heaven and earth"
+    },
+    {
+      "Classical Chinese": "之",
+      "Dictionary Meaning (English)": "A grammatical marker used to indicate possession, relation, or specification.",
+      "Nuance (English)": "Serves to link nouns with modifiers or to show a relationship between concepts.",
+      "Part of Speech (English)": "particle",
+      "Pronunciation (English)": "zhī",
+      "Register (English)": "archaic literary",
+      "Sentence Translations (English)": "Non-being is the beginning of heaven and earth; being is the mother of all things.",
+      "Sentences": "S無名，天地<strong>之</strong>始，有名，萬物之母。",
+      "Translation (English)": "the"
+    },
+    {
+      "Classical Chinese": "始",
+      "Dictionary Meaning (English)": "The starting point of something; the source or genesis.",
+      "Nuance (English)": "Implies a foundational or primordial beginning rather than a temporal one.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "shǐ",
+      "Register (English)": "archaic literary",
+      "Sentence Translations (English)": "Non-being is the beginning of heaven and earth; being is the mother of all things.",
+      "Sentences": "S無名，天地之<strong>始</strong>，有名，萬物之母。",
+      "Translation (English)": "beginning, origin"
+    }
+  ]
+}

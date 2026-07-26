@@ -1,0 +1,26 @@
+{
+  "cards": [
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "The fundamental, ineffable principle underlying the universe and all phenomena.",
+      "Nuance (English)": "Implies a cosmic order that cannot be fully expressed in words.",
+      "Part of Speech (English)": "noun",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "Classical Chinese (Wang Bi recension)",
+      "Sentence Translations (English)": "The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;",
+      "Sentences": "S<strong>道</strong>可道，非常道，名可名，非常名；",
+      "Translation (English)": "way; principle; doctrine"
+    },
+    {
+      "Classical Chinese": "道",
+      "Dictionary Meaning (English)": "To express or articulate something verbally.",
+      "Nuance (English)": "Implies the act of verbal expression, often in a philosophical or didactic context.",
+      "Part of Speech (English)": "verb",
+      "Pronunciation (English)": "dào",
+      "Register (English)": "Classical Chinese (Wang Bi recension)",
+      "Sentence Translations (English)": "The master speaks it, the disciple repeats it.|The Master said: Lead them by moral example and align them with ritual, and they will have shame and be upright.|A gentleman expresses his words, a petty person conceals his deeds.|The way is the path by which something comes to be.",
+      "Sentences": "夫子<strong>道</strong>之，弟子述之。|子曰：<strong>道</strong>之以德，齐之以礼，有耻且格。|君子<strong>道</strong>其言，小人隐其事。|<strong>道</strong>者，言其所由也。",
+      "Translation (English)": "to speak; to say"
+    }
+  ]
+}

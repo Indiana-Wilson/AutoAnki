@@ -1,0 +1,54 @@
+{
+  "message": "For an uninflected Classical Chinese term, a generated additional-sense example must contain exactly one literal occurrence. Repetition can mix grammatical roles or senses.",
+  "status_code": null,
+  "timestamp": "2026-07-26T05:16:23.418212+00:00",
+  "transient": false,
+  "type": "GeneratedCardValidationError",
+  "validation": {
+    "accepted_problem_count": 0,
+    "all_problems_resolved": false,
+    "can_complete_with_manual_acceptance": false,
+    "can_manually_accept": false,
+    "full_retry_required": false,
+    "local_repair_applied": false,
+    "local_repair_count": 0,
+    "local_repairs": [],
+    "non_overrideable_problem_count": 1,
+    "overrideable_problem_count": 0,
+    "problem_count": 1,
+    "problems": [
+      {
+        "accepted": false,
+        "actual": {
+          "occurrence_count": 2,
+          "sentence": "君子可讓，小人不可讓。"
+        },
+        "card_index": 3,
+        "card_number": 4,
+        "code": "repeated_exact_form_source_term",
+        "context_id": "source-context-c535f824d57f859c34ac",
+        "exception_type": "GeneratedCardValidationError",
+        "expected": "Exactly one literal occurrence of 可.",
+        "field_name": "Sentences",
+        "location": "Card 4 (“可”) → Sentences → item 3",
+        "message": "For an uninflected Classical Chinese term, a generated additional-sense example must contain exactly one literal occurrence. Repetition can mix grammatical roles or senses.",
+        "overrideable": false,
+        "path": "$.term_results[1].additional_senses[0][\"Sentences\"][2]",
+        "problem_id": "repeated_exact_form_source_term:04a65f335f07537a",
+        "repair_target": {
+          "kind": "source_rank",
+          "source_rank": 2
+        },
+        "scope": "field",
+        "source_rank": 2,
+        "suggestion": "Retry with one natural example containing a single target usage.",
+        "term": "可",
+        "title": "Example repeats the complete source term"
+      }
+    ],
+    "remaining_problem_count": 1,
+    "structurally_valid": true,
+    "syntax_valid": true,
+    "valid": false
+  }
+}

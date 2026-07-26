@@ -263,7 +263,7 @@ class SourceJobsGuiTests(unittest.TestCase):
     def test_validation_problem_details_are_human_readable(self):
         problem = {
             "title": "Example sentence count is wrong",
-            "message": "Exactly four examples are required.",
+            "message": "Exactly three examples are required.",
             "location": "Card 3 (“wyrd”) → Sentences",
             "path": '$.cards[2]["Sentences"]',
             "expected": 4,

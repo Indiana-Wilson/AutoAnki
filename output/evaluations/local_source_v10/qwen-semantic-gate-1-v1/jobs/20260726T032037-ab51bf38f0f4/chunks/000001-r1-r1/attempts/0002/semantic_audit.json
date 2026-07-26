@@ -1,0 +1,65 @@
+{
+  "audited_at": "2026-07-26T03:25:08.302048+00:00",
+  "candidate_sha256": "6afa3fe4478cf020b74b2d69839c19ac1a52df3677237697fe104ca694a3a78f",
+  "case_count": 8,
+  "error": null,
+  "failed_case_count": 0,
+  "kind": "local_example_semantic_audit",
+  "model_id": "ollama/qwen3:14b",
+  "passes": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "prompt_sha256": "9fff35ba33c6f76a78765339860e179d0128af26e0386adf259085cc558a4fac",
+  "request": {
+    "dispatched_at": "2026-07-26T03:25:02.957845+00:00",
+    "kind": "ollama_source_dispatch",
+    "max_output_tokens": 128,
+    "model_id": "ollama/qwen3:14b",
+    "provider_model": "qwen3:14b",
+    "reasoning": {
+      "effort": "none"
+    },
+    "runtime": {
+      "keep_alive": "10m",
+      "options": {
+        "num_ctx": 8192,
+        "repeat_penalty": 1.05,
+        "seed": 250613461,
+        "temperature": 0.0,
+        "top_k": 40,
+        "top_p": 0.9
+      }
+    },
+    "schema_version": 1,
+    "seed": 250613461
+  },
+  "response": {
+    "model": "qwen3:14b",
+    "raw_text": "{\"passes\": [true, true, true, true, true, true, true, true]}",
+    "received_at": "2026-07-26T03:25:08.302007+00:00",
+    "response_id": "ollama-df107490d7e8086a69c5c502",
+    "schema_version": 1,
+    "service_tier": "local",
+    "status": "completed",
+    "usage": {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 0,
+      "input_tokens": 694,
+      "output_tokens": 21,
+      "reasoning_tokens": 0,
+      "total_tokens": 715,
+      "uncached_input_tokens": 694,
+      "visible_output_tokens": 21,
+      "web_search_calls": 0
+    }
+  },
+  "schema_version": 1,
+  "status": "passed"
+}

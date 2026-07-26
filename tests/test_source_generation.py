@@ -134,7 +134,9 @@ def make_plan(
         excluded_words=(),
         request_protocol="v9",
         reasoning_effort="none",
-        execution_mode="standard"):
+        execution_mode="standard",
+        model="gpt-5.4-mini",
+        automatic_repair=False):
     source = make_source()
     return plan_source_generation(
         source,
@@ -145,9 +147,11 @@ def make_plan(
             concurrency=3,
             request_stagger_ms=0,
             max_transient_retries=2,
+            model=model,
             request_protocol=request_protocol,
             reasoning_effort=reasoning_effort,
             execution_mode=execution_mode,
+            automatic_repair=automatic_repair,
             excluded_words=tuple(excluded_words)))
 
 
@@ -157,9 +161,30 @@ class SourcePlanningTests(unittest.TestCase):
 
         self.assertEqual(config.chunk_size, 30)
         self.assertEqual(config.concurrency, 8)
-        self.assertEqual(config.request_protocol, "v9")
-        self.assertEqual(config.reasoning_effort, "none")
+        self.assertEqual(config.request_protocol, "v10")
+        self.assertEqual(config.reasoning_effort, "low")
         self.assertEqual(config.execution_mode, "standard")
+        self.assertEqual(config.model, "gpt-5.4-mini")
+        self.assertFalse(config.automatic_repair)
+
+    def test_retired_models_and_repair_caps_are_rejected(self):
+        with self.assertRaises(ValueError):
+            SourceGenerationConfig(
+                source_key="fixture_source",
+                model="unknown")
+        with self.assertRaises(ValueError):
+            SourceGenerationConfig(
+                source_key="fixture_source",
+                model="gpt-5.6-luna")
+        with self.assertRaises(ValueError):
+            SourceGenerationConfig(
+                source_key="fixture_source",
+                execution_mode="economy",
+                automatic_repair=True)
+        with self.assertRaises(ValueError):
+            SourceGenerationConfig(
+                source_key="fixture_source",
+                max_automatic_repairs=4)
 
     def test_request_protocol_reasoning_and_execution_settings_are_validated(
             self):
@@ -174,7 +199,7 @@ class SourcePlanningTests(unittest.TestCase):
         self.assertEqual(legacy.reasoning_effort, "low")
         self.assertEqual(legacy.execution_mode, "economy")
         for setting, value, message in (
-                ("request_protocol", "v10", "protocol"),
+                ("request_protocol", "v11", "protocol"),
                 ("reasoning_effort", "medium", "reasoning"),
                 ("execution_mode", "fast", "execution")):
             with self.subTest(setting=setting), self.assertRaisesRegex(
@@ -597,11 +622,11 @@ class SourcePlanningTests(unittest.TestCase):
             "deterministic character-class approximation; no API call")
         self.assertEqual(
             detailed_estimate.assumptions["reasoning_effort"],
-            "none")
+            "low")
         self.assertEqual(
             detailed_estimate.assumptions[
                 "reasoning_output_reserve_multiplier"],
-            1.0)
+            1.20)
 
     def test_cost_estimate_counts_exact_per_chunk_response_schemas(self):
         plan = make_plan(
@@ -709,7 +734,10 @@ class SourcePlanningTests(unittest.TestCase):
                 })
 
     def test_cost_estimate_uses_exact_protocol_payload_rendering(self):
-        for protocol, reasoning in (("v8", "low"), ("v9", "none")):
+        for protocol, reasoning in (
+                ("v8", "low"),
+                ("v9", "none"),
+                ("v10", "none")):
             with self.subTest(protocol=protocol):
                 plan = make_plan(
                     chunk_size=2,
@@ -775,6 +803,30 @@ class SourcePlanningTests(unittest.TestCase):
             economy.high_total_usd,
             standard.high_total_usd / 2)
 
+    def test_automatic_repair_reserve_is_bounded_and_not_in_headline(self):
+        plan = make_plan(
+            chunk_size=2,
+            automatic_repair=True)
+
+        estimate = estimate_plan_cost(
+            plan,
+            OutputDetail(("translation",)),
+            prompt_text="Prompt")
+        baseline = estimate_plan_cost(
+            make_plan(chunk_size=2),
+            OutputDetail(("translation",)),
+            prompt_text="Prompt")
+
+        self.assertEqual(
+            estimate.assumptions["automatic_repair_max_requests"],
+            estimate.request_count * 3)
+        self.assertGreater(
+            estimate.assumptions["automatic_repair_reserve_aud"],
+            0)
+        self.assertEqual(
+            estimate.estimated_total_usd,
+            baseline.estimated_total_usd)
+
     def test_cost_estimate_uses_cache_reads_centrally_and_cold_input_high(
             self):
         plan = make_plan(chunk_size=2)
@@ -819,6 +871,18 @@ class SourcePlanningTests(unittest.TestCase):
             shared_plan,
             detail,
             use_source_for_example_sentences=True)
+        remembered = estimate_plan_cost(
+            shared_plan,
+            detail,
+            use_source_for_example_sentences=True,
+            request_protocol="v10",
+            translation_memory_by_chunk={
+                shared_plan.chunks[0].chunk_id: {
+                    shared_plan.chunks[0].contexts[0].context_id: {
+                        "translation": "A remembered translation.",
+                    },
+                },
+            })
         separate = estimate_plan_cost(
             separate_plan,
             detail,
@@ -831,6 +895,12 @@ class SourcePlanningTests(unittest.TestCase):
         self.assertGreater(
             separate.estimated_output_tokens,
             shared.estimated_output_tokens)
+        self.assertLess(
+            remembered.estimated_output_tokens,
+            shared.estimated_output_tokens)
+        self.assertEqual(
+            remembered.assumptions["translation_memory_hit_count"],
+            1)
         self.assertEqual(
             generated_separate.estimated_output_tokens,
             generated_shared.estimated_output_tokens)
@@ -1119,10 +1189,10 @@ class SourceResponseValidationTests(unittest.TestCase):
         }
         additional_examples = (
             "<strong>甲</strong>一。|<strong>甲</strong>二。|"
-            "<strong>甲</strong>三。|<strong>甲</strong>四。")
+            "<strong>甲</strong>三。")
         additional_translations = (
             "First 甲 example.|Second 甲 example.|"
-            "Third 甲 example.|Fourth 甲 example.")
+            "Third 甲 example.")
         raw = json.dumps({
             "cards": [
                 {
@@ -1203,13 +1273,11 @@ class SourceResponseValidationTests(unittest.TestCase):
                         "<strong>甲</strong>一。",
                         "<strong>甲</strong>二。",
                         "<strong>甲</strong>三。",
-                        "<strong>甲</strong>四。",
                     ],
                     sentence_translations_field: [
                         "First.",
                         "Second.",
                         "Third.",
-                        "Fourth.",
                     ],
                     meaning_field: "other sense",
                 },
@@ -1232,10 +1300,10 @@ class SourceResponseValidationTests(unittest.TestCase):
             validated[1][sentence_field],
             (
                 "<strong>甲</strong>一。|<strong>甲</strong>二。|"
-                "<strong>甲</strong>三。|<strong>甲</strong>四。"))
+                "<strong>甲</strong>三。"))
         self.assertEqual(
             validated[1][sentence_translations_field],
-            "First.|Second.|Third.|Fourth.")
+            "First.|Second.|Third.")
 
     def test_v6_split_cards_merge_contextual_first_in_source_rank_order(self):
         pipeline = context_classical_pipeline()
@@ -1258,7 +1326,6 @@ class SourceResponseValidationTests(unittest.TestCase):
             "<strong>甲</strong>一。",
             "<strong>甲</strong>二。",
             "<strong>甲</strong>三。",
-            "<strong>甲</strong>四。",
         ]
         raw = json.dumps({
             "contextual_cards": [
@@ -1269,7 +1336,7 @@ class SourceResponseValidationTests(unittest.TestCase):
                 term_field: "甲",
                 sentence_field: examples,
                 sentence_translations_field: [
-                    "First.", "Second.", "Third.", "Fourth.",
+                    "First.", "Second.", "Third.",
                 ],
                 meaning_field: "甲 additional",
             }],
@@ -1407,10 +1474,9 @@ class SourceResponseValidationTests(unittest.TestCase):
                     "<strong>甲</strong>一|續。",
                     "<strong>甲</strong>二。",
                     "<strong>甲</strong>三。",
-                    "<strong>甲</strong>四。",
                 ],
                 sentence_translations_field: [
-                    "First.", "Second.", "Third.", "Fourth.",
+                    "First.", "Second.", "Third.",
                 ],
                 meaning_field: "additional",
             }],
@@ -1514,9 +1580,8 @@ class SourceResponseValidationTests(unittest.TestCase):
             "<strong>甲</strong>一。",
             "<strong>甲</strong>二。",
             "<strong>甲</strong>三。",
-            "<strong>甲</strong>四。",
         ]
-        translations = ["First.", "Second.", "Third.", "Fourth."]
+        translations = ["First.", "Second.", "Third."]
         raw = json.dumps({
             "contextual_cards": [
                 {term_field: "甲", meaning_field: "contextual"},
@@ -1590,13 +1655,11 @@ class SourceResponseValidationTests(unittest.TestCase):
                     "<strong>甲</strong>一。",
                     "<strong>甲</strong>二。",
                     "<strong>甲</strong>三。",
-                    "<strong>甲</strong>四。",
                 ],
                 sentence_translation_field: [
                     "First.",
                     "Second.",
                     "Third.",
-                    "Fourth.",
                 ],
                 translation_field: "to say",
                 definition_field: "To speak / say.",
@@ -1816,7 +1879,6 @@ class SourceResponseValidationTests(unittest.TestCase):
                         "<strong>甲</strong>一。",
                         "<strong>甲</strong>二。",
                         "<strong>甲</strong>三。",
-                        "<strong>甲</strong>四。",
                     ],
                     sentence_translations_field: [
                         "One.", "Two.", "Three.", "Four.",
@@ -1967,12 +2029,12 @@ class SourceResponseValidationTests(unittest.TestCase):
             process_text.get_response_field_names(pipeline))
         first_examples = (
             "<strong>甲</strong>一。|<strong>甲</strong>二。|"
-            "<strong>甲</strong>三。|<strong>甲</strong>四。")
+            "<strong>甲</strong>三。")
         second_examples = (
             "<strong>乙</strong>一。|<strong>乙</strong>二。|"
-            "<strong>乙</strong>三。|<strong>乙</strong>四。")
-        first_translations = "甲 one.|甲 two.|甲 three.|甲 four."
-        second_translations = "乙 one.|乙 two.|乙 three.|乙 four."
+            "<strong>乙</strong>三。")
+        first_translations = "甲 one.|甲 two.|甲 three."
+        second_translations = "乙 one.|乙 two.|乙 three."
         raw = json.dumps({
             "cards": [
                 {
@@ -2040,7 +2102,7 @@ class SourceResponseValidationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
                 process_text.GeneratedCardValidationError,
-                "additional sense needs four"):
+                "additional sense needs three"):
             validator(raw, chunk)
 
 
@@ -2104,8 +2166,8 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertIn("estimated_cost_low_usd", estimate)
         self.assertIn("estimated_cost_high_usd", estimate)
         self.assertIn("input_tokens", estimate)
-        self.assertEqual(estimate["request_protocol"], "v9")
-        self.assertEqual(estimate["reasoning_effort"], "none")
+        self.assertEqual(estimate["request_protocol"], "v10")
+        self.assertEqual(estimate["reasoning_effort"], "low")
         self.assertEqual(estimate["execution_mode"], "standard")
         self.assertEqual(
             estimate["assumptions"]["schema_estimation_mode"],
@@ -2287,8 +2349,8 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertEqual(contract["model"], SOURCE_REQUEST_MODEL)
         self.assertEqual(
             contract["reasoning"],
-            {"effort": "none"})
-        self.assertEqual(contract["schema_version"], 9)
+            {"effort": "low"})
+        self.assertEqual(contract["schema_version"], 10)
         self.assertTrue(contract["response_format"]["strict"])
         self.assertEqual(
             json.loads(
@@ -2339,7 +2401,7 @@ class SourceBackendAdapterTests(unittest.TestCase):
 
         self.assertEqual(self.backend.jobs.list(), ())
 
-    def test_create_job_rejects_stale_protocol_reasoning_and_mode(
+    def test_create_job_rejects_stale_protocol_and_repair_policy(
             self):
         estimate = self.backend.estimate(self.request)
         changed_settings = (
@@ -2347,8 +2409,10 @@ class SourceBackendAdapterTests(unittest.TestCase):
                 "request_protocol": "v8",
                 "reasoning_effort": "low",
             },
-            {"reasoning_effort": "low"},
+            {"reasoning_effort": "none"},
             {"execution_mode": "economy"},
+            {"automatic_repair": True},
+            {"max_automatic_repairs": 2},
         )
 
         for settings in changed_settings:
@@ -2371,7 +2435,7 @@ class SourceBackendAdapterTests(unittest.TestCase):
 
         contract = build_source_request_contract(pipeline)
 
-        self.assertEqual(contract["schema_version"], 9)
+        self.assertEqual(contract["schema_version"], 10)
         self.assertEqual(contract["model"], "gpt-5.4-mini")
         self.assertEqual(contract["reasoning"], {"effort": "low"})
         self.assertIn(
@@ -2479,11 +2543,11 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertEqual(
             additional_item_schema["properties"]["Sentences"][
                 "minItems"],
-            4)
+            3)
         self.assertEqual(
             additional_item_schema["properties"][
                 "Sentence Translations (English)"]["maxItems"],
-            4)
+            3)
         context_schema = response_schema["properties"][
             "source_context_translations"]
         self.assertIn(

@@ -182,6 +182,16 @@ class CompactRepairWorkflowTests(unittest.TestCase):
             self.job.job_id,
             self.chunk.chunk_id)
         self.assertTrue((latest / "repair_scope.json").is_file())
+        repair_scope = json.loads(
+            (latest / "repair_scope.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            repair_scope["kind"],
+            "compact_v10_selective_repair")
+        self.assertEqual(
+            self.backend.jobs.chunk_status(
+                self.job.job_id,
+                self.chunk.chunk_id)["worker"],
+            "selective v10 repair")
         self.assertEqual(
             json.loads((latest / "response.json").read_text(
                 encoding="utf-8"))["raw_text"],

@@ -1,0 +1,7 @@
+{
+  "message": "OpenAI response did not complete: incomplete",
+  "status_code": null,
+  "timestamp": "2026-07-26T03:45:45.079081+00:00",
+  "transient": false,
+  "type": "OpenAIIncompleteResponseError"
+}

@@ -63,11 +63,10 @@ def valid_default_card():
         "Sentences": (
             "One <strong>astrolabe</strong>.|"
             "Two <strong>astrolabes</strong>.|"
-            "This <strong>astrolabe</strong>.|"
-            "That <strong>astrolabe</strong>."),
+            "This <strong>astrolabe</strong>."),
         "Sentence Translations (English)": (
             "One astrolabe.|Two astrolabes.|"
-            "This astrolabe.|That astrolabe."),
+            "This astrolabe."),
         "Dictionary Meaning (English)": (
             "An instrument formerly used to determine celestial positions."),
         "Pronunciation (English)": "/ˈæstrəleɪb/",
@@ -417,6 +416,48 @@ class ResponseSchemaTests(unittest.TestCase):
 
 
 class SentenceTranslationTemplateTests(unittest.TestCase):
+    def test_context_front_shows_term_immediately_above_example(self):
+        for language_key, term_field in templates.TERM_FIELD_NAMES.items():
+            with self.subTest(language=language_key):
+                model = templates.get_direction_card_type(
+                    language_key,
+                    "context").model
+                question = model.templates[0]["qfmt"]
+                term_markup = (
+                    f'<div class="term context-term">'
+                    f'{{{{{term_field}}}}}</div>')
+                sentence_markup = (
+                    '<div id="sentence" class="sentence"></div>')
+
+                self.assertIn('class="context-example"', question)
+                self.assertIn(
+                    term_markup + "\n  " + sentence_markup,
+                    question)
+                self.assertLess(
+                    question.index(term_markup),
+                    question.index(sentence_markup))
+                self.assertIn("flex-direction: column", model.css)
+                self.assertIn(".context-term", model.css)
+
+    def test_other_directions_do_not_render_context_term(self):
+        for language_key in templates.TERM_FIELD_NAMES:
+            for direction_key in (
+                    "word_to_meaning",
+                    "meaning_to_word"):
+                with self.subTest(
+                        language=language_key,
+                        direction=direction_key):
+                    model = templates.get_direction_card_type(
+                        language_key,
+                        direction_key).model
+
+                    self.assertNotIn(
+                        "context-term",
+                        model.templates[0]["qfmt"])
+                    self.assertNotIn(
+                        "context-term",
+                        model.templates[0]["afmt"])
+
     def test_translation_field_is_appended_and_rendered_first_on_context_back(
             self):
         model = templates.get_direction_card_type(
@@ -570,25 +611,6 @@ class SentenceEmphasisTests(unittest.TestCase):
             result,
             "She ran &amp; rested.|&lt;em&gt;He stayed.&lt;/em&gt;")
 
-    def test_validation_identifies_sentences_without_model_emphasis(self):
-        card = valid_default_card()
-        card["Sentences"] = (
-            "One <strong>astrolabe</strong>.|"
-            "Two astrolabes.|"
-            "This <strong>astrolabe</strong>.|"
-            "That astrolabe.")
-
-        report = process_text.inspect_generated_response(
-            json.dumps({"cards": [card]}))
-
-        problem = next(
-            problem
-            for problem in report["problems"]
-            if problem["code"] == "missing_sentence_emphasis")
-        self.assertEqual(
-            problem["actual"]["sentences_without_emphasis"],
-            [2, 4])
-
     def test_generated_non_sentence_html_is_non_overrideable(self):
         cases = {
             "Word": "<strong>astrolabe</strong>",
@@ -613,90 +635,6 @@ class SentenceEmphasisTests(unittest.TestCase):
                 self.assertFalse(problem["overrideable"])
                 self.assertFalse(report["can_manually_accept"])
 
-    def test_sentences_reject_every_tag_except_literal_strong(self):
-        cases = (
-            (
-                "<em>One <strong>astrolabe</strong>.</em>",
-                ["<em>", "</em>"],
-            ),
-            (
-                'One <strong class="sense">astrolabe</strong>.',
-                ['<strong class="sense">'],
-            ),
-        )
-
-        for first_sentence, expected_tags in cases:
-            with self.subTest(first_sentence=first_sentence):
-                card = valid_default_card()
-                card["Sentences"] = (
-                    first_sentence
-                    + "|Two <strong>astrolabes</strong>."
-                    + "|This <strong>astrolabe</strong>."
-                    + "|That <strong>astrolabe</strong>.")
-
-                report = process_text.inspect_generated_response(
-                    json.dumps({"cards": [card]}))
-
-                problem = next(
-                    problem
-                    for problem in report["problems"]
-                    if (
-                        problem["code"]
-                        == "sentence_contains_unsupported_html"))
-                self.assertEqual(
-                    problem["actual"]["unsupported_tags"],
-                    expected_tags)
-                self.assertFalse(problem["overrideable"])
-                self.assertFalse(report["can_manually_accept"])
-
-    def test_literal_strong_is_the_only_allowed_sentence_markup(self):
-        report = process_text.inspect_generated_response(
-            json.dumps({"cards": [valid_default_card()]}))
-
-        self.assertNotIn(
-            "sentence_contains_unsupported_html",
-            {
-                problem["code"]
-                for problem in report["problems"]
-            })
-
-    def test_classical_chinese_validation_rejects_neighbouring_bold_text(
-            self):
-        pipeline = configured_pipeline(
-            "classical_chinese_wang_bi",
-            enabled=("context",),
-            shared_fields=(
-                pipeline_store.FieldSetting(
-                    "dictionary_meaning",
-                    "english"),
-            ))
-        card = {
-            "Classical Chinese": "始",
-            "Sentences": (
-                "天地<strong>之</strong><strong>始</strong>。|"
-                "萬物有<strong>始</strong>。|"
-                "慎終如<strong>始</strong>。|"
-                "知<strong>始</strong>者明。"),
-            "Sentence Translations (English)": (
-                "The beginning of heaven and earth.|"
-                "All things have a beginning.|"
-                "Be as careful at the end as at the beginning.|"
-                "One who knows beginnings is discerning."),
-            "Dictionary Meaning (English)": "beginning or origin",
-        }
-
-        report = process_text.inspect_generated_response(
-            json.dumps({"cards": [card]}, ensure_ascii=False),
-            pipeline)
-
-        problem = next(
-            problem
-            for problem in report["problems"]
-            if problem["code"] == "unexpected_emphasized_form")
-        self.assertEqual(
-            problem["actual"],
-            [{"sentence": 1, "emphasized": "之"}])
-
 
 class ProcessJsonTests(unittest.TestCase):
     def test_packaging_preserves_model_selected_occurrences(self):
@@ -705,8 +643,7 @@ class ProcessJsonTests(unittest.TestCase):
         card["Sentences"] = (
             "She <strong>runs</strong> daily.|"
             "Yesterday she <strong>ran</strong>.|"
-            "They <strong>run</strong> a shop, then run home.|"
-            "He has <strong>run</strong> before.")
+            "They <strong>run</strong> a shop, then run home.")
         deck = MagicMock()
         package = MagicMock()
 
@@ -725,8 +662,7 @@ class ProcessJsonTests(unittest.TestCase):
             note_class.call_args.kwargs["fields"][1],
             "She <strong>runs</strong> daily.|"
             "Yesterday she <strong>ran</strong>.|"
-            "They <strong>run</strong> a shop, then run home.|"
-            "He has <strong>run</strong> before.")
+            "They <strong>run</strong> a shop, then run home.")
 
     def test_classical_chinese_era_uses_existing_classical_chinese_model(self):
         pipeline = configured_pipeline(
@@ -830,11 +766,10 @@ class ProcessJsonTests(unittest.TestCase):
             "Sentences": (
                 "Une <strong>s'épanouit</strong>.|"
                 "Deux <strong>s'épanouissent</strong>.|"
-                "Elle <strong>s'épanouira</strong>.|"
-                "Il <strong>s'est épanoui</strong>."),
+                "Elle <strong>s'épanouira</strong>."),
             "Sentence Translations (English)": (
                 "One flourishes.|Two flourish.|"
-                "She will flourish.|He flourished."),
+                "She will flourish."),
             "Translation (English)": "to flourish",
             "Nuance (French)": "évoque un développement positif",
             "Dictionary Meaning (Japanese)": "十分に発達すること",
@@ -991,14 +926,14 @@ class ProcessJsonTests(unittest.TestCase):
 
     def test_wrong_sentence_count_is_rejected_before_export(self):
         card = valid_default_card()
-        card["Sentences"] = "One|Two|Three"
+        card["Sentences"] = "One|Two"
         deck = MagicMock()
 
         with (
                 patch.object(process_text.genanki, "Package") as package,
                 self.assertRaisesRegex(
                     process_text.GeneratedCardValidationError,
-                    "exactly four")):
+                    "exactly three")):
             process_text.process_json_text(
                 json.dumps({"cards": [card]}),
                 deck=deck)
@@ -1009,7 +944,7 @@ class ProcessJsonTests(unittest.TestCase):
     def test_sentence_translations_must_match_example_positions(self):
         card = valid_default_card()
         card["Sentence Translations (English)"] = (
-            "First.|Second.|Third.")
+            "First.|Second.")
 
         report = process_text.inspect_generated_response(
             json.dumps({"cards": [card]}))
@@ -1020,16 +955,16 @@ class ProcessJsonTests(unittest.TestCase):
             if problem["code"] == "sentence_translation_count_mismatch")
         self.assertEqual(
             problem["expected"]["translation_count"],
-            4)
+            3)
         self.assertEqual(
             problem["actual"]["translation_count"],
-            3)
+            2)
 
     def test_sentence_translation_html_is_non_overrideable(self):
         card = valid_default_card()
         card["Sentence Translations (English)"] = (
             "One <strong>astrolabe</strong>.|Two astrolabes.|"
-            "This astrolabe.|That astrolabe.")
+            "This astrolabe.")
 
         report = process_text.inspect_generated_response(
             json.dumps({"cards": [card]}))

@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\n  \"repairs\": {\n    \"p001\": {\n      \"sentence\": \"君子之道，不可言也。\",\n      \"translation\": \"The way of the gentleman cannot be expressed in words.\"\n    }\n  }\n}",
+  "received_at": "2026-07-26T02:49:09.706140+00:00",
+  "response_id": "ollama-47da6897e04d9e0da89ba68b",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 311,
+    "output_tokens": 49,
+    "reasoning_tokens": 0,
+    "total_tokens": 360,
+    "uncached_input_tokens": 311,
+    "visible_output_tokens": 49,
+    "web_search_calls": 0
+  }
+}

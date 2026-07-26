@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-dd1c5d0084d0bc5697d58d5b3bf0805fd5d3cae3097c0194cc208392993f9136",
+  "created_at": "2026-07-26T09:35:06.980294+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "故有無相生，難易相成，長短相較，高下相傾，音聲相和，前後相隨。",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T09:35:06.980318+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-f237ae687159baa10c2d",
+          "effective_raw_sha256": "b02c026cf782352ed95e2b7726c5de1435e3ce76a0241046b2e00d2dbda897ec",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T093429-4f2acf1c0f47",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "7eefa5274aea6d90fa074fc981bbcc6f5769b252b394d307484a6fbb169eff54",
+          "provider_raw_sha256": "b02c026cf782352ed95e2b7726c5de1435e3ce76a0241046b2e00d2dbda897ec",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "085f48fdd675087d33b3cab888bd192f20d198145629e116397bf8bbe4cbea65",
+          "validated_at": "2026-07-26T09:35:06.980169+00:00"
+        }
+      ],
+      "translation": "Therefore being and non-being generate each other; difficulty and ease complete each other; long and short compare with each other; high and low incline toward each other; sound and voice harmonize with each other; before and after follow each other.",
+      "translation_sha256": "cc171650177dc271404bfcd37e5c92b95af4a07eb26c213a797baeec0d18365b"
+    }
+  ]
+}

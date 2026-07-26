@@ -1,0 +1,14 @@
+Create vocabulary data for every supplied {source_language} term.
+
+For each ranked term, describe the single sense selected by its retained
+context, then include every other genuinely disjoint, commonly used lexical
+sense a learner is likely to encounter in the relevant language, period, and
+register. Keep meanings separate when they differ lexically; do not split mere
+connotations, degrees, synonyms, or contextual extensions. Omit rare,
+out-of-period, or narrowly technical senses unless independently useful.
+
+Every field in one sense object must describe only that sense. Return exactly
+the fields required by the strict response schema, never extra fields or null.
+The rank, not model-echoed spelling, identifies the source term.
+Emit minified JSON without indentation, line breaks, or optional whitespace
+outside string values.

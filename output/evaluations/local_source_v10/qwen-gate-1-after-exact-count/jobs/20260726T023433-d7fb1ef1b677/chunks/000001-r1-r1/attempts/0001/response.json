@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\n  \"term_results\": [\n    {\n      \"rank\": 1,\n      \"contextual_sense\": {\n        \"Translation (English)\": \"the Way\",\n        \"Dictionary Meaning (English)\": \"The fundamental principle or force underlying the universe, often described as ineffable and beyond human comprehension.\",\n        \"Pronunciation (English)\": \"dào\",\n        \"Part of Speech (English)\": \"noun\",\n        \"Register (English)\": \"philosophical, literary, archaic\",\n        \"Nuance (English)\": \"Implies a cosmic order or natural law that is not fixed but dynamic and ever-changing.\"\n      },\n      \"additional_senses\": [\n        {\n          \"Translation (English)\": \"a path or road\",\n          \"Dictionary Meaning (English)\": \"A physical route or passage for travel.\",\n          \"Pronunciation (English)\": \"dào\",\n          \"Part of Speech (English)\": \"noun\",\n          \"Register (English)\": \"neutral, common usage\",\n          \"Nuance (English)\": \"Implies a tangible, navigable route rather than an abstract principle.\",\n          \"Sentences\": [\n            \"行者沿道而進，不見其盡。\",\n            \"此道通向山頂，行人多走之。\",\n            \"道旁有石，可為標記。\",\n            \"問路者曰：'此道何往？'\"\n          ],\n          \"Sentence Translations (English)\": [\n            \"The traveler walked along the path, not seeing its end.\",\n            \"This road leads to the mountain top, and many travelers take it.\",\n            \"There are stones by the road that can serve as markers.\",\n            \"The person asking for directions said: 'Where does this road lead?'\"\n          ]\n        },\n        {\n          \"Translation (English)\": \"to speak or express\",\n          \"Dictionary Meaning (English)\": \"To articulate or convey something verbally.\",\n          \"Pronunciation (English)\": \"dào\",\n          \"Part of Speech (English)\": \"verb\",\n          \"Register (English)\": \"archaic, literary\",\n          \"Nuance (English)\": \"Used in contexts where speech is deliberate or formal.\",\n          \"Sentences\": [\n            \"君子之道，不可道也。\",\n            \"道其言，人皆信之。\",\n            \"道其所見，以告於君。\",\n            \"道者，言之精也。\"\n          ],\n          \"Sentence Translations (English)\": [\n            \"The Way of the gentleman cannot be spoken.\",\n            \"He spoke his words, and all believed him.\",\n            \"He conveyed what he saw to the ruler.\",\n            \"To speak is the essence of language.\"\n          ]\n        }\n      ]\n    }\n  ],\n  \"source_context_translations\": [\n    {\n      \"context_id\": \"source-context-c535f824d57f859c34ac\",\n      \"translation\": \"The Way that can be spoken of is not the eternal Way; the name that can be named is not the eternal name;\"\n    }\n  ]\n}",
+  "received_at": "2026-07-26T02:36:58.462637+00:00",
+  "response_id": "ollama-f8369e7ce721a358f04c9453",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 1869,
+    "output_tokens": 627,
+    "reasoning_tokens": 0,
+    "total_tokens": 2496,
+    "uncached_input_tokens": 1869,
+    "visible_output_tokens": 627,
+    "web_search_calls": 0
+  }
+}

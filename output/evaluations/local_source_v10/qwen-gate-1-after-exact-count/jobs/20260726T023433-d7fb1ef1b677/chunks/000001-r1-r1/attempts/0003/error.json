@@ -1,0 +1,7 @@
+{
+  "message": "Ollama rejected the local inference request: {\"error\":\"{\\\"error\\\":{\\\"code\\\":400,\\\"message\\\":\\\"Field 'json_schema': \\\\\\\"json_schema\\\\\\\": JSON schema conversion failed:\\\\nPattern must start with '^' and end with '$'\\\",\\\"type\\\":\\\"invalid_request_error\\\"}}\"}",
+  "status_code": 400,
+  "timestamp": "2026-07-26T02:40:08.342662+00:00",
+  "transient": false,
+  "type": "LocalInferenceRequestError"
+}

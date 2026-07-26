@@ -35,13 +35,11 @@ class SourceDeckTests(unittest.TestCase):
                     "Sentences": (
                         "Plants <strong>flourish</strong> here.|"
                         "Arts <strong>flourish</strong> in peace.|"
-                        "Trade can <strong>flourish</strong>.|"
-                        "May learning <strong>flourish</strong>."),
+                        "Trade can <strong>flourish</strong>."),
                     "Sentence Translations (English)": (
                         "Plants flourish here.|"
                         "Arts flourish in peace.|"
-                        "Trade can flourish.|"
-                        "May learning flourish."),
+                        "Trade can flourish."),
                     "Dictionary Meaning (English)": (
                         "To grow or develop successfully."),
                     "Pronunciation (English)": "IPA: /ˈflʌrɪʃ/",
@@ -51,13 +49,11 @@ class SourceDeckTests(unittest.TestCase):
                     "Sentences": (
                         "They <strong>fulfil</strong> the promise.|"
                         "They <strong>fulfil</strong> the need.|"
-                        "We <strong>fulfil</strong> our duties.|"
-                        "This will <strong>fulfil</strong> the goal."),
+                        "We <strong>fulfil</strong> our duties."),
                     "Sentence Translations (English)": (
                         "They fulfil the promise.|"
                         "They fulfil the need.|"
-                        "We fulfil our duties.|"
-                        "This will fulfil the goal."),
+                        "We fulfil our duties."),
                     "Dictionary Meaning (English)": (
                         "To carry out or bring to completion."),
                     "Pronunciation (English)": "IPA: /fʊlˈfɪl/",
@@ -128,8 +124,7 @@ class SourceDeckTests(unittest.TestCase):
                 "Sentences": (
                     "Plants <strong>flourish</strong> here.|"
                     "Arts <strong>flourish</strong> in peace.|"
-                    "Trade can <strong>flourish</strong>.|"
-                    "May learning <strong>flourish</strong>."),
+                    "Trade can <strong>flourish</strong>."),
                 "Dictionary Meaning (English)": (
                     "To grow or develop successfully."),
                 "Pronunciation (English)": "IPA: /ˈflʌrɪʃ/",

@@ -1,0 +1,38 @@
+{
+  "cache_key": "sctm1-5b630539591aec75e7df949db33a661019430c84bdd8a607bb70123e29e5e0c2",
+  "created_at": "2026-07-26T03:47:23.995727+00:00",
+  "kind": "source_context_translation_memory",
+  "schema_version": 1,
+  "source_language_key": "classical_chinese_wang_bi",
+  "source_text": "道可道，非常道，名可名，非常名；",
+  "state": "usable",
+  "target_language_key": "english",
+  "updated_at": "2026-07-26T03:47:23.995764+00:00",
+  "variants": [
+    {
+      "provenance": [
+        {
+          "attempt": 3,
+          "chunk_id": "000001-r1-r1",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "effective_raw_sha256": "8d4214b93c30e7c00b25fc9e860b4bc1bed368385264916e16ab27666131dae5",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T033730-ecfca1316b72",
+          "manual_acceptance": false,
+          "model": "ollama/qwen3:14b",
+          "origin": "provider",
+          "provenance_id": "cc8b4d35dd755d68f06a9bcc4b89d7a15af95931a170e6a3914e16fd6caa3cda",
+          "provider_raw_sha256": "8d4214b93c30e7c00b25fc9e860b4bc1bed368385264916e16ab27666131dae5",
+          "reasoning": {
+            "effort": "none"
+          },
+          "request_contract_sha256": "b598999c19d7030a9af566b398d8e996f14b4978c13529f684f3abe1214d9985",
+          "validated_at": "2026-07-26T03:47:23.995467+00:00"
+        }
+      ],
+      "translation": "The Way that can be spoken is not the eternal Way, the name that can be named is not the eternal name;",
+      "translation_sha256": "5bdb84af1f22a45848928ded99c0f42c407033f18893261a3f9767adadf59706"
+    }
+  ]
+}

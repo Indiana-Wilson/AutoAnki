@@ -8,14 +8,12 @@ import re
 from corpus_pipeline.processing import normalize_word
 import pipeline_store
 import process_text
+from source_generation.local_repair import repair_compact_response
 
 
 _SENTENCE_TRANSLATIONS_FIELD = (
     process_text.SENTENCE_TRANSLATIONS_FIELD_NAME)
 _HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
-_STRONG_ELEMENT_PATTERN = re.compile(
-    r"<strong>(.*?)</strong>",
-    re.DOTALL)
 _GROUPED_TERM_RESULTS_KEY = process_text.SOURCE_TERM_RESULTS_KEY
 _GROUPED_CONTEXTUAL_SENSE_KEY = (
     process_text.SOURCE_CONTEXTUAL_SENSE_KEY)
@@ -24,6 +22,20 @@ _GROUPED_ADDITIONAL_SENSES_KEY = (
 _COMPACT_RANK_FIELD = process_text.SOURCE_RANK_FIELD_NAME
 _GROUPED_CONTEXT_TRANSLATION_PLACEHOLDER = (
     "[AutoAnki validated source-context translation]")
+
+
+class ValidatedPipelineResponse(dict):
+    """Canonical cards plus non-JSON metadata for durable local-repair audit."""
+
+    def __init__(
+            self,
+            value,
+            *,
+            local_repair_audit=None,
+            effective_raw_text=None):
+        super().__init__(value)
+        self.local_repair_audit = local_repair_audit
+        self.effective_raw_text = effective_raw_text
 
 
 def _source_context_translation_map(parsed, chunk):
@@ -632,7 +644,7 @@ def _normalize_grouped_source_results(parsed, pipeline, chunk):
                 "source_context_translation_contains_html",
                 "Source-context translation contains HTML",
                 "A retained context translation must be plain English text "
-                "without strong tags or other HTML.",
+                "without HTML.",
                 path=item_path,
                 location=(
                     "Response → source_context_translations "
@@ -660,7 +672,7 @@ def _mark_compact_problem(
         source_rank=None,
         context_id=None,
         full_retry_required=False):
-    """Attach the smallest safe v9 repair scope to one diagnostic."""
+    """Attach the smallest safe compact-protocol repair scope."""
     if source_rank is not None:
         problem["source_rank"] = source_rank
     if context_id is not None:
@@ -701,8 +713,14 @@ def _compact_problem(
         full_retry_required=full_retry_required)
 
 
-def _normalize_compact_source_results(parsed, pipeline, chunk):
-    """Normalize the v9 compact arrays into canonical card candidates."""
+def _normalize_compact_source_results(
+        parsed,
+        pipeline,
+        chunk,
+        *,
+        enforce_contextual_constants=True,
+        source_context_translation_memory=None):
+    """Normalize compact result arrays into canonical card candidates."""
     problems = []
     cards = []
     card_raw_paths = []
@@ -829,6 +847,29 @@ def _normalize_compact_source_results(parsed, pipeline, chunk):
             continue
         contexts_by_id[context_id] = context
     expected_context_ids = set(contexts_by_id)
+    if source_context_translation_memory is None:
+        source_context_translation_memory = {}
+    if not isinstance(source_context_translation_memory, dict):
+        raise TypeError(
+            "Source-context translation memory must be an object.")
+    for context_id, hit in source_context_translation_memory.items():
+        translation = (
+            hit.get("translation")
+            if isinstance(hit, dict)
+            else hit)
+        if (
+                context_id not in expected_context_ids
+                or not isinstance(translation, str)
+                or not translation.strip()
+                or "|" in html.unescape(translation)
+                or _HTML_TAG_PATTERN.search(translation)):
+            raise ValueError(
+                "Source-context translation memory does not match this "
+                "chunk.")
+        translations[context_id] = translation
+    remembered_context_ids = set(translations)
+    expected_provider_context_ids = (
+        expected_context_ids - remembered_context_ids)
 
     term_results = parsed.get(term_results_key, missing_marker)
     term_results_path = f"$.{term_results_key}"
@@ -1101,7 +1142,9 @@ def _normalize_compact_source_results(parsed, pipeline, chunk):
                 context_id=word.context_id))
         else:
             contextual_index = len(cards)
-            if isinstance(contextual, dict):
+            if (
+                    isinstance(contextual, dict)
+                    and enforce_contextual_constants):
                 for field_name, expected_value in (
                         process_text.compact_contextual_field_constants(
                             pipeline,
@@ -1203,7 +1246,8 @@ def _normalize_compact_source_results(parsed, pipeline, chunk):
             path=translation_path,
             location="Response → source_context_translations",
             expected=(
-                "An array containing each requested context_id exactly once."),
+                "An array containing each non-remembered context_id exactly "
+                "once."),
             actual=(
                 "Field omitted"
                 if raw_translations is missing_marker
@@ -1310,6 +1354,33 @@ def _normalize_compact_source_results(parsed, pipeline, chunk):
                 identity=context_id,
                 context_id=context_id,
                 full_retry_required=True))
+        if (
+                known_context
+                and context_id in remembered_context_ids
+                and set(entry) == expected_translation_keys
+                and entry.get(context_translation_key)
+                == translations[context_id]):
+            # Echoing an exact trusted value wastes output tokens but does not
+            # make an otherwise valid paid response unusable.
+            continue
+        if known_context and context_id in remembered_context_ids:
+            problems.append(_compact_problem(
+                "provider_overrode_translation_memory",
+                "Provider contradicted a remembered source translation",
+                "A context with an exact locally validated translation must "
+                "be omitted from source_context_translations, not replaced.",
+                path=entry_path,
+                location=(
+                    "Response → source_context_translations "
+                    f"→ {context_id}"),
+                expected="The remembered context_id omitted.",
+                actual=entry,
+                suggestion=(
+                    "Remove this entry and retain the frozen local "
+                    "translation."),
+                identity=context_id,
+                context_id=context_id))
+            continue
         if context_id in seen_context_ids:
             problems.append(_compact_problem(
                 "duplicate_compact_source_context_translation",
@@ -1442,7 +1513,7 @@ def _normalize_compact_source_results(parsed, pipeline, chunk):
                 "source_context_translation_contains_html",
                 "Source-context translation contains HTML",
                 "A retained context translation must be plain English text "
-                "without strong tags or other HTML.",
+                "without HTML.",
                 path=value_path,
                 location=(
                     "Response → source_context_translations "
@@ -1455,7 +1526,8 @@ def _normalize_compact_source_results(parsed, pipeline, chunk):
                 identity=context_id,
                 context_id=context_id))
 
-    for context_id in sorted(expected_context_ids - set(translations)):
+    for context_id in sorted(
+            expected_provider_context_ids - set(translations)):
         problems.append(_compact_problem(
             "missing_source_context_translation",
             "A retained source context has no translation",
@@ -1520,7 +1592,7 @@ def _finalize_compact_report(
         card_raw_paths,
         card_source_ranks,
         card_context_ids):
-    """Expose v9 raw paths and propagate per-item repair metadata."""
+    """Expose compact raw paths and propagate per-item repair metadata."""
     for problem in report.get("problems", ()):
         card_index = problem.get("card_index")
         if (
@@ -1556,7 +1628,7 @@ def _finalize_compact_report(
                 problem,
                 source_rank=int(rank_match.group("rank")))
             continue
-        # A v9 response problem that cannot be traced to one known result or
+        # A compact response problem that cannot be traced to one known result or
         # retained context must not be sent to a selective repair request.
         if problem.get("scope") != "request":
             _mark_compact_problem(
@@ -1771,24 +1843,24 @@ def _collapse_sentence_arrays(cards):
                     scope="field",
                     card_index=card_index,
                     field_name=field_name,
-                    expected="An array containing exactly four strings.",
+                    expected="An array containing exactly three strings.",
                     actual=type(value).__name__,
                     suggestion=(
                         "Retry using the frozen structured-output schema."),
                     identity=field_name))
                 continue
-            if len(value) != 4:
+            if len(value) != 3:
                 problems.append(process_text._generated_problem(
                     "sentence_collection_wrong_length",
                     "Sentence array length is wrong",
                     "Generated-example sentence arrays and translation arrays "
-                    "must each contain exactly four items.",
+                    "must each contain exactly three items.",
                     path=field_path,
                     location=f"Card {card_index + 1} → {field_name}",
                     scope="field",
                     card_index=card_index,
                     field_name=field_name,
-                    expected=4,
+                    expected=3,
                     actual=len(value),
                     suggestion=(
                         "Retry using the frozen structured-output schema."),
@@ -1822,7 +1894,7 @@ def _collapse_sentence_arrays(cards):
                     "Sentence array item contains the card delimiter",
                     "A generated sentence or translation array item cannot "
                     "contain | because the Anki field uses it to separate "
-                    "the four aligned items.",
+                    "the three aligned items.",
                     path=f"{field_path}[{item_index}]",
                     location=(
                         f"Card {card_index + 1} → {field_name} → item "
@@ -1852,41 +1924,6 @@ def _sense_text_fingerprint(value):
     if not isinstance(value, str):
         return ""
     return re.sub(r"[\W_]+", " ", value.casefold()).strip()
-
-
-def _unemphasized_term_positions(sentence, term):
-    """Return literal term offsets outside exact ``<strong>term</strong>``."""
-    if not isinstance(sentence, str) or not isinstance(term, str) or not term:
-        return ()
-    valid_strong_ranges = tuple(
-        (match.start(), match.end())
-        for match in _STRONG_ELEMENT_PATTERN.finditer(sentence)
-        if html.unescape(match.group(1)) == term
-    )
-    positions = []
-    search_start = 0
-    while True:
-        position = sentence.find(term, search_start)
-        if position < 0:
-            break
-        end = position + len(term)
-        if not any(
-                range_start <= position and end <= range_end
-                for range_start, range_end in valid_strong_ranges):
-            positions.append(position)
-        search_start = position + max(1, len(term))
-    return tuple(positions)
-
-
-def _exact_emphasized_term_count(sentence, term):
-    """Count exact ``<strong>term</strong>`` spans in one example."""
-    if not isinstance(sentence, str) or not isinstance(term, str) or not term:
-        return 0
-    return sum(
-        1
-        for match in _STRONG_ELEMENT_PATTERN.finditer(sentence)
-        if html.unescape(match.group(1)) == term
-    )
 
 
 def _translation_definition_pairs(pipeline):
@@ -1938,7 +1975,9 @@ def inspect_pipeline_response(
         use_source_context_translation_map=False,
         use_split_source_context_cards=False,
         use_grouped_source_results=False,
-        use_compact_source_results=False):
+        use_compact_source_results=False,
+        use_local_example_emphasis=False,
+        source_context_translation_memory=None):
     """Return canonical cards plus precise structural/content problems.
 
     The returned ``canonical_response`` is intentionally internal data and
@@ -1948,19 +1987,30 @@ def inspect_pipeline_response(
     pipeline_store.validate_pipelines((pipeline,))
     if use_grouped_source_results and use_compact_source_results:
         raise ValueError(
-            "Grouped v8 and compact v9 source results are mutually exclusive.")
+            "Grouped v8 and compact source results are mutually exclusive.")
+    if use_local_example_emphasis and not use_compact_source_results:
+        raise ValueError(
+            "Local example emphasis requires compact source results.")
     use_ranked_source_results = (
         use_grouped_source_results
         or use_compact_source_results)
     if use_ranked_source_results:
-        # V8 rank-keyed objects and v9 compact arrays normalize to the same
+        # V8 rank-keyed objects and compact arrays normalize to the same
         # source-context card stream. Keep either public flag self-contained.
         use_source_for_example_sentences = True
         require_sentence_translations = True
         sentence_collections_as_arrays = True
         use_source_context_translation_map = True
         use_split_source_context_cards = True
-    validation_text = raw_text
+    local_repair = None
+    effective_raw_text = raw_text
+    if use_local_example_emphasis:
+        local_repair = repair_compact_response(
+            raw_text,
+            pipeline,
+            chunk)
+        effective_raw_text = local_repair.candidate_raw_text
+    validation_text = effective_raw_text
     additional_senses_missing_sentences = set()
     preflight_problems = []
     source_context_translations = {}
@@ -1980,7 +2030,7 @@ def inspect_pipeline_response(
         # ordinary validation. The retained context is authoritative and is
         # inserted below. Later entries remain untouched and are checked.
         try:
-            parsed = json.loads(raw_text)
+            parsed = json.loads(effective_raw_text)
         except (json.JSONDecodeError, TypeError):
             parsed = None
             parse_failed = True
@@ -1998,7 +2048,11 @@ def inspect_pipeline_response(
             ) = _normalize_compact_source_results(
                 parsed,
                 pipeline,
-                chunk)
+                chunk,
+                enforce_contextual_constants=(
+                    not use_local_example_emphasis),
+                source_context_translation_memory=(
+                    source_context_translation_memory))
             preflight_problems.extend(compact_problems)
         elif use_grouped_source_results and not parse_failed:
             (
@@ -2175,6 +2229,15 @@ def inspect_pipeline_response(
             if use_source_for_example_sentences
             else ()),
         require_sentence_translations=require_sentence_translations)
+    if local_repair is not None:
+        audit = local_repair.audit_record()
+        report.update({
+            "local_repair_applied": local_repair.changed,
+            "local_repair_count": len(local_repair.changes),
+            "local_repairs": list(local_repair.changes),
+            "_local_repair_audit": audit,
+            "_effective_raw_text": effective_raw_text,
+        })
     if preflight_problems:
         report["problems"] = [
             *preflight_problems,
@@ -2417,8 +2480,7 @@ def inspect_pipeline_response(
                                     "source_context_translation_contains_html",
                                     "Source-context translation contains HTML",
                                     "A retained context translation must be "
-                                    "plain English text without strong tags or "
-                                    "other HTML.",
+                                    "plain English text without HTML.",
                                     path=process_text._field_path(
                                         card_index,
                                         _SENTENCE_TRANSLATIONS_FIELD),
@@ -2443,7 +2505,7 @@ def inspect_pipeline_response(
                         "missing_additional_sense_sentences",
                         "Additional sense has no example sentences",
                         "Only the first, contextual sense may omit "
-                        '"Sentences"; every additional sense needs four '
+                        '"Sentences"; every additional sense needs three '
                         "generated examples.",
                         path=process_text._field_path(
                             card_index,
@@ -2457,11 +2519,11 @@ def inspect_pipeline_response(
                         term=term,
                         field_name="Sentences",
                         expected=(
-                            "Four distinct examples for this additional "
+                            "Three distinct examples for this additional "
                             "sense."),
                         actual="Field omitted",
                         suggestion=(
-                            "Retry the request or add four example sentences "
+                            "Retry the request or add three example sentences "
                             "before packaging.")))
 
         generated_examples = {}
@@ -2480,25 +2542,25 @@ def inspect_pipeline_response(
             sentences = card.get("Sentences")
             if not isinstance(sentences, str):
                 continue
-            if use_ranked_source_results:
-                for sentence_index, sentence in enumerate(
-                        sentences.split("|")):
-                    emphasized_count = _exact_emphasized_term_count(
-                        sentence,
-                        term)
-                    if emphasized_count > 1:
+            if use_local_example_emphasis:
+                if pipeline.language_key.startswith(
+                        "classical_chinese"):
+                    for sentence_index, sentence in enumerate(
+                            sentences.split("|")):
+                        if term in html.unescape(sentence):
+                            continue
                         report["problems"].append(
                             process_text._generated_problem(
-                                "repeated_emphasized_source_term",
+                                "missing_exact_form_source_term",
                                 (
-                                    "Example repeats the emphasized source "
+                                    "Example omits the complete source "
                                     "term"),
                                 (
-                                    "A grouped source example must contain "
-                                    "the requested literal spelling exactly "
-                                    "once, inside one exact strong span. This "
-                                    "keeps one usage and one sense "
-                                    "unambiguous."),
+                                    "Classical Chinese does not require "
+                                    "inflection here, so every generated "
+                                    "additional-sense example must contain "
+                                    "the complete requested lexical item at "
+                                    "least once."),
                                 path=(
                                     process_text._field_path(
                                         card_index,
@@ -2509,76 +2571,30 @@ def inspect_pipeline_response(
                                     "→ Sentences → item "
                                     f"{sentence_index + 1}"),
                                 scope="field",
-                                overrideable=True,
                                 card_index=card_index,
                                 term=term,
                                 field_name="Sentences",
                                 expected=(
-                                    "Exactly one "
-                                    f"<strong>{term}</strong> span."),
-                                actual={
-                                    "sentence": sentence,
-                                    "emphasized_occurrence_count": (
-                                        emphasized_count),
-                                },
+                                    "At least one literal occurrence of "
+                                    f"{term}."),
+                                actual=sentence,
                                 suggestion=(
-                                    "Retry, or replace this sentence with "
-                                    "one natural example containing a single "
-                                    "target usage."),
+                                    "Retry with a natural example that uses "
+                                    "the complete requested term, not only a "
+                                    "component or synonym."),
                                 identity={
                                     "sentence_index": sentence_index,
-                                    "count": emphasized_count,
+                                    "term": term,
                                 }))
-                    positions = _unemphasized_term_positions(
-                        sentence,
-                        term)
-                    if positions:
-                        report["problems"].append(
-                            process_text._generated_problem(
-                                "unemphasized_source_term_occurrence",
-                                (
-                                    "Example contains an unemboldened "
-                                    "occurrence of the source term"),
-                                (
-                                    "Every literal occurrence of the "
-                                    "requested term in a generated "
-                                    "additional-sense example must express "
-                                    "that card's selected sense and be "
-                                    "enclosed by exact <strong>...</strong> "
-                                    "tags. Remove mixed-sense homographs from "
-                                    "the example."),
-                                path=(
-                                    process_text._field_path(
-                                        card_index,
-                                        "Sentences")
-                                    + f"[{sentence_index}]"),
-                                location=(
-                                    f'Card {card_index + 1} (“{term}”) '
-                                    "→ Sentences → item "
-                                    f"{sentence_index + 1}"),
-                                scope="field",
-                                overrideable=True,
-                                card_index=card_index,
-                                term=term,
-                                field_name="Sentences",
-                                expected=(
-                                    "No literal source-term occurrence "
-                                    "outside "
-                                    f"<strong>{term}</strong>."),
-                                actual={
-                                    "sentence": sentence,
-                                    "unemphasized_character_offsets": (
-                                        positions),
-                                },
-                                suggestion=(
-                                    "Retry, or replace this sentence with "
-                                    "one whose every occurrence of the term "
-                                    "has the selected meaning and exact "
-                                    "strong markup."),
-                                identity={
-                                    "sentence_index": sentence_index,
-                                    "positions": positions,
-                                }))
+                # V10 owns presentation markup locally. Exact literal matches
+                # are emphasized using the language's boundary policy.
+                # Inflected forms may remain unmarked; the card template also
+                # displays the immutable term.
+                sentences = process_text.emphasize_term_in_sentences(
+                    sentences,
+                    term,
+                    pipeline.language_key)
+                card["Sentences"] = sentences
             example_set = tuple(sorted(
                 sentence.strip()
                 for sentence in sentences.split("|")))
@@ -2605,7 +2621,7 @@ def inspect_pipeline_response(
                     term=term,
                     field_name="Sentences",
                     expected=(
-                        "Four examples distinct from every other additional "
+                        "Three examples distinct from every other additional "
                         "sense of this term."),
                     actual={
                         "duplicates_card": previous + 1,
@@ -2620,6 +2636,16 @@ def inspect_pipeline_response(
                     }))
 
         sense_pairs = _translation_definition_pairs(pipeline)
+        lexical_field_names = tuple(
+            field_name
+            for field_name in process_text.get_response_field_names(
+                pipeline,
+                include_sentence_translations=True)
+            if field_name not in {
+                term_field,
+                "Sentences",
+                _SENTENCE_TRANSLATIONS_FIELD,
+            })
         seen_senses = {}
         for card_index, card in enumerate(canonical["cards"]):
             term = card[term_field]
@@ -2643,6 +2669,21 @@ def inspect_pipeline_response(
             if not fingerprints:
                 continue
             identity = (normalized, fingerprints)
+            if use_local_example_emphasis:
+                # V10 may receive homographs/polyphones whose concise
+                # translation and definition coincide while pronunciation,
+                # part of speech, register, or nuance distinguishes the
+                # lexical sense. Never collapse those locally.
+                identity = (
+                    *identity,
+                    tuple(
+                        (
+                            field_name,
+                            _sense_text_fingerprint(
+                                card.get(field_name)),
+                        )
+                        for field_name in lexical_field_names),
+                )
             previous = seen_senses.get(identity)
             if previous is None:
                 seen_senses[identity] = card_index
@@ -2791,7 +2832,9 @@ def public_validation_report(report, accepted_problem_ids=()):
     result = {
         key: value
         for key, value in report.items()
-        if key not in {"canonical_response", "problems"}
+        if (
+            key not in {"canonical_response", "problems"}
+            and not key.startswith("_"))
     }
     result.update({
         "problems": problems,
@@ -2816,6 +2859,10 @@ def _validation_error(report):
         else process_text.GeneratedCardValidationError)
     error = exception_class(first["message"])
     error.validation_report = public_validation_report(report)
+    error.local_repair_audit = report.get(
+        "_local_repair_audit")
+    error.effective_raw_text = report.get(
+        "_effective_raw_text")
     return error
 
 
@@ -2828,11 +2875,30 @@ def make_pipeline_response_validator(
         use_source_context_translation_map=False,
         use_split_source_context_cards=False,
         use_grouped_source_results=False,
-        use_compact_source_results=False):
+        use_compact_source_results=False,
+        use_local_example_emphasis=False,
+        source_context_translation_memory_by_chunk=None):
     """Validate schema, card semantics, and membership in the source chunk."""
     pipeline_store.validate_pipelines((pipeline,))
+    if source_context_translation_memory_by_chunk is None:
+        source_context_translation_memory_by_chunk = {}
+    if not isinstance(source_context_translation_memory_by_chunk, dict):
+        raise TypeError(
+            "Source-context translation memory by chunk must be an object.")
 
     def validate(raw_text, chunk):
+        expected_context_ids = {
+            context.context_id
+            for context in chunk.contexts
+        }
+        chunk_memory = {
+            context_id: hit
+            for context_id, hit in
+            source_context_translation_memory_by_chunk.get(
+                getattr(chunk, "chunk_id", None),
+                {}).items()
+            if context_id in expected_context_ids
+        }
         report = inspect_pipeline_response(
             raw_text,
             pipeline,
@@ -2850,9 +2916,18 @@ def make_pipeline_response_validator(
             use_grouped_source_results=(
                 use_grouped_source_results),
             use_compact_source_results=(
-                use_compact_source_results))
+                use_compact_source_results),
+            use_local_example_emphasis=(
+                use_local_example_emphasis),
+            source_context_translation_memory=(
+                chunk_memory))
         if report["problems"]:
             raise _validation_error(report)
-        return report["canonical_response"]
+        return ValidatedPipelineResponse(
+            report["canonical_response"],
+            local_repair_audit=report.get(
+                "_local_repair_audit"),
+            effective_raw_text=report.get(
+                "_effective_raw_text"))
 
     return validate

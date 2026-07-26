@@ -11,7 +11,7 @@ httpcore==1.0.9
 httpx==0.28.1
 idna==3.18
 jiter==0.16.0
-openai==2.44.0
+openai==2.48.0
 pydantic==2.13.4
 pydantic_core==2.46.4
 pypdf==6.14.2

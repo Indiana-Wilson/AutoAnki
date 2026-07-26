@@ -1,0 +1,13 @@
+{
+  "attempts": 1,
+  "chunk_id": "000001-r1-r10",
+  "completed_at": "2026-07-26T07:19:58.127062+00:00",
+  "created_at": "2026-07-26T07:19:36.119148+00:00",
+  "index": 1,
+  "last_error": null,
+  "latest_attempt_path": "attempts/0001",
+  "started_at": "2026-07-26T07:19:36.191036+00:00",
+  "status": "succeeded",
+  "updated_at": "2026-07-26T07:19:58.127552+00:00",
+  "worker": "autoanki-source_0"
+}

@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:14b",
+  "raw_text": "{\"term_results\":[{\"rank\":1,\"contextual_sense\":{\"Translation (English)\":\"the Way\",\"Dictionary Meaning (English)\":\"The fundamental principle or force underlying the universe, often associated with the Daoist concept of the Dao.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"noun\",\"Register (English)\":\"philosophical, literary, classical\",\"Nuance (English)\":\"Implies an ineffable, natural order that cannot be fully expressed in words.\"},\"additional_senses\":[{\"Translation (English)\":\"to speak; to say\",\"Dictionary Meaning (English)\":\"To express verbally or in writing.\",\"Pronunciation (English)\":\"dào\",\"Part of Speech (English)\":\"verb\",\"Register (English)\":\"literary, classical\",\"Nuance (English)\":\"Often used in the context of communicating abstract ideas or principles.\",\"Sentences\":[\"道者，不可言也。\",\"子曰：道可道，非常道。\",\"道之以德，齐之以礼。\",\"道其不可言，言其不可道。\"],\"Sentence Translations (English)\":[\"The Way cannot be spoken.\",\"The Master said: The Way that can be spoken is not the eternal Way.\",\"Govern people by virtue and align them with ritual.\",\"The Way cannot be spoken, and what is spoken cannot capture the Way.\"]}]}],\"source_context_translations\":[{\"context_id\":\"source-context-c535f824d57f859c34ac\",\"translation\":\"The Way that can be spoken is not the eternal Way; the name that can be named is not the eternal name;\"}]}",
+  "received_at": "2026-07-26T04:50:18.694527+00:00",
+  "response_id": "ollama-240cb11953ab3e1c21986b12",
+  "schema_version": 1,
+  "service_tier": "local",
+  "status": "completed",
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 2205,
+    "output_tokens": 338,
+    "reasoning_tokens": 0,
+    "total_tokens": 2543,
+    "uncached_input_tokens": 2205,
+    "visible_output_tokens": 338,
+    "web_search_calls": 0
+  }
+}
