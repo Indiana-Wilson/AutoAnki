@@ -40,6 +40,8 @@ from source_generation import (
     public_validation_report,
     render_chunk_input,
     source_request_contract_digest,
+    source_request_includes_context_nuance,
+    source_request_requires_generated_examples,
     source_request_requires_sentence_translations,
     source_request_uses_compact_source_results,
     source_request_uses_grouped_source_results,
@@ -779,7 +781,13 @@ class SourceWorkflowController:
                 request_contract.get("schema_version") == 10
                 and uses_compact_source_results),
             source_context_translation_memory_by_chunk=(
-                source_context_translation_memory_by_chunk))
+                source_context_translation_memory_by_chunk),
+            include_source_context_nuance=(
+                source_request_includes_context_nuance(
+                    request_contract)),
+            require_generated_examples=(
+                source_request_requires_generated_examples(
+                    request_contract)))
 
     def _run_job(self, job_id, pipeline, client, chunk_ids=None):
         request_contract, _origin = self._request_contract_for_job(
@@ -812,7 +820,7 @@ class SourceWorkflowController:
                     translation_memory_by_chunk))
             snapshot = runner.run(chunk_ids)
             if config.get("automatic_repair") is True:
-                snapshot = self._run_automatic_example_repairs(
+                snapshot = self._run_automatic_repairs(
                     job_id,
                     pipeline,
                     client,
@@ -1986,11 +1994,20 @@ class SourceWorkflowController:
                     finalize_attempts=attempts,
                     last_error=None)
                 _path, notes_created = self.package_creator(
-                    {"cards": combined["cards"]},
+                    {
+                        "cards": combined["cards"],
+                        "source_contexts": combined.get(
+                            "source_contexts",
+                            []),
+                        "expected_source_sentence_ids": combined.get(
+                            "expected_source_sentence_ids",
+                            []),
+                    },
                     source_title=manifest["plan"]["source_title"],
                     source_key=manifest["plan"]["source_key"],
                     pipeline=pipeline,
                     output_path=package_path,
+                    guid_seed=f"source-job:{job_id}",
                     use_source_for_example_sentences=bool(
                         request_contract.get(
                                 "use_source_for_example_sentences",
@@ -1998,6 +2015,18 @@ class SourceWorkflowController:
                     require_sentence_translations=(
                         source_request_requires_sentence_translations(
                             request_contract)),
+                    separate_source_decks=bool(
+                        manifest.get(
+                            "request_metadata",
+                            {}).get(
+                                "separate_source_decks",
+                                False)),
+                    shared_source_sentence_cards=bool(
+                        manifest.get(
+                            "request_metadata",
+                            {}).get(
+                                "shared_source_sentence_cards",
+                                False)),
                     allow_accepted_content_problems=(
                         accepted_content_problem_count > 0))
                 workflow = self._update_workflow(
@@ -2343,7 +2372,13 @@ class SourceWorkflowController:
                 and uses_compact_source_results),
             source_context_translation_memory=(
                 self._translation_memory_by_chunk(
-                    job_id).get(chunk_id, {})))
+                    job_id).get(chunk_id, {})),
+            include_source_context_nuance=(
+                source_request_includes_context_nuance(
+                    request_contract)),
+            require_generated_examples=(
+                source_request_requires_generated_examples(
+                    request_contract)))
         audit = self.backend.jobs.load_manual_validation(
             job_id,
             chunk_id)
@@ -2792,15 +2827,15 @@ class SourceWorkflowController:
                         "automatic") is True)
         )
 
-    def _run_automatic_example_repairs(
+    def _run_automatic_repairs(
             self,
             job_id,
             pipeline,
             client,
             request_contract,
             chunk_ids=None):
-        """Repair invalid pair-addressable v10 examples, never broad scopes."""
-        if request_contract.get("schema_version") != 10:
+        """Run only bounded, identity-addressable compact repairs."""
+        if request_contract.get("schema_version") not in {9, 10}:
             return self.backend.jobs.refresh(job_id)
         config = self._manifest(job_id).get(
             "plan",
@@ -2840,15 +2875,35 @@ class SourceWorkflowController:
                 chunk = self.backend.jobs.load_chunk(
                     job_id,
                     chunk_id)
-                scope = derive_compact_example_repair_scope(
-                    public_report,
-                    chunk,
-                    base_raw_text)
-                if scope is None:
+                example_scope = (
+                    derive_compact_example_repair_scope(
+                        public_report,
+                        chunk,
+                        base_raw_text)
+                    if request_contract.get("schema_version") == 10
+                    else None)
+                selective_scope = (
+                    None
+                    if example_scope is not None
+                    else derive_compact_repair_scope(
+                        public_report,
+                        chunk))
+                if example_scope is None and selective_scope is None:
                     break
+                scope_kind = (
+                    "example_pairs"
+                    if example_scope is not None
+                    else "rank_or_context")
+                scope = (
+                    example_scope
+                    if example_scope is not None
+                    else selective_scope)
                 signature = hashlib.sha256(
                     json.dumps(
-                        scope.to_dict(),
+                        {
+                            "kind": scope_kind,
+                            **scope.to_dict(),
+                        },
                         ensure_ascii=False,
                         sort_keys=True,
                         separators=(",", ":")).encode(
@@ -2861,17 +2916,30 @@ class SourceWorkflowController:
                     (chunk_id,))
                 if chunk_id not in reset:
                     break
-                self._run_compact_example_repair(
-                    job_id,
-                    chunk_id,
-                    pipeline,
-                    client,
-                    request_contract,
-                    base_raw_text,
-                    public_report.get("attempt"),
-                    scope,
-                    automatic=True,
-                    dispatch_ordinal=dispatched + 1)
+                if example_scope is not None:
+                    self._run_compact_example_repair(
+                        job_id,
+                        chunk_id,
+                        pipeline,
+                        client,
+                        request_contract,
+                        base_raw_text,
+                        public_report.get("attempt"),
+                        example_scope,
+                        automatic=True,
+                        dispatch_ordinal=dispatched + 1)
+                else:
+                    self._run_compact_selective_repair(
+                        job_id,
+                        chunk_id,
+                        pipeline,
+                        client,
+                        request_contract,
+                        base_raw_text,
+                        public_report.get("attempt"),
+                        selective_scope,
+                        automatic=True,
+                        dispatch_ordinal=dispatched + 1)
         return self.backend.jobs.refresh(job_id)
 
     def _run_compact_selective_repair(
@@ -2883,7 +2951,10 @@ class SourceWorkflowController:
             request_contract,
             base_raw_text,
             base_attempt,
-            scope):
+            scope,
+            *,
+            automatic=False,
+            dispatch_ordinal=None):
         """Retry only failed compact identities, then validate the full merge."""
         jobs = self.backend.jobs
         protocol_version = request_contract.get("schema_version")
@@ -2891,7 +2962,10 @@ class SourceWorkflowController:
             raise ValueError(
                 "Compact selective repair requires a v9 or v10 contract.")
         protocol_label = f"v{protocol_version}"
-        repair_worker = f"selective {protocol_label} repair"
+        repair_worker = (
+            f"automatic selective {protocol_label} repair"
+            if automatic
+            else f"selective {protocol_label} repair")
         chunk = jobs.load_chunk(job_id, chunk_id)
         repair_chunk = build_compact_repair_chunk(
             chunk,
@@ -2923,11 +2997,26 @@ class SourceWorkflowController:
                     "schema_version": 1,
                     "kind": f"compact_{protocol_label}_selective_repair",
                     "base_attempt": base_attempt,
+                    "automatic": bool(automatic),
+                    "dispatch_ordinal": dispatch_ordinal,
                     "base_raw_sha256": hashlib.sha256(
                         base_raw_text.encode("utf-8")).hexdigest(),
                     **scope.to_dict(),
                 })
+            if automatic:
+                # Persist before dispatch so a crash cannot exceed the
+                # configured paid automatic-repair bound on resume.
+                _atomic_write_json(
+                    attempt_path / "automatic_repair_dispatch.json",
+                    {
+                        "schema_version": 1,
+                        "kind": "automatic_repair_dispatch",
+                        "automatic": True,
+                        "dispatch_ordinal": dispatch_ordinal,
+                        "dispatched_at": _utc_now(),
+                    })
             paid_received = False
+            merged_raw_text = None
             try:
                 response = client.responses.create(
                     **self._request_options(
@@ -2974,18 +3063,27 @@ class SourceWorkflowController:
                     _atomic_write_text(
                         attempt_path / "repair_raw.txt",
                         retained_response.raw_text)
-                # Keep the last complete candidate in raw.txt. The exact paid
-                # repair response remains in response.json/repair_raw.txt.
+                # A schema-valid bounded repair may fix only part of the full
+                # response. Retain that complete merged candidate so a later
+                # bounded attempt can address the remaining identities.
+                candidate = (
+                    merged_raw_text
+                    if isinstance(merged_raw_text, str)
+                    else base_raw_text)
                 jobs.write_raw(
                     attempt_path,
-                    base_raw_text)
-                # This attempt's raw.txt deliberately points back to the last
-                # complete full response, not the smaller paid repair body or
-                # a failed merged candidate. Their local-repair hashes cannot
-                # truthfully describe raw.txt, so retain the public validation
-                # diagnostics but do not write mismatched repair artifacts.
-                error.local_repair_audit = None
-                error.effective_raw_text = None
+                    candidate)
+                audit = getattr(
+                    error,
+                    "local_repair_audit",
+                    None)
+                if (
+                        not isinstance(audit, dict)
+                        or audit.get("original_sha256")
+                        != hashlib.sha256(
+                            candidate.encode("utf-8")).hexdigest()):
+                    error.local_repair_audit = None
+                    error.effective_raw_text = None
                 transient = is_transient_request_error(error)
                 error_record = jobs.write_error(
                     attempt_path,
@@ -3021,7 +3119,8 @@ class SourceWorkflowController:
                         job_id,
                         chunk_id)["status"],
                     message=(
-                        f"The selective {protocol_label} repair was retained "
+                        f"The {'automatic ' if automatic else ''}selective "
+                        f"{protocol_label} repair was retained "
                         "but did not "
                         "produce a fully valid merged response."),
                     attempt=attempt)

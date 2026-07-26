@@ -111,23 +111,15 @@ class GroupedSourceValidationTests(unittest.TestCase):
             [card[self.term_field] for card in cards],
             ["道", "道", "可"],
         )
+        self.assertNotIn(self.sentences_field, cards[0])
+        self.assertNotIn(self.sentence_translations_field, cards[0])
+        self.assertNotIn(self.sentences_field, cards[2])
+        self.assertNotIn(self.sentence_translations_field, cards[2])
         self.assertEqual(
-            cards[0][self.sentence_translations_field],
+            report["canonical_response"]["source_contexts"][0][
+                "english_translation"],
             "The way that can be spoken.",
         )
-        self.assertEqual(
-            cards[2][self.sentence_translations_field],
-            "The way that can be spoken.",
-        )
-        self.assertIn("<strong>道</strong>可道。", cards[0][
-            self.sentences_field])
-        self.assertEqual(
-            cards[0][self.sentences_field].count(
-                "<strong>道</strong>"),
-            1,
-        )
-        self.assertIn("道<strong>可</strong>道。", cards[2][
-            self.sentences_field])
         self.assertEqual(
             cards[1][self.sentences_field].split("|"),
             self.examples()["Sentences"],

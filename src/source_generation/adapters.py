@@ -37,6 +37,10 @@ def _source_example_setting(request, plan, pipeline):
         raise ValueError(
             "Using source text for example sentences requires source "
             "context. Choose a context option other than None.")
+    if plan.config.context_mode is not ContextMode.SENTENCE:
+        raise ValueError(
+            "Source sentence cards require Current sentence context so the "
+            "front is exactly one original sentence.")
     # The contract builder also checks this, but doing it here keeps the
     # source-specific error next to the other source-plan validation.
     if not pipeline_store.requires_sentences(pipeline):
@@ -340,10 +344,13 @@ class SourceGenerationBackend:
             request,
             plan,
             pipeline)
+        include_source_context_nuance = bool(
+            request.get("include_source_context_nuance", False))
         memory_enabled = bool(
             plan.config.automatic_repair
             and use_source_examples
-            and plan.config.request_protocol == "v10")
+            and plan.config.request_protocol == "v10"
+            and not include_source_context_nuance)
         translation_memory_by_chunk = (
             self.translation_memory.lookup_chunks(
                 pipeline.language_key,
@@ -358,7 +365,9 @@ class SourceGenerationBackend:
             protocol_version=_request_protocol_version(plan.config),
             reasoning_effort=plan.config.reasoning_effort,
             model=plan.config.model,
-            translation_memory_enabled=memory_enabled)
+            translation_memory_enabled=memory_enabled,
+            include_source_context_nuance=(
+                include_source_context_nuance))
         estimate = estimate_plan_cost(
             plan,
             pipeline,
@@ -370,6 +379,8 @@ class SourceGenerationBackend:
             execution_mode=plan.config.execution_mode,
             translation_memory_by_chunk=(
                 translation_memory_by_chunk),
+            include_source_context_nuance=(
+                include_source_context_nuance),
             **_estimate_response_format_arguments(
                 plan.config,
                 request_contract))
@@ -466,10 +477,13 @@ class SourceGenerationBackend:
             request,
             plan,
             pipeline)
+        include_source_context_nuance = bool(
+            request.get("include_source_context_nuance", False))
         memory_enabled = bool(
             plan.config.automatic_repair
             and use_source_examples
-            and plan.config.request_protocol == "v10")
+            and plan.config.request_protocol == "v10"
+            and not include_source_context_nuance)
         authorized_estimate = request.get("estimate")
         translation_memory_by_chunk = (
             _normalise_translation_memory_snapshot(
@@ -489,7 +503,9 @@ class SourceGenerationBackend:
             protocol_version=_request_protocol_version(plan.config),
             reasoning_effort=plan.config.reasoning_effort,
             model=plan.config.model,
-            translation_memory_enabled=memory_enabled)
+            translation_memory_enabled=memory_enabled,
+            include_source_context_nuance=(
+                include_source_context_nuance))
         estimate = estimate_plan_cost(
             plan,
             pipeline,
@@ -501,6 +517,8 @@ class SourceGenerationBackend:
             execution_mode=plan.config.execution_mode,
             translation_memory_by_chunk=(
                 translation_memory_by_chunk),
+            include_source_context_nuance=(
+                include_source_context_nuance),
             **_estimate_response_format_arguments(
                 plan.config,
                 request_contract))
@@ -565,6 +583,12 @@ class SourceGenerationBackend:
                 plan.config.max_automatic_repairs),
             "translation_memory_by_chunk": (
                 translation_memory_by_chunk),
+            "include_source_context_nuance": (
+                include_source_context_nuance),
+            "shared_source_sentence_cards": bool(
+                use_source_examples),
+            "separate_source_decks": bool(
+                request.get("separate_source_decks", False)),
             "request_contract": request_contract,
             "estimate": {
                 **estimate.to_dict(),

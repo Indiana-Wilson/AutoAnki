@@ -381,6 +381,9 @@ class SourceWorkflowTests(unittest.TestCase):
             call["max_output_tokens"],
             source_workflow.MODEL_MAX_OUTPUT_TOKENS)
         package_creator.assert_called_once()
+        self.assertEqual(
+            package_creator.call_args.kwargs["guid_seed"],
+            f"source-job:{result['job_id']}")
         package_importer.assert_called_once()
         workflow = controller._workflow(result["job_id"])
         self.assertEqual(workflow["state"], "imported")

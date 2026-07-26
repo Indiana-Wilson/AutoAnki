@@ -27,8 +27,8 @@ overrides any general instruction to copy a supplied term into a term field.
 
 "contextual_sense" also excludes "Sentences" and
 "Sentence Translations (English)". The processor inserts the retained source
-context and its matching translation for this one sense. Do not repeat,
-rewrite, delimit, or repeat either value in "contextual_sense".
+context and its matching translation for this one sense. Do not return,
+rewrite, or delimit either value in "contextual_sense".
 
 Each input word supplies an "occurrence_span", a pair of zero-based character
 offsets [start, end) relative to the referenced context object's "text". It
@@ -69,10 +69,12 @@ when they are common in the selected period. If one is contextual, the other
 qualifying senses still belong in "additional_senses".
 
 Every "additional_senses" item contains the same requested lexical fields as
-"contextual_sense", plus "Sentences" as exactly three array items and
-"Sentence Translations (English)" as exactly three positionally matched array
-items. It contains no source-language term field. Follow all general generated
-example and translation rules for these arrays.
+"contextual_sense", plus exactly three natural source-language examples in
+"Sentences" and exactly three aligned English translations in
+"Sentence Translations (English)". These arrays demonstrate only that
+additional sense. Do not reuse the retained source sentence, and do not return
+a source-language term field. The original source sentence is still packaged
+separately, once per retained context, for the contextual sense.
 
 SOURCE CONTEXT TRANSLATIONS
 
@@ -81,10 +83,10 @@ required by the response schema. For every object in the input "contexts"
 array, copy its "context_id" character-for-character as one JSON property name.
 Return every required context ID exactly once and add no other property.
 
-The value of each context-ID property is one complete, natural English
-translation of that entire context, directly as a JSON string. It is not an
-object or array. Translate each context exactly once regardless of how many
-ranks refer to it. The string may contain normal English punctuation and
-multiple clauses or sentences, but never |, or any HTML.
-Do not split one context translation into several values. If the context is
-already Modern English, repeat it as plain text.
+Follow the response schema for each context-ID value. It is either one complete,
+natural English translation directly as a JSON string, or an object containing
+that "translation" plus the requested "nuance" string. Translate each context
+exactly once regardless of how many ranks refer to it. Translation and nuance
+strings may contain normal English punctuation, but never | or HTML. Do not
+split one context translation into several values. If the context is already
+Modern English, repeat it as plain text.

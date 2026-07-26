@@ -564,6 +564,7 @@ class PromptComponentTests(unittest.TestCase):
             keys,
             {
                 "core",
+                "core_source_sentence_translation",
                 "core_source_v9",
                 "core_source_v10",
                 "ending",
@@ -579,6 +580,7 @@ class PromptComponentTests(unittest.TestCase):
                 "directions/sentence_translation_arrays_v9",
                 "directions/sentence_translation_arrays_v10",
                 "source/batch",
+                "source/batch_sentences_only",
                 "source/batch_v9",
                 "source/batch_v10",
                 "source/context_examples",
@@ -589,9 +591,12 @@ class PromptComponentTests(unittest.TestCase):
                 "source/context_examples_v9",
                 "source/context_examples_v10",
                 "source/context_examples_v10_memory",
+                "source/context_sentences_only",
                 "source/final_checks_v8",
                 "source/final_checks_v9",
                 "source/final_checks_v10",
+                "source/final_checks_lexical",
+                "source/final_checks_sentences_only",
                 "source/web_search",
                 "fields/dictionary_meaning_v10",
                 *{

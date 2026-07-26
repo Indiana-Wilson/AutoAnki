@@ -4143,6 +4143,15 @@ class AutoAnkiApp:
         self.source_request_stagger_ms = tk.StringVar(value="100")
         self.source_allow_web_search = tk.BooleanVar(value=False)
         self.source_use_source_examples = tk.BooleanVar(value=False)
+        self.source_card_direction_variables = {
+            direction.key: tk.BooleanVar(
+                value=direction.key == "context")
+            for direction in pipeline_store.list_directions()
+        }
+        self.source_card_direction_summary = tk.StringVar(
+            value="Sentence → Meaning")
+        self.source_include_context_nuance = tk.BooleanVar(value=False)
+        self.source_separate_decks = tk.BooleanVar(value=False)
         self.source_model_label = tk.StringVar(
             value=SOURCE_MODEL_OPTIONS[0][1])
         self.source_request_protocol_label = tk.StringVar(
@@ -4400,6 +4409,7 @@ class AutoAnkiApp:
             state="readonly",
             style="App.TCombobox",
             width=42)
+        self.source_context_selector = context_box
         context_box.grid(
             row=3,
             column=1,
@@ -4424,9 +4434,70 @@ class AutoAnkiApp:
                 sticky="w",
                 pady=(7, 14))
 
+        source_card_options = ttk.Frame(
+            config,
+            style="Panel.TFrame")
+        source_card_options.grid(
+            row=7,
+            column=0,
+            columnspan=3,
+            sticky="ew",
+            pady=(0, 14))
+        source_card_options.columnconfigure(1, weight=1)
+        ttk.Label(
+            source_card_options,
+            text="CARD TYPES",
+            style="FieldLabel.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(0, 12))
+        self.source_card_type_button = ttk.Menubutton(
+            source_card_options,
+            textvariable=self.source_card_direction_summary,
+            style="Secondary.TButton",
+            cursor="hand2")
+        self.source_card_type_button.grid(
+            row=0,
+            column=1,
+            sticky="w")
+        source_card_type_menu = tk.Menu(
+            self.source_card_type_button,
+            tearoff=False)
+        for direction in pipeline_store.list_directions():
+            source_card_type_menu.add_checkbutton(
+                label=direction.name,
+                variable=self.source_card_direction_variables[direction.key],
+                command=self._source_card_options_changed)
+        self.source_card_type_button.configure(
+            menu=source_card_type_menu)
+        self.source_include_context_nuance_check = ttk.Checkbutton(
+            source_card_options,
+            text="Include cultural / historical sentence nuance",
+            variable=self.source_include_context_nuance,
+            command=self._source_card_options_changed,
+            style="Panel.TCheckbutton")
+        self.source_include_context_nuance_check.grid(
+            row=1,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(9, 0))
+        ttk.Checkbutton(
+            source_card_options,
+            text="Package each selected card type in a separate deck",
+            variable=self.source_separate_decks,
+            command=self._source_card_options_changed,
+            style="Panel.TCheckbutton").grid(
+                row=2,
+                column=0,
+                columnspan=2,
+                sticky="w",
+                pady=(7, 0))
+
         self.source_use_source_examples_check = ttk.Checkbutton(
             config,
-            text="Use source for example sentences",
+            text="Use source sentences for Sentence → Meaning cards",
             variable=self.source_use_source_examples,
             command=self._source_example_setting_changed,
             style="Panel.TCheckbutton")
@@ -4438,9 +4509,10 @@ class AutoAnkiApp:
         ttk.Label(
             config,
             text=(
-                "For each word's contextual sense, use the exact selected "
-                "source passage as its sole example. Other common, disjoint "
-                "senses still receive three generated examples."
+                "Create one sentence card from each exact source sentence. "
+                "The original is inserted locally; the model returns its "
+                "English translation and, optionally, sentence-level nuance. "
+                "Word cards request lexical fields separately."
             ),
             style="Muted.TLabel",
             wraplength=950).grid(
@@ -4454,7 +4526,7 @@ class AutoAnkiApp:
             config,
             style="Panel.TFrame")
         prefix_controls.grid(
-            row=7,
+            row=8,
             column=0,
             columnspan=3,
             sticky="ew")
@@ -4499,7 +4571,7 @@ class AutoAnkiApp:
             ),
             style="Muted.TLabel",
             wraplength=950).grid(
-                row=8,
+                row=9,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -4509,7 +4581,7 @@ class AutoAnkiApp:
             config,
             text="WORDS PER MODEL REQUEST",
             style="FieldLabel.TLabel").grid(
-                row=9,
+                row=10,
                 column=0,
                 sticky="w",
                 padx=(0, 12))
@@ -4519,7 +4591,7 @@ class AutoAnkiApp:
             width=14,
             style="App.TEntry")
         self.source_chunk_entry.grid(
-            row=9,
+            row=10,
             column=1,
             sticky="w")
         self.source_chunk_entry.bind(
@@ -4534,7 +4606,7 @@ class AutoAnkiApp:
             ),
             style="Muted.TLabel",
             wraplength=570).grid(
-                row=9,
+                row=10,
                 column=2,
                 sticky="w",
                 padx=(12, 0))
@@ -4543,7 +4615,7 @@ class AutoAnkiApp:
             config,
             style="Panel.TFrame")
         mode_controls.grid(
-            row=10,
+            row=11,
             column=0,
             columnspan=3,
             sticky="ew",
@@ -4633,7 +4705,7 @@ class AutoAnkiApp:
             ),
             style="Muted.TLabel",
             wraplength=950).grid(
-                row=11,
+                row=12,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -4646,7 +4718,7 @@ class AutoAnkiApp:
             command=self._source_automatic_repair_changed,
             style="Panel.TCheckbutton")
         self.source_automatic_repair_check.grid(
-            row=12,
+            row=13,
             column=0,
             columnspan=3,
             sticky="w",
@@ -4660,7 +4732,7 @@ class AutoAnkiApp:
             ),
             style="Muted.TLabel",
             wraplength=950).grid(
-                row=13,
+                row=14,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -4670,7 +4742,7 @@ class AutoAnkiApp:
             config,
             style="Panel.TFrame")
         rate_controls.grid(
-            row=14,
+            row=15,
             column=0,
             columnspan=3,
             sticky="ew",
@@ -4732,7 +4804,7 @@ class AutoAnkiApp:
             style="Muted.TLabel",
             wraplength=950)
         self.source_rate_notice_label.grid(
-                row=15,
+                row=16,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -4747,7 +4819,7 @@ class AutoAnkiApp:
             command=self._schedule_source_estimate,
             style="Panel.TCheckbutton")
         self.source_web_search_check.grid(
-                row=16,
+                row=17,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -4761,7 +4833,7 @@ class AutoAnkiApp:
             ),
             style="Muted.TLabel",
             wraplength=950).grid(
-                row=17,
+                row=18,
                 column=0,
                 columnspan=3,
                 sticky="w",
@@ -4786,10 +4858,11 @@ class AutoAnkiApp:
             text="ESTIMATED OPENAI COST",
             background=self.PALE,
             foreground=self.TEXT_SECONDARY,
-            font=("DejaVu Sans", 8, "bold")).grid(
-                row=0,
-                column=0,
-                sticky="w")
+            font=("DejaVu Sans", 8, "bold"))
+        self.source_estimate_heading_label.grid(
+            row=0,
+            column=0,
+            sticky="w")
         tk.Label(
             estimate,
             textvariable=self.source_estimate_price,
@@ -6458,7 +6531,15 @@ class AutoAnkiApp:
                 else "locally prepared source")
             self.source_summary.set(" · ".join(summary))
             self.source_deck_notice.set(
-                f'Creates and imports “Vocabulary from {option.name}”.')
+                (
+                    "Creates and imports separate card-type subdecks under "
+                    f'“Vocabulary from {option.name}”.'
+                    if (
+                        hasattr(self, "source_separate_decks")
+                        and self.source_separate_decks.get())
+                    else (
+                        f'Creates and imports “Vocabulary from '
+                        f'{option.name}”.')))
         if (
                 self.source_preview_page_data is not None
                 and (
@@ -6481,6 +6562,16 @@ class AutoAnkiApp:
         self._schedule_source_estimate()
 
     def _source_context_changed(self, _event=None):
+        if (
+                getattr(
+                    self,
+                    "source_use_source_examples",
+                    None) is not None
+                and self.source_use_source_examples.get()
+                and self.source_context_label.get()
+                != SOURCE_CONTEXT_LABELS["sentence"]):
+            self.source_context_label.set(
+                SOURCE_CONTEXT_LABELS["sentence"])
         self._update_source_context_description()
         self.source_paid_authorized.set(False)
         self._schedule_source_estimate()
@@ -6681,6 +6772,91 @@ class AutoAnkiApp:
         self._schedule_source_estimate()
 
     def _source_example_setting_changed(self):
+        if self.source_use_source_examples.get():
+            self.source_context_label.set(
+                SOURCE_CONTEXT_LABELS["sentence"])
+            self._update_source_context_description()
+        self._sync_source_card_options()
+        self.source_paid_authorized.set(False)
+        self._schedule_source_estimate()
+
+    def _selected_source_direction_keys(self):
+        variables = getattr(
+            self,
+            "source_card_direction_variables",
+            {})
+        return tuple(
+            direction.key
+            for direction in pipeline_store.list_directions()
+            if (
+                direction.key in variables
+                and variables[direction.key].get()))
+
+    def _sync_source_card_options(self):
+        selected = self._selected_source_direction_keys()
+        names = {
+            "context": "Sentence → Meaning",
+            "word_to_meaning": "Word → Meaning",
+            "meaning_to_word": "Meaning → Word",
+        }
+        summary = getattr(
+            self,
+            "source_card_direction_summary",
+            None)
+        if hasattr(summary, "set"):
+            summary.set(
+                ", ".join(names[key] for key in selected)
+                if selected
+                else "Select at least one card type")
+        use_source = bool(
+            getattr(
+                self,
+                "source_use_source_examples",
+                None).get()
+            if hasattr(
+                getattr(self, "source_use_source_examples", None),
+                "get")
+            else False)
+        nuance_enabled = (
+            use_source
+            and "context" in selected)
+        context_selector = getattr(
+            self,
+            "source_context_selector",
+            None)
+        if context_selector is not None:
+            context_selector.configure(
+                state=tk.DISABLED if use_source else "readonly")
+        nuance_variable = getattr(
+            self,
+            "source_include_context_nuance",
+            None)
+        nuance_check = getattr(
+            self,
+            "source_include_context_nuance_check",
+            None)
+        if not nuance_enabled and hasattr(nuance_variable, "set"):
+            nuance_variable.set(False)
+        if nuance_check is not None:
+            nuance_check.configure(
+                state=tk.NORMAL if nuance_enabled else tk.DISABLED)
+
+    def _source_card_options_changed(self):
+        self._sync_source_card_options()
+        self._sync_source_example_control()
+        try:
+            option = self._selected_source_option()
+        except ValueError:
+            pass
+        else:
+            self.source_deck_notice.set(
+                (
+                    "Creates and imports separate card-type subdecks under "
+                    f'“Vocabulary from {option.name}”.'
+                    if self.source_separate_decks.get()
+                    else (
+                        f'Creates and imports “Vocabulary from '
+                        f'{option.name}”.')))
         self.source_paid_authorized.set(False)
         self._schedule_source_estimate()
 
@@ -6723,15 +6899,10 @@ class AutoAnkiApp:
         context_key = SOURCE_CONTEXT_KEYS_BY_LABEL.get(
             self.source_context_label.get(),
             "sentence")
-        enabled = context_key != "none"
-        if enabled and getattr(self, "pipeline_rows", None):
-            try:
-                pipelines = self.get_pipeline_configs()
-            except (OSError, ValueError):
-                pipelines = ()
-            enabled = bool(
-                pipelines
-                and pipeline_store.requires_sentences(pipelines[0]))
+        selected_directions = self._selected_source_direction_keys()
+        enabled = (
+            context_key != "none"
+            and "context" in selected_directions)
         if not enabled:
             if source_example_variable is not None:
                 source_example_variable.set(False)
@@ -6739,6 +6910,7 @@ class AutoAnkiApp:
                 source_example_check.configure(state=tk.DISABLED)
         elif source_example_check is not None:
             source_example_check.configure(state=tk.NORMAL)
+        self._sync_source_card_options()
 
     def _manual_filter_changed(self):
         language_key = self.get_generation_language().key
@@ -7393,10 +7565,12 @@ class AutoAnkiApp:
             use_source_examples_variable.get()
             if hasattr(use_source_examples_variable, "get")
             else False)
-        if use_source_examples and context_mode == "none":
-            raise ValueError(
-                "Using source text for example sentences requires source "
-                "context.")
+        selected_source_directions = (
+            self._selected_source_direction_keys()
+            if hasattr(self, "source_card_direction_variables")
+            else None)
+        if use_source_examples and context_mode != "sentence":
+            context_mode = "sentence"
         protocol_variable = getattr(
             self,
             "source_request_protocol_label",
@@ -7455,12 +7629,58 @@ class AutoAnkiApp:
         if not selected_language_key:
             raise ValueError("Select the source language and historical era.")
         pipelines = self.get_pipeline_configs()
+        if selected_source_directions is None:
+            selected_source_directions = (
+                tuple(
+                    card.direction_key
+                    for card in pipeline_store.get_enabled_cards(
+                        pipelines[0]))
+                if pipelines
+                else ("context",))
+        if not selected_source_directions:
+            raise ValueError("Select at least one source card type.")
+        if (
+                use_source_examples
+                and "context" not in selected_source_directions):
+            raise ValueError(
+                "Using source sentences requires Sentence → Meaning.")
         if selected_language_key:
             source_pipelines = []
             for pipeline in pipelines:
                 settings = pipeline_store.get_language_settings(
                     pipeline,
                     selected_language_key)
+                source_cards = []
+                for card in settings.cards:
+                    enabled = (
+                        card.direction_key
+                        in selected_source_directions)
+                    effective_fields = (
+                        pipeline_store.get_effective_fields(
+                            settings,
+                            card))
+                    if (
+                            enabled
+                            and card.direction_key == "context"
+                            and not effective_fields):
+                        # Dedicated source-sentence notes do not consume a
+                        # definition field. Keep the transient pipeline valid
+                        # without asking the provider for this placeholder.
+                        effective_fields = (
+                            pipeline_store.FieldSetting(
+                                "dictionary_meaning",
+                                "english"),
+                        )
+                    source_cards.append(replace(
+                        card,
+                        enabled=enabled,
+                        fields=tuple(effective_fields)))
+                settings = replace(
+                    settings,
+                    cards=tuple(source_cards),
+                    target_deck=f"Vocabulary from {option.name}",
+                    separate_target_decks=False,
+                    share_field_settings=False)
                 settings_by_key = {
                     item.language_key: item
                     for item in pipeline.language_settings
@@ -7508,6 +7728,32 @@ class AutoAnkiApp:
                         "get")
                     else False)),
             "use_source_for_example_sentences": use_source_examples,
+            "include_source_context_nuance": bool(
+                use_source_examples
+                and "context" in selected_source_directions
+                and (
+                    getattr(
+                        self,
+                        "source_include_context_nuance",
+                        False).get()
+                    if hasattr(
+                        getattr(
+                            self,
+                            "source_include_context_nuance",
+                            None),
+                        "get")
+                    else False)),
+            "source_card_directions": list(
+                selected_source_directions),
+            "separate_source_decks": bool(
+                getattr(
+                    self,
+                    "source_separate_decks",
+                    False).get()
+                if hasattr(
+                    getattr(self, "source_separate_decks", None),
+                    "get")
+                else False),
             "pipeline": pipelines[0] if pipelines else None,
             "pipelines": pipelines,
             "anki_exclusions": exclusions,
@@ -7614,8 +7860,9 @@ class AutoAnkiApp:
             detail += (
                 "\nExample-sentence mode: "
                 + (
-                    "EXACT SOURCE PASSAGE for each contextual sense; "
-                    "model-generated examples for additional senses."
+                    "ONE CARD PER EXACT SOURCE SENTENCE; original text is "
+                    "inserted locally, while selected word cards request "
+                    "lexical fields without generated examples."
                     if source_examples_enabled
                     else (
                         "MODEL-GENERATED EXAMPLES for every sense; source "

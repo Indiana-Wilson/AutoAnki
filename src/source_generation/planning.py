@@ -122,6 +122,7 @@ _AUTOMATIC_REPAIR_OUTPUT_TOKENS_PER_PAIR = 80
 _AUTOMATIC_REPAIR_MAX_PAIRS_PER_CALL = 64
 _SOURCE_TERM_RESULT_OVERHEAD_TOKENS = 8
 _SOURCE_CONTEXT_TRANSLATION_OVERHEAD_TOKENS = 8
+_SOURCE_CONTEXT_NUANCE_OUTPUT_TOKENS = 28
 
 
 @dataclass(frozen=True)
@@ -868,19 +869,39 @@ def estimate_chunk_output_tokens(
         * high_multiplier)
 
 
+def _source_output_detail_from_pipeline(pipeline):
+    """Describe only fields requested for source lexical-direction cards."""
+    import pipeline_store
+
+    settings = pipeline_store.get_source_lexical_field_settings(pipeline)
+    return OutputDetail(
+        field_keys=tuple(
+            setting.field_key
+            for setting in settings),
+        response_language_keys=tuple(
+            setting.target_language_key
+            for setting in settings),
+        include_example_sentences=bool(settings),
+        term_field_name=(
+            pipeline_store.get_language(
+                pipeline.language_key).term_field),
+    )
+
+
 def _source_chunk_output_tokens(
         detail,
         chunk,
         *,
         additional_senses_per_word,
         context_translation_token_ratio,
-        remembered_context_ids=()):
+        remembered_context_ids=(),
+        include_source_context_nuance=False):
     """Estimate the visible compact source-context response shape.
 
-    The contextual entry is lexical-only. Additional senses retain generated
-    examples, and each deduplicated source context is translated exactly once.
-    Terms themselves are restored from immutable ranks rather than echoed in
-    either source-result sense object.
+    Contextual entries are lexical-only, additional entries include generated
+    examples when lexical cards are selected, and each deduplicated source
+    sentence is translated exactly once. Terms and original source sentences
+    are restored locally rather than echoed by the model.
     """
     contextual_tokens_per_word = _tokens_per_sense(
         detail,
@@ -889,16 +910,25 @@ def _source_chunk_output_tokens(
     additional_tokens_per_sense = _tokens_per_sense(
         detail,
         include_term=False,
-        include_generated_examples=True)
+        include_generated_examples=detail.include_example_sentences)
+    effective_additional_senses = (
+        additional_senses_per_word
+        if detail.field_keys
+        else 0)
     context_translation_tokens = sum(
         (
             math.ceil(
-                estimate_text_tokens(context.text)
+                estimate_text_tokens(
+                    getattr(context, "text", ""))
                 * context_translation_token_ratio)
             + _SOURCE_CONTEXT_TRANSLATION_OVERHEAD_TOKENS)
         for context in chunk.contexts
         if context.context_id not in remembered_context_ids
     )
+    context_nuance_tokens = (
+        len(chunk.contexts) * _SOURCE_CONTEXT_NUANCE_OUTPUT_TOKENS
+        if include_source_context_nuance
+        else 0)
     return math.ceil(
         (
             len(chunk.words)
@@ -906,11 +936,43 @@ def _source_chunk_output_tokens(
                 contextual_tokens_per_word
                 + _SOURCE_TERM_RESULT_OVERHEAD_TOKENS
                 + (
-                    additional_senses_per_word
+                    effective_additional_senses
                     * additional_tokens_per_sense))
         )
         + context_translation_tokens
+        + context_nuance_tokens
         + _RESPONSE_ENVELOPE_TOKENS)
+
+
+def estimate_source_chunk_output_tokens(
+        detail,
+        chunk,
+        *,
+        include_source_context_nuance=False,
+        high_multiplier=1.0):
+    """Estimate a source-sentence response for output-limit reservation."""
+    if isinstance(detail, dict):
+        detail = OutputDetail.from_mapping(detail)
+    elif not isinstance(detail, OutputDetail):
+        detail = _source_output_detail_from_pipeline(detail)
+    if not isinstance(include_source_context_nuance, bool):
+        raise TypeError("Source-context nuance mode must be true or false.")
+    if (
+            isinstance(high_multiplier, bool)
+            or not isinstance(high_multiplier, (int, float))
+            or high_multiplier < 1):
+        raise ValueError("Output safety multiplier must be at least one.")
+    return math.ceil(
+        _source_chunk_output_tokens(
+            detail,
+            chunk,
+            additional_senses_per_word=(
+                SOURCE_ADDITIONAL_SENSES_PER_WORD_HIGH),
+            context_translation_token_ratio=(
+                SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_HIGH),
+            include_source_context_nuance=(
+                include_source_context_nuance))
+        * high_multiplier)
 
 
 def _reasoning_multiplier(reasoning_effort, scenario):
@@ -1061,7 +1123,8 @@ def estimate_plan_cost(
         reasoning_effort=None,
         execution_mode=None,
         response_formats_by_chunk=None,
-        translation_memory_by_chunk=None):
+        translation_memory_by_chunk=None,
+        include_source_context_nuance=False):
     """Estimate one source plan without contacting OpenAI.
 
     A fixed ``response_format`` represents a compact reusable schema.
@@ -1069,18 +1132,28 @@ def estimate_plan_cost(
     """
     if not isinstance(plan, GenerationPlan):
         raise TypeError("A source generation plan is required.")
+    if not isinstance(use_source_for_example_sentences, bool):
+        raise TypeError(
+            "Source-example response mode must be true or false.")
+    if not isinstance(include_source_context_nuance, bool):
+        raise TypeError("Source-context nuance mode must be true or false.")
+    if (
+            include_source_context_nuance
+            and not use_source_for_example_sentences):
+        raise ValueError(
+            "Source-context nuance requires retained source sentence cards.")
     if isinstance(detail, dict):
         detail = OutputDetail.from_mapping(detail)
     elif not isinstance(detail, OutputDetail):
-        detail = OutputDetail.from_pipeline(detail)
+        detail = (
+            _source_output_detail_from_pipeline(detail)
+            if use_source_for_example_sentences
+            else OutputDetail.from_pipeline(detail))
     if (
             isinstance(senses_per_word, bool)
             or not isinstance(senses_per_word, (int, float))
             or senses_per_word < 1):
         raise ValueError("Expected senses per word must be at least one.")
-    if not isinstance(use_source_for_example_sentences, bool):
-        raise TypeError(
-            "Source-example response mode must be true or false.")
     reasoning_effort = (
         plan.config.reasoning_effort
         if reasoning_effort is None
@@ -1231,7 +1304,9 @@ def estimate_plan_cost(
                     remembered_context_ids=set(
                         translation_memory_by_chunk.get(
                             chunk.chunk_id,
-                            ())))
+                            ())),
+                    include_source_context_nuance=(
+                        include_source_context_nuance))
                 for chunk in plan.chunks),
             "central": tuple(
                 _source_chunk_output_tokens(
@@ -1244,7 +1319,9 @@ def estimate_plan_cost(
                     remembered_context_ids=set(
                         translation_memory_by_chunk.get(
                             chunk.chunk_id,
-                            ())))
+                            ())),
+                    include_source_context_nuance=(
+                        include_source_context_nuance))
                 for chunk in plan.chunks),
             "high": tuple(
                 _source_chunk_output_tokens(
@@ -1257,10 +1334,12 @@ def estimate_plan_cost(
                     remembered_context_ids=set(
                         translation_memory_by_chunk.get(
                             chunk.chunk_id,
-                            ())))
+                            ())),
+                    include_source_context_nuance=(
+                        include_source_context_nuance))
                 for chunk in plan.chunks),
         }
-        response_shape = "source_contextual_lexical_plus_additional"
+        response_shape = "source_sentences_plus_lexical_senses"
         output_shape_assumptions = {
             "contextual_senses_per_word": 1.0,
             "contextual_senses_include_generated_examples": False,
@@ -1273,6 +1352,8 @@ def estimate_plan_cost(
                 detail.include_example_sentences),
             "source_context_translations": (
                 "one output translation per deduplicated context"),
+            "source_context_nuance": bool(
+                include_source_context_nuance),
             "source_context_translation_token_ratio": {
                 "low": SOURCE_CONTEXT_TRANSLATION_TOKEN_RATIO_LOW,
                 "central": (
@@ -1560,11 +1641,15 @@ def estimate_plan_cost(
             },
             "example_sentence_tokens_per_sense": (
                 _EXAMPLE_SENTENCE_OUTPUT_TOKENS
-                if detail.include_example_sentences
+                if (
+                    detail.include_example_sentences
+                    and not use_source_for_example_sentences)
                 else 0),
             "example_translation_tokens_per_sense": (
                 _EXAMPLE_TRANSLATION_OUTPUT_TOKENS
-                if detail.include_example_sentences
+                if (
+                    detail.include_example_sentences
+                    and not use_source_for_example_sentences)
                 else 0),
             "context_deduplication_scope": "within each request",
             "translation_memory_hit_count": (

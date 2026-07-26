@@ -7,8 +7,9 @@ retained passage and early-Han manuscript usage.
 Copy the supplied source form exactly into the Classical Chinese field.
 Preserve manuscript and transcription forms such as 无, 亓, 后, 浴, and other
 historical or graphic variants; do not silently replace them with received-text
-forms such as 無, 其, 後, or 谷. Write example sentences in concise early-Han
-Classical Chinese and include the exact supplied form.
+forms such as 無, 其, 後, or 谷. If the schema requests example sentences,
+write them in concise early-Han Classical Chinese and include the exact
+supplied form.
 
 Give pronunciation in Hanyu Pinyin with tone marks, explicitly treating it as
 a modern conventional reading rather than a reconstruction of early-Han

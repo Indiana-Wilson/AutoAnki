@@ -4,12 +4,14 @@ import hashlib
 import json
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+import pipeline_store
 import process_text
 from source_generation import (
     ContextUnit,
@@ -17,11 +19,30 @@ from source_generation import (
     SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION,
     build_source_request_contract,
     render_chunk_input,
+    source_request_includes_context_nuance,
+    source_request_requires_generated_examples,
     source_request_uses_compact_source_results,
 )
 from source_generation.requests import normalise_source_request_contract
 from tests.test_v8_schema_contract import context_pipeline, grouped_chunk
 from tests.test_v9_schema_contract import located_chunk
+
+
+def lexical_context_pipeline():
+    pipeline = context_pipeline()
+    settings = pipeline_store.get_language_settings(
+        pipeline,
+        "classical_chinese_wang_bi")
+    settings = replace(
+        settings,
+        cards=tuple(
+            replace(card, enabled=True)
+            for card in settings.cards))
+    return pipeline_store.replace_active_language_settings(
+        pipeline,
+        settings,
+        (settings,),
+        active_language_key="classical_chinese_wang_bi")
 
 
 def opening_chunk():
@@ -167,6 +188,28 @@ class CompactV10SchemaTests(unittest.TestCase):
 
 
 class VersionTenContractTests(unittest.TestCase):
+    def test_source_lexical_contracts_request_examples_only_for_additional_senses(
+            self):
+        for protocol_version in (8, 9, 10):
+            with self.subTest(protocol_version=protocol_version):
+                contract = build_source_request_contract(
+                    lexical_context_pipeline(),
+                    chunks=(grouped_chunk(),),
+                    use_source_for_example_sentences=True,
+                    protocol_version=protocol_version)
+
+                self.assertTrue(
+                    source_request_requires_generated_examples(contract))
+                prompt = " ".join(
+                    contract["composed_prompt"].split())
+                self.assertIn(
+                    "exactly three natural source-language examples",
+                    prompt)
+                self.assertIn(
+                    "reuse the retained source sentence",
+                    prompt.casefold())
+                self.assertNotIn("<strong>", prompt)
+
     def test_programmatic_default_builds_a_v10_contract(self):
         pipeline = context_pipeline()
         chunk = grouped_chunk()
@@ -182,7 +225,9 @@ class VersionTenContractTests(unittest.TestCase):
             contract["response_format"],
             process_text.build_compact_source_response_format(
                 pipeline,
-                protocol_version=10))
+                protocol_version=10,
+                source_lexical_only=True,
+                include_generated_examples=False))
         self.assertEqual(
             set(contract["response_formats_by_chunk"]),
             {chunk.chunk_id})
@@ -191,7 +236,9 @@ class VersionTenContractTests(unittest.TestCase):
             process_text.build_compact_source_response_format(
                 pipeline,
                 protocol_version=10,
-                chunk=chunk))
+                chunk=chunk,
+                source_lexical_only=True,
+                include_generated_examples=False))
         self.assertRegex(
             contract["prompt_cache_key"],
             r"^autoanki-source-v10-[0-9a-f]{32}$")
@@ -237,7 +284,61 @@ class VersionTenContractTests(unittest.TestCase):
             translations["maxItems"],
             len(chunk.contexts))
 
-    def test_v10_prompt_requests_plain_unformatted_sentences(self):
+    def test_v10_nuance_is_optional_by_contract_and_required_by_schema(
+            self):
+        contract = build_source_request_contract(
+            context_pipeline(),
+            chunks=(grouped_chunk(),),
+            use_source_for_example_sentences=True,
+            protocol_version=10,
+            include_source_context_nuance=True)
+        context_item = contract["response_format"]["schema"][
+            "properties"]["source_context_translations"]["items"]
+
+        self.assertTrue(
+            source_request_includes_context_nuance(contract))
+        self.assertFalse(
+            source_request_requires_generated_examples(contract))
+        self.assertIn("nuance", context_item["properties"])
+        self.assertIn("nuance", context_item["required"])
+        self.assertIn(
+            "cultural or historical knowledge",
+            contract["composed_prompt"])
+        self.assertIn(
+            "otherwise return an empty string",
+            contract["composed_prompt"])
+
+    def test_nuance_rejects_translation_memory_without_nuance_values(self):
+        with self.assertRaisesRegex(
+                ValueError,
+                "Translation memory cannot be combined"):
+            build_source_request_contract(
+                context_pipeline(),
+                chunks=(grouped_chunk(),),
+                use_source_for_example_sentences=True,
+                protocol_version=10,
+                translation_memory_enabled=True,
+                include_source_context_nuance=True)
+
+    def test_source_sentence_contract_rejects_multi_sentence_context(self):
+        chunk = opening_chunk()
+        invalid_context = replace(
+            chunk.contexts[0],
+            sentence_ids=("sentence-1", "sentence-2"))
+        invalid_chunk = replace(
+            chunk,
+            contexts=(invalid_context,))
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "exactly one original sentence"):
+            build_source_request_contract(
+                context_pipeline(),
+                chunks=(invalid_chunk,),
+                use_source_for_example_sentences=True,
+                protocol_version=10)
+
+    def test_v10_source_sentence_prompt_requests_no_generated_examples(self):
         contract = build_source_request_contract(
             context_pipeline(),
             chunks=(grouped_chunk(),),
@@ -251,11 +352,14 @@ class VersionTenContractTests(unittest.TestCase):
                 "quality_hint",
                 "highlight"):
             self.assertNotIn(forbidden, prompt)
-        self.assertIn("three plain strings", prompt)
-        self.assertIn("complete lexical item", prompt)
-        self.assertIn("ordinary inflected form", prompt)
-        self.assertIn("visually similar or homophonous", prompt)
-        self.assertIn("never invent component senses", prompt)
+        self.assertNotIn("three plain strings", prompt)
+        self.assertNotIn("Every generated sentence", prompt)
+        self.assertNotIn("complete lexical item", prompt)
+        self.assertIn(
+            "one Sentence → Meaning card",
+            prompt)
+        self.assertIn("Do not perform or return lexical analysis", prompt)
+        self.assertNotIn("dictionary meaning", prompt.casefold())
         self.assertTrue(
             prompt.endswith("Here is the source batch JSON:\n"))
 
@@ -276,7 +380,7 @@ class VersionTenContractTests(unittest.TestCase):
         self.assertTrue(
             source_request_uses_compact_source_results(contract))
 
-    def test_v9_request_material_matches_its_pre_v10_fingerprints(self):
+    def test_v9_request_material_has_current_feature_fingerprints(self):
         contract = build_source_request_contract(
             context_pipeline(),
             chunks=(grouped_chunk(),),
@@ -306,14 +410,14 @@ class VersionTenContractTests(unittest.TestCase):
             },
             {
                 "prompt": (
-                    "ba36a30bc806eca11e0282d19943b0843556bec5eede95f112e418"
-                    "abc7abd28e"),
+                    "16053d585d5593f6a0ad441447d36f3a6f1c9a4acbc12b22489c3e"
+                    "01fb76dabe"),
                 "schema": (
-                    "ba829e73d899ffb44dbc022d4757c10d4e31053fac348d912bb7338"
-                    "0bd1b31ed"),
+                    "d8d231db57644a066a89cbd5414a200bf7db38d56cfc01c609f8ad"
+                    "1a8eededce"),
                 "contract": (
-                    "e940f5b772fda44ba97ba5895b3ee04e22fa31b52244906d6bb48c"
-                    "259c8eb648"),
+                    "691a82cf7022ad7723049460b8300f367b8c7c2c33c0cfe91d6ae30"
+                    "ccace1ef6"),
                 "payload": (
                     "3f569818c47eedc9bfc4337da31da0bf14f7f0a08c3ffc67859e8ed"
                     "cca4f1351"),

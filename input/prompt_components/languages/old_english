@@ -8,9 +8,9 @@ Modern English cognate.
 
 Copy the supplied source form exactly into the Word field, preserving thorn,
 eth, ash, wynn, yogh, macrons and other diacritics, apostrophes, hyphens, and
-the edition's spelling; do not modernize or silently lemmatize it. Write
-example sentences in natural, period- and dialect-appropriate Old English
-rather than faux-archaic Modern English.
+the edition's spelling; do not modernize or silently lemmatize it. If the
+schema requests example sentences, write them in natural, period- and
+dialect-appropriate Old English rather than faux-archaic Modern English.
 
 Give pronunciation as a reconstructed IPA form. Use the dialect and date
 supported by the source where possible, otherwise label a conventional

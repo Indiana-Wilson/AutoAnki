@@ -887,6 +887,11 @@ class SourcePlanningTests(unittest.TestCase):
             separate_plan,
             detail,
             use_source_for_example_sentences=True)
+        with_nuance = estimate_plan_cost(
+            shared_plan,
+            detail,
+            use_source_for_example_sentences=True,
+            include_source_context_nuance=True)
         generated_shared = estimate_plan_cost(shared_plan, detail)
         generated_separate = estimate_plan_cost(separate_plan, detail)
 
@@ -898,6 +903,9 @@ class SourcePlanningTests(unittest.TestCase):
         self.assertLess(
             remembered.estimated_output_tokens,
             shared.estimated_output_tokens)
+        self.assertGreater(
+            with_nuance.estimated_output_tokens,
+            shared.estimated_output_tokens)
         self.assertEqual(
             remembered.assumptions["translation_memory_hit_count"],
             1)
@@ -906,13 +914,19 @@ class SourcePlanningTests(unittest.TestCase):
             generated_shared.estimated_output_tokens)
         self.assertEqual(
             shared.assumptions["response_shape"],
-            "source_contextual_lexical_plus_additional")
+            "source_sentences_plus_lexical_senses")
         shape = shared.assumptions["output_shape"]
         self.assertFalse(
             shape["contextual_senses_include_generated_examples"])
         self.assertEqual(
             shape["additional_senses_per_word"]["central"],
             1.0)
+        self.assertTrue(
+            shape["additional_senses_include_generated_examples"])
+        self.assertFalse(shape["source_context_nuance"])
+        self.assertTrue(
+            with_nuance.assumptions[
+                "output_shape"]["source_context_nuance"])
         self.assertEqual(
             shape["source_context_translations"],
             "one output translation per deduplicated context")
@@ -2494,25 +2508,24 @@ class SourceBackendAdapterTests(unittest.TestCase):
             reasoning_effort="low")
 
         prompt_text = " ".join(contract["composed_prompt"].split())
-        self.assertIn(
+        self.assertNotIn(
             '"Sentences" JSON array',
             contract["composed_prompt"])
         self.assertNotIn(
             "pipe-separated example sentences",
             contract["composed_prompt"])
+        self.assertIn("structural association data only", prompt_text)
         self.assertIn(
-            '"contextual_sense" also excludes "Sentences" and "Sentence '
-            'Translations (English)"',
+            'empty "contextual_sense" object and an empty '
+            '"additional_senses" array',
             prompt_text)
         self.assertIn(
-            "Every rank value contains exactly",
+            "The original sentence is already stored locally",
             prompt_text)
         self.assertIn(
-            "inspect every other occurrence of the same spelling",
+            "Do not perform or return lexical analysis",
             prompt_text)
-        self.assertIn(
-            'that different sense MUST be an "additional_senses" item',
-            prompt_text)
+        self.assertNotIn("inspect every other occurrence", prompt_text)
         response_schema = contract["response_formats_by_chunk"][
             chunk.chunk_id]["schema"]
         self.assertEqual(
@@ -2537,17 +2550,15 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertNotIn(
             "Sentence Translations (English)",
             contextual_item_schema["properties"])
-        self.assertIn(
+        self.assertNotIn(
             "Sentences",
             additional_item_schema["required"])
-        self.assertEqual(
-            additional_item_schema["properties"]["Sentences"][
-                "minItems"],
-            3)
-        self.assertEqual(
-            additional_item_schema["properties"][
-                "Sentence Translations (English)"]["maxItems"],
-            3)
+        self.assertNotIn(
+            "Sentences",
+            additional_item_schema["properties"])
+        self.assertNotIn(
+            "Sentence Translations (English)",
+            additional_item_schema["properties"])
         context_schema = response_schema["properties"][
             "source_context_translations"]
         self.assertIn(
@@ -2565,14 +2576,12 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertTrue(
             source_request_uses_occurrence_locators(contract))
         self.assertIn(
-            "For every object in the input \"contexts\" array",
+            "Translate every retained context required by the response "
+            "schema exactly once",
             prompt_text)
-        self.assertIn('"occurrence_span"', contract["composed_prompt"])
-        self.assertIn('"occurrence_locator"', contract["composed_prompt"])
-        self.assertIn(
-            '"contextual_sense" object MUST describe the grammatical role '
-            "and lexical sense",
-            prompt_text)
+        self.assertNotIn('"occurrence_span"', contract["composed_prompt"])
+        self.assertNotIn('"occurrence_locator"', contract["composed_prompt"])
+        self.assertNotIn("grammatical role and lexical sense", prompt_text)
         self.assertTrue(
             contract["composed_prompt"].endswith(
                 "Here is the source batch JSON:\n"))

@@ -970,6 +970,17 @@ class GenerationJobStore:
     def _write_combined(self, job_id):
         chunks = []
         cards = []
+        source_contexts_by_sentence = {}
+        expected_source_sentence_ids = set()
+        for chunk_id in self.chunk_ids(job_id):
+            chunk = self.load_chunk(job_id, chunk_id)
+            for context in chunk.contexts:
+                sentence_ids = tuple(
+                    getattr(context, "sentence_ids", ()))
+                expected_source_sentence_ids.add(
+                    sentence_ids[0]
+                    if len(sentence_ids) == 1
+                    else context.context_id)
         for chunk_id in self.chunk_ids(job_id):
             status = self.chunk_status(job_id, chunk_id)
             if status["status"] != CHUNK_SUCCEEDED:
@@ -988,6 +999,105 @@ class GenerationJobStore:
                     isinstance(validated, dict)
                     and isinstance(validated.get("cards"), list)):
                 cards.extend(validated["cards"])
+            if isinstance(validated, dict):
+                for context in validated.get("source_contexts", ()):
+                    if not isinstance(context, dict):
+                        continue
+                    sentence_id = context.get(
+                        "sentence_id",
+                        context.get("context_id"))
+                    if not isinstance(sentence_id, str) or not sentence_id:
+                        continue
+                    existing = source_contexts_by_sentence.get(sentence_id)
+                    if existing is None:
+                        ranked_terms = {
+                            item.get("rank"): item.get("term")
+                            for item in context.get("ranked_terms", ())
+                            if (
+                                isinstance(item, dict)
+                                and not isinstance(item.get("rank"), bool)
+                                and isinstance(item.get("rank"), int)
+                                and item.get("rank") > 0
+                                and isinstance(item.get("term"), str)
+                                and item.get("term"))
+                        }
+                        source_contexts_by_sentence[sentence_id] = {
+                            **context,
+                            "word_ranks": list(dict.fromkeys(
+                                context.get("word_ranks", ()))),
+                            "terms": list(dict.fromkeys(
+                                context.get("terms", ()))),
+                            "ranked_terms": [
+                                {
+                                    "rank": rank,
+                                    "term": term,
+                                }
+                                for rank, term in sorted(
+                                    ranked_terms.items())
+                            ],
+                        }
+                        continue
+                    if (
+                            existing.get("original_sentence")
+                            != context.get("original_sentence")):
+                        raise ValueError(
+                            "Validated chunks disagree about the original "
+                            f"text for source sentence {sentence_id}.")
+                    if (
+                            context.get("english_translation")
+                            and context.get("english_translation")
+                            != existing.get("english_translation")):
+                        existing["translation_variants"] = list(
+                            dict.fromkeys((
+                                *existing.get(
+                                    "translation_variants",
+                                    (existing.get(
+                                        "english_translation", ""),)),
+                                context["english_translation"],
+                            )))
+                    if (
+                            context.get("nuance")
+                            and context.get("nuance")
+                            != existing.get("nuance")):
+                        existing["nuance_variants"] = list(
+                            dict.fromkeys((
+                                *existing.get(
+                                    "nuance_variants",
+                                    (existing.get("nuance", ""),)),
+                                context["nuance"],
+                            )))
+                    existing["word_ranks"] = sorted(set(
+                        existing.get("word_ranks", ()))
+                        | set(context.get("word_ranks", ())))
+                    existing["terms"] = list(dict.fromkeys((
+                        *existing.get("terms", ()),
+                        *context.get("terms", ()),
+                    )))
+                    ranked_terms = {
+                        item.get("rank"): item.get("term")
+                        for item in (
+                            *existing.get("ranked_terms", ()),
+                            *context.get("ranked_terms", ()),
+                        )
+                        if (
+                            isinstance(item, dict)
+                            and not isinstance(item.get("rank"), bool)
+                            and isinstance(item.get("rank"), int)
+                            and item.get("rank") > 0
+                            and isinstance(item.get("term"), str)
+                            and item.get("term"))
+                    }
+                    existing["ranked_terms"] = [
+                        {
+                            "rank": rank,
+                            "term": term,
+                        }
+                        for rank, term in sorted(ranked_terms.items())
+                    ]
+                    if (
+                            not existing.get("nuance")
+                            and context.get("nuance")):
+                        existing["nuance"] = context["nuance"]
         manifest = self._manifest(job_id)
         value = {
             "schema_version": SOURCE_GENERATION_SCHEMA_VERSION,
@@ -1000,6 +1110,14 @@ class GenerationJobStore:
             "total_chunk_count": manifest["plan"]["chunk_count"],
             "chunks": chunks,
             "cards": cards,
+            "expected_source_sentence_ids": sorted(
+                expected_source_sentence_ids),
+            "source_contexts": sorted(
+                source_contexts_by_sentence.values(),
+                key=lambda context: (
+                    min(context.get("word_ranks", (float("inf"),))),
+                    context.get("sentence_id", ""),
+                )),
         }
         _atomic_write_json(
             self._job_path(job_id) / "combined.json",

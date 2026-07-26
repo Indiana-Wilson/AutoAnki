@@ -1,3 +1,3 @@
 Preserve traditional Chinese characters unless the input requests another
-form. Write example sentences in Classical Chinese. Give pronunciation in
-Hanyu Pinyin with tone marks.
+form. If the schema requests example sentences, write them in Classical
+Chinese. Give pronunciation in Hanyu Pinyin with tone marks.

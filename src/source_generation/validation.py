@@ -161,7 +161,12 @@ def _source_context_translation_map(parsed, chunk):
     return translations, problems
 
 
-def _normalize_grouped_source_results(parsed, pipeline, chunk):
+def _normalize_grouped_source_results(
+        parsed,
+        pipeline,
+        chunk,
+        *,
+        include_source_context_nuance=False):
     """Normalize the rank-keyed v8 response into canonical card candidates.
 
     V8 deliberately omits the term from every sense object.  The immutable
@@ -174,6 +179,7 @@ def _normalize_grouped_source_results(parsed, pipeline, chunk):
     contextual_indices = set()
     additional_indices = set()
     translations = {}
+    nuances = {}
     translation_key = process_text.SOURCE_CONTEXT_TRANSLATIONS_KEY
     expected_root_keys = {
         _GROUPED_TERM_RESULTS_KEY,
@@ -197,6 +203,7 @@ def _normalize_grouped_source_results(parsed, pipeline, chunk):
             cards,
             card_raw_paths,
             translations,
+            nuances,
             contextual_indices,
             additional_indices,
             problems,
@@ -409,6 +416,8 @@ def _normalize_grouped_source_results(parsed, pipeline, chunk):
                             pipeline,
                             word,
                             contexts_by_id).items()):
+                    if field_name not in contextual:
+                        continue
                     actual_value = contextual.get(
                         field_name,
                         missing_marker)
@@ -539,10 +548,74 @@ def _normalize_grouped_source_results(parsed, pipeline, chunk):
     for context_id in sorted(expected_context_ids):
         if context_id not in raw_translations:
             continue
-        translation = raw_translations[context_id]
+        raw_translation = raw_translations[context_id]
         item_path = (
             f"{translation_path}"
             f"[{json.dumps(context_id, ensure_ascii=False)}]")
+        if include_source_context_nuance:
+            expected_fields = {
+                process_text.SOURCE_CONTEXT_TRANSLATION_FIELD_NAME,
+                process_text.SOURCE_CONTEXT_NUANCE_FIELD_NAME,
+            }
+            if (
+                    not isinstance(raw_translation, dict)
+                    or set(raw_translation) != expected_fields):
+                problems.append(process_text._generated_problem(
+                    "invalid_source_context_translation_entry",
+                    "Source-context entry is malformed",
+                    "Every source-context value must contain exactly "
+                    "translation and nuance.",
+                    path=item_path,
+                    location=(
+                        "Response → source_context_translations "
+                        f"→ {context_id}"),
+                    expected=sorted(expected_fields),
+                    actual=raw_translation,
+                    suggestion=(
+                        "Retry using the frozen grouped structured-output "
+                        "schema."),
+                    identity=context_id))
+                continue
+            translation = raw_translation[
+                process_text.SOURCE_CONTEXT_TRANSLATION_FIELD_NAME]
+            nuance = raw_translation[
+                process_text.SOURCE_CONTEXT_NUANCE_FIELD_NAME]
+            if not isinstance(nuance, str):
+                problems.append(process_text._generated_problem(
+                    "invalid_source_context_nuance",
+                    "Source-context nuance is not text",
+                    "The optional cultural or historical nuance must be a "
+                    "JSON string; use an empty string when none is needed.",
+                    path=(
+                        f"{item_path}."
+                        + process_text.SOURCE_CONTEXT_NUANCE_FIELD_NAME),
+                    location=(
+                        "Response → source_context_translations "
+                        f"→ {context_id} → nuance"),
+                    expected="A JSON string.",
+                    actual=type(nuance).__name__,
+                    suggestion=(
+                        "Retry with a plain nuance string."),
+                    identity=context_id))
+            else:
+                nuances[context_id] = nuance
+                if _HTML_TAG_PATTERN.search(nuance):
+                    problems.append(process_text._generated_problem(
+                        "source_context_nuance_contains_html",
+                        "Source-context nuance contains HTML",
+                        "Sentence nuance must be plain text without HTML.",
+                        path=(
+                            f"{item_path}."
+                            + process_text.SOURCE_CONTEXT_NUANCE_FIELD_NAME),
+                        location=(
+                            "Response → source_context_translations "
+                            f"→ {context_id} → nuance"),
+                        expected="Plain text without HTML.",
+                        actual=nuance,
+                        suggestion="Remove the HTML after checking the text.",
+                        identity=context_id))
+        else:
+            translation = raw_translation
         if not isinstance(translation, str):
             problems.append(process_text._generated_problem(
                 "invalid_source_context_translation_entry",
@@ -660,6 +733,7 @@ def _normalize_grouped_source_results(parsed, pipeline, chunk):
         cards,
         card_raw_paths,
         translations,
+        nuances,
         contextual_indices,
         additional_indices,
         problems,
@@ -719,7 +793,8 @@ def _normalize_compact_source_results(
         chunk,
         *,
         enforce_contextual_constants=True,
-        source_context_translation_memory=None):
+        source_context_translation_memory=None,
+        include_source_context_nuance=False):
     """Normalize compact result arrays into canonical card candidates."""
     problems = []
     cards = []
@@ -729,6 +804,7 @@ def _normalize_compact_source_results(
     contextual_indices = set()
     additional_indices = set()
     translations = {}
+    nuances = {}
     missing_marker = object()
 
     term_results_key = process_text.SOURCE_TERM_RESULTS_KEY
@@ -762,6 +838,7 @@ def _normalize_compact_source_results(
             card_source_ranks,
             card_context_ids,
             translations,
+            nuances,
             contextual_indices,
             additional_indices,
             problems,
@@ -1150,6 +1227,8 @@ def _normalize_compact_source_results(
                             pipeline,
                             word,
                             contexts_by_id).items()):
+                    if field_name not in contextual:
+                        continue
                     actual_value = contextual.get(
                         field_name,
                         missing_marker)
@@ -1237,6 +1316,9 @@ def _normalize_compact_source_results(
         context_id_key,
         context_translation_key,
     }
+    if include_source_context_nuance:
+        expected_translation_keys.add(
+            process_text.SOURCE_CONTEXT_NUANCE_FIELD_NAME)
     if not isinstance(raw_translations, list):
         problems.append(_compact_problem(
             "invalid_compact_source_context_translations",
@@ -1433,6 +1515,48 @@ def _normalize_compact_source_results(
             continue
 
         translations[context_id] = translation
+        if include_source_context_nuance:
+            nuance = entry.get(
+                process_text.SOURCE_CONTEXT_NUANCE_FIELD_NAME,
+                missing_marker)
+            nuance_path = (
+                f"{entry_path}."
+                + process_text.SOURCE_CONTEXT_NUANCE_FIELD_NAME)
+            if not isinstance(nuance, str):
+                problems.append(_compact_problem(
+                    "invalid_source_context_nuance",
+                    "Source-context nuance is not text",
+                    "The optional cultural or historical nuance must be a "
+                    "JSON string; use an empty string when none is needed.",
+                    path=nuance_path,
+                    location=(
+                        "Response → source_context_translations "
+                        f"→ {context_id} → nuance"),
+                    expected="A JSON string.",
+                    actual=(
+                        "Field omitted"
+                        if nuance is missing_marker
+                        else type(nuance).__name__),
+                    suggestion="Repair this context with a plain text value.",
+                    identity=context_id,
+                    context_id=context_id))
+            else:
+                nuances[context_id] = nuance
+                if _HTML_TAG_PATTERN.search(nuance):
+                    problems.append(_compact_problem(
+                        "source_context_nuance_contains_html",
+                        "Source-context nuance contains HTML",
+                        "Sentence nuance must be plain text without HTML.",
+                        path=nuance_path,
+                        location=(
+                            "Response → source_context_translations "
+                            f"→ {context_id} → nuance"),
+                        expected="Plain text without HTML.",
+                        actual=nuance,
+                        suggestion=(
+                            "Repair this context by removing the HTML."),
+                        identity=context_id,
+                        context_id=context_id))
         if not translation.strip():
             problems.append(_compact_problem(
                 "blank_source_context_translation",
@@ -1549,6 +1673,7 @@ def _normalize_compact_source_results(
         card_source_ranks,
         card_context_ids,
         translations,
+        nuances,
         contextual_indices,
         additional_indices,
         problems,
@@ -1977,7 +2102,9 @@ def inspect_pipeline_response(
         use_grouped_source_results=False,
         use_compact_source_results=False,
         use_local_example_emphasis=False,
-        source_context_translation_memory=None):
+        source_context_translation_memory=None,
+        include_source_context_nuance=False,
+        require_generated_examples=True):
     """Return canonical cards plus precise structural/content problems.
 
     The returned ``canonical_response`` is intentionally internal data and
@@ -2008,12 +2135,20 @@ def inspect_pipeline_response(
         local_repair = repair_compact_response(
             raw_text,
             pipeline,
-            chunk)
+            chunk,
+            source_lexical_only=(
+                use_source_for_example_sentences
+                and not require_generated_examples),
+            include_generated_examples=(
+                require_generated_examples),
+            include_source_context_nuance=(
+                include_source_context_nuance))
         effective_raw_text = local_repair.candidate_raw_text
     validation_text = effective_raw_text
     additional_senses_missing_sentences = set()
     preflight_problems = []
     source_context_translations = {}
+    source_context_nuances = {}
     grouped_card_raw_paths = []
     compact_card_source_ranks = []
     compact_card_context_ids = []
@@ -2042,6 +2177,7 @@ def inspect_pipeline_response(
                 compact_card_source_ranks,
                 compact_card_context_ids,
                 source_context_translations,
+                source_context_nuances,
                 split_contextual_card_indices,
                 split_additional_card_indices,
                 compact_problems,
@@ -2052,20 +2188,25 @@ def inspect_pipeline_response(
                 enforce_contextual_constants=(
                     not use_local_example_emphasis),
                 source_context_translation_memory=(
-                    source_context_translation_memory))
+                    source_context_translation_memory),
+                include_source_context_nuance=(
+                    include_source_context_nuance))
             preflight_problems.extend(compact_problems)
         elif use_grouped_source_results and not parse_failed:
             (
                 merged_split_cards,
                 grouped_card_raw_paths,
                 source_context_translations,
+                source_context_nuances,
                 split_contextual_card_indices,
                 split_additional_card_indices,
                 grouped_problems,
             ) = _normalize_grouped_source_results(
                 parsed,
                 pipeline,
-                chunk)
+                chunk,
+                include_source_context_nuance=(
+                    include_source_context_nuance))
             preflight_problems.extend(grouped_problems)
         elif use_split_source_context_cards and not parse_failed:
             (
@@ -2131,7 +2272,9 @@ def inspect_pipeline_response(
                     continue
                 is_contextual_card = (
                     card_index in split_contextual_card_indices
-                    if use_split_source_context_cards
+                    if (
+                        use_ranked_source_results
+                        or use_split_source_context_cards)
                     else normalized not in seen)
                 if is_contextual_card:
                     seen.add(normalized)
@@ -2216,16 +2359,32 @@ def inspect_pipeline_response(
                         (
                             not use_split_source_context_cards
                             or card_index in split_additional_card_indices)
+                        and require_generated_examples
                         and "Sentences" not in card):
                     additional_senses_missing_sentences.add(card_index)
             validation_text = json.dumps(
                 parsed,
                 ensure_ascii=False)
+    optional_fields = {"Sentences"}
+    if use_source_for_example_sentences and not require_generated_examples:
+        optional_fields.add(_SENTENCE_TRANSLATIONS_FIELD)
+        lexical_source_fields = {
+            pipeline_store.response_field_name(field_setting)
+            for field_setting
+            in pipeline_store.get_source_lexical_field_settings(pipeline)
+        }
+        optional_fields.update(
+            pipeline_store.response_field_name(field_setting)
+            for field_setting
+            in pipeline_store.get_requested_field_settings(pipeline)
+            if (
+                pipeline_store.response_field_name(field_setting)
+                not in lexical_source_fields))
     report = process_text.inspect_generated_response(
         validation_text,
         pipeline,
         optional_fields=(
-            ("Sentences",)
+            tuple(sorted(optional_fields))
             if use_source_for_example_sentences
             else ()),
         require_sentence_translations=require_sentence_translations)
@@ -2279,7 +2438,9 @@ def inspect_pipeline_response(
                 continue
             is_contextual_card = (
                 card_index in split_contextual_card_indices
-                if use_split_source_context_cards
+                if (
+                    use_ranked_source_results
+                    or use_split_source_context_cards)
                 else normalized not in seen)
             if is_contextual_card:
                 seen.add(normalized)
@@ -2499,7 +2660,9 @@ def inspect_pipeline_response(
                                         "Retry or remove the HTML tags after "
                                         "checking the translation.")))
                 continue
-            if card_index in additional_senses_missing_sentences:
+            if (
+                    require_generated_examples
+                    and card_index in additional_senses_missing_sentences):
                 report["problems"].append(
                     process_text._generated_problem(
                         "missing_additional_sense_sentences",
@@ -2531,7 +2694,9 @@ def inspect_pipeline_response(
         for card_index, card in enumerate(canonical["cards"]):
             term = card[term_field]
             normalized = _term_identity(term, pipeline)
-            if use_split_source_context_cards:
+            if (
+                    use_ranked_source_results
+                    or use_split_source_context_cards):
                 is_additional = (
                     card_index in split_additional_card_indices)
             else:
@@ -2634,6 +2799,87 @@ def inspect_pipeline_response(
                         "normalized": normalized,
                         "first_card_index": previous,
                     }))
+
+        if use_ranked_source_results:
+            # Dedicated source-sentence notes own contextual examples.
+            # Additional senses retain their three generated examples.
+            for card_index in split_contextual_card_indices:
+                if not 0 <= card_index < len(canonical["cards"]):
+                    continue
+                canonical["cards"][card_index].pop("Sentences", None)
+                canonical["cards"][card_index].pop(
+                    _SENTENCE_TRANSLATIONS_FIELD,
+                    None)
+
+        words_by_rank = {
+            word.rank: word
+            for word in chunk.words
+        }
+        word_ranks_by_context = {}
+        for word in chunk.words:
+            word_ranks_by_context.setdefault(
+                getattr(word, "context_id", None),
+                []).append(word.rank)
+        source_context_records = []
+        for context in chunk.contexts:
+            context_id = context.context_id
+            sentence_ids = tuple(
+                getattr(context, "sentence_ids", ()))
+            if (
+                    use_ranked_source_results
+                    and not require_generated_examples
+                    and len(sentence_ids) != 1):
+                report["problems"].append(
+                    process_text._generated_problem(
+                        "source_context_is_not_one_sentence",
+                        "Source sentence context is not exactly one sentence",
+                        "Shared Sentence → Meaning notes require each retained "
+                        "context to identify exactly one original source "
+                        "sentence.",
+                        path="$",
+                        location=f"Source context {context_id}",
+                        expected="Exactly one sentence_id.",
+                        actual={
+                            "sentence_ids": list(sentence_ids),
+                        },
+                        suggestion=(
+                            "Rebuild this request using Current sentence "
+                            "context."),
+                        identity=context_id))
+            context_word_ranks = tuple(
+                getattr(
+                    context,
+                    "word_ranks",
+                    word_ranks_by_context.get(context_id, ())))
+            source_context_records.append({
+                "context_id": context.context_id,
+                "sentence_id": (
+                    sentence_ids[0]
+                    if len(sentence_ids) == 1
+                    else context.context_id),
+                "original_sentence": getattr(context, "text", ""),
+                "english_translation": source_context_translations.get(
+                    context.context_id,
+                    ""),
+                "nuance": source_context_nuances.get(
+                    context.context_id,
+                    ""),
+                "word_ranks": list(context_word_ranks),
+                "terms": [
+                    words_by_rank[rank].surface
+                    for rank in context_word_ranks
+                    if rank in words_by_rank
+                ],
+                "ranked_terms": [
+                    {
+                        "rank": rank,
+                        "term": words_by_rank[rank].surface,
+                    }
+                    for rank in context_word_ranks
+                    if rank in words_by_rank
+                ],
+            })
+        canonical["source_contexts"] = source_context_records
 
         sense_pairs = _translation_definition_pairs(pipeline)
         lexical_field_names = tuple(
@@ -2877,7 +3123,9 @@ def make_pipeline_response_validator(
         use_grouped_source_results=False,
         use_compact_source_results=False,
         use_local_example_emphasis=False,
-        source_context_translation_memory_by_chunk=None):
+        source_context_translation_memory_by_chunk=None,
+        include_source_context_nuance=False,
+        require_generated_examples=True):
     """Validate schema, card semantics, and membership in the source chunk."""
     pipeline_store.validate_pipelines((pipeline,))
     if source_context_translation_memory_by_chunk is None:
@@ -2920,7 +3168,11 @@ def make_pipeline_response_validator(
             use_local_example_emphasis=(
                 use_local_example_emphasis),
             source_context_translation_memory=(
-                chunk_memory))
+                chunk_memory),
+            include_source_context_nuance=(
+                include_source_context_nuance),
+            require_generated_examples=(
+                require_generated_examples))
         if report["problems"]:
             raise _validation_error(report)
         return ValidatedPipelineResponse(

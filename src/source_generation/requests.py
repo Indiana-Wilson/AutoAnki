@@ -193,12 +193,74 @@ def load_source_v10_final_checks(project_root=None):
     return text
 
 
+def load_source_lexical_final_checks(project_root=None):
+    """Load source-selected checks that request no generated examples."""
+    component_key = "source/final_checks_lexical"
+    component = pipeline_store.prompt_component_map(
+        project_root).get(component_key)
+    if component is None:
+        raise prompt_builder.PromptComponentError(
+            f'Required prompt component "{component_key}" was not found.')
+    try:
+        text = component.path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise prompt_builder.PromptComponentError(
+            f'Could not read prompt component "{component_key}": '
+            f"{error}") from error
+    if not text:
+        raise prompt_builder.PromptComponentError(
+            f'Prompt component "{component_key}" cannot be empty.')
+    return text
+
+
+def load_source_sentence_final_checks(project_root=None):
+    """Load final checks for source sentence cards without lexical output."""
+    component_key = "source/final_checks_sentences_only"
+    component = pipeline_store.prompt_component_map(
+        project_root).get(component_key)
+    if component is None:
+        raise prompt_builder.PromptComponentError(
+            f'Required prompt component "{component_key}" was not found.')
+    try:
+        text = component.path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise prompt_builder.PromptComponentError(
+            f'Could not read prompt component "{component_key}": '
+            f"{error}") from error
+    if not text:
+        raise prompt_builder.PromptComponentError(
+            f'Prompt component "{component_key}" cannot be empty.')
+    return text
+
+
+def load_source_sentence_batch_instructions(project_root=None):
+    """Load the payload marker for source sentence cards only."""
+    component_key = "source/batch_sentences_only"
+    component = pipeline_store.prompt_component_map(
+        project_root).get(component_key)
+    if component is None:
+        raise prompt_builder.PromptComponentError(
+            f'Required prompt component "{component_key}" was not found.')
+    try:
+        text = component.path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise prompt_builder.PromptComponentError(
+            f'Could not read prompt component "{component_key}": '
+            f"{error}") from error
+    if not text:
+        raise prompt_builder.PromptComponentError(
+            f'Prompt component "{component_key}" cannot be empty.')
+    return text
+
+
 def _source_batch_prompt(
         project_root=None,
         *,
         use_grouped_source_results,
         use_compact_source_results,
-        compact_source_protocol=9):
+        compact_source_protocol=9,
+        include_generated_examples=True,
+        include_lexical_fields=True):
     """Keep protocol-specific checks next to the final payload marker."""
     if use_grouped_source_results and use_compact_source_results:
         raise ValueError(
@@ -209,12 +271,15 @@ def _source_batch_prompt(
         raise ValueError(
             "Compact source results require protocol 9 or 10.")
     batch = (
-        (
-            load_source_v10_batch_instructions(project_root).strip()
-            if compact_source_protocol == 10
-            else load_source_v9_batch_instructions(project_root).strip())
-        if use_compact_source_results
-        else load_source_batch_instructions(project_root).strip())
+        load_source_sentence_batch_instructions(project_root).strip()
+        if not include_lexical_fields
+        else (
+            (
+                load_source_v10_batch_instructions(project_root).strip()
+                if compact_source_protocol == 10
+                else load_source_v9_batch_instructions(project_root).strip())
+            if use_compact_source_results
+            else load_source_batch_instructions(project_root).strip()))
     if (
             not use_grouped_source_results
             and not use_compact_source_results):
@@ -225,12 +290,18 @@ def _source_batch_prompt(
             f'{_SOURCE_BATCH_MARKER!r}.')
     prefix = batch[:-len(_SOURCE_BATCH_MARKER)].rstrip()
     final_checks = (
-        (
-            load_source_v10_final_checks(project_root)
-            if compact_source_protocol == 10
-            else load_source_v9_final_checks(project_root))
-        if use_compact_source_results
-        else load_source_v8_final_checks(project_root))
+        load_source_sentence_final_checks(project_root)
+        if not include_lexical_fields
+        else (
+            load_source_lexical_final_checks(project_root)
+            if not include_generated_examples
+            else (
+                (
+                    load_source_v10_final_checks(project_root)
+                    if compact_source_protocol == 10
+                    else load_source_v9_final_checks(project_root))
+                if use_compact_source_results
+                else load_source_v8_final_checks(project_root))))
     return (
         prefix
         + "\n\n"
@@ -248,7 +319,8 @@ def load_source_context_example_instructions(
         use_grouped_source_results=False,
         use_compact_source_results=False,
         compact_source_protocol=9,
-        translation_memory_enabled=False):
+        translation_memory_enabled=False,
+        include_lexical_fields=True):
     """Load guidance for using retained source text as the card example."""
     if (
             use_compact_source_results
@@ -256,27 +328,30 @@ def load_source_context_example_instructions(
         raise ValueError(
             "Compact source results require protocol 9 or 10.")
     component_key = (
-        "source/context_examples_v10_memory"
-        if (
-            use_compact_source_results
-            and compact_source_protocol == 10
-            and translation_memory_enabled)
+        "source/context_sentences_only"
+        if not include_lexical_fields
         else (
-        f"source/context_examples_v{compact_source_protocol}"
-        if use_compact_source_results
-        else (
-            "source/context_examples_v8"
-            if use_grouped_source_results
+            "source/context_examples_v10_memory"
+            if (
+                use_compact_source_results
+                and compact_source_protocol == 10
+                and translation_memory_enabled)
             else (
-                "source/context_examples_v7"
-                if use_occurrence_locators
+            f"source/context_examples_v{compact_source_protocol}"
+            if use_compact_source_results
+            else (
+                "source/context_examples_v8"
+                if use_grouped_source_results
                 else (
-                    "source/context_examples_v6"
-                    if split_source_context_cards
+                    "source/context_examples_v7"
+                    if use_occurrence_locators
                     else (
-                        "source/context_examples_v5"
-                        if use_context_translation_map
-                        else "source/context_examples"))))))
+                        "source/context_examples_v6"
+                        if split_source_context_cards
+                        else (
+                            "source/context_examples_v5"
+                            if use_context_translation_map
+                            else "source/context_examples")))))))
     component = pipeline_store.prompt_component_map(
         project_root).get(component_key)
     if component is None:
@@ -307,7 +382,8 @@ def build_source_prompt(
         use_grouped_source_results=False,
         use_compact_source_results=False,
         compact_source_protocol=9,
-        translation_memory_enabled=False):
+        translation_memory_enabled=False,
+        include_source_context_nuance=False):
     """Compose Card Setup's minimum prompt plus source-batch instructions."""
     if (
             use_compact_source_results
@@ -323,12 +399,36 @@ def build_source_prompt(
             and require_sentence_translations)
     if use_occurrence_locators is None:
         use_occurrence_locators = split_source_context_cards
+    source_lexical_settings = (
+        pipeline_store.get_source_lexical_field_settings(pipeline)
+        if use_source_for_example_sentences
+        else None)
+    include_source_lexical_fields = bool(
+        source_lexical_settings
+        if use_source_for_example_sentences
+        else True)
     prompt = (
         prompt_builder.build_prompt(
             pipeline,
             project_root,
             include_sentence_translations=(
                 require_sentence_translations),
+            include_example_sentence_instructions=(
+                not use_source_for_example_sentences),
+            requested_field_settings=(
+                source_lexical_settings
+                if use_source_for_example_sentences
+                else None),
+            core_component_key=(
+                "core_source_sentence_translation"
+                if (
+                    use_source_for_example_sentences
+                    and not include_source_lexical_fields)
+                else None),
+            include_language_instructions=(
+                not (
+                    use_source_for_example_sentences
+                    and not include_source_lexical_fields)),
             sentence_collections_as_arrays=(
                 sentence_collections_as_arrays),
             grouped_source_examples=(
@@ -361,15 +461,29 @@ def build_source_prompt(
                     use_compact_source_results),
                 compact_source_protocol=compact_source_protocol,
                 translation_memory_enabled=(
-                    translation_memory_enabled))
+                    translation_memory_enabled),
+                include_lexical_fields=(
+                    include_source_lexical_fields))
             + "\n")
+        if include_source_context_nuance:
+            prompt += (
+                "For each source context, also return the schema's "
+                '"nuance" string. Use it only for an implied meaning that '
+                "a learner could not understand without cultural or "
+                "historical knowledge; otherwise return an empty string. "
+                "Do not repeat the translation or give a word definition.\n")
     return (
         prompt
         + _source_batch_prompt(
             project_root,
             use_grouped_source_results=use_grouped_source_results,
             use_compact_source_results=use_compact_source_results,
-            compact_source_protocol=compact_source_protocol)
+            compact_source_protocol=compact_source_protocol,
+            include_generated_examples=(
+                not use_source_for_example_sentences
+                or include_source_lexical_fields),
+            include_lexical_fields=(
+                include_source_lexical_fields))
         + "\n")
 
 
@@ -683,6 +797,85 @@ def source_request_uses_compact_source_results(value):
         and bool(contract.get("use_source_for_example_sentences", False)))
 
 
+def _effective_source_response_schemas(contract):
+    """Return the schemas that actually govern individual source chunks."""
+    per_chunk = contract.get("response_formats_by_chunk", {})
+    formats = (
+        tuple(per_chunk.values())
+        if per_chunk
+        else (contract["response_format"],))
+    return tuple(
+        response_format.get("schema", {})
+        for response_format in formats
+        if (
+            isinstance(response_format, dict)
+            and isinstance(response_format.get("schema"), dict))
+    )
+
+
+def _source_term_result_schemas(schema):
+    term_results = (
+        schema.get("properties", {})
+        .get("term_results", {}))
+    item_schema = term_results.get("items")
+    if isinstance(item_schema, dict):
+        return (item_schema,)
+    properties = term_results.get("properties")
+    if not isinstance(properties, dict):
+        return ()
+    return tuple(
+        result_schema
+        for result_schema in properties.values()
+        if isinstance(result_schema, dict)
+    )
+
+
+def source_request_includes_context_nuance(value):
+    """Detect the optional sentence-level nuance field in a frozen schema."""
+    contract = normalise_source_request_contract(value)
+    for schema in _effective_source_response_schemas(contract):
+        translations = (
+            schema.get("properties", {})
+            .get("source_context_translations", {}))
+        items = translations.get("items")
+        if isinstance(items, dict):
+            properties = items.get("properties", {})
+            if isinstance(properties, dict) and "nuance" in properties:
+                return True
+        properties = translations.get("properties", {})
+        if any(
+                isinstance(item, dict)
+                and isinstance(item.get("properties"), dict)
+                and "nuance" in item["properties"]
+                for item in (
+                    properties.values()
+                    if isinstance(properties, dict)
+                    else ())):
+            return True
+    return False
+
+
+def source_request_requires_generated_examples(value):
+    """Return whether additional lexical senses carry generated examples."""
+    contract = normalise_source_request_contract(value)
+    found_source_term_results = False
+    for schema in _effective_source_response_schemas(contract):
+        result_schemas = _source_term_result_schemas(schema)
+        found_source_term_results = bool(
+            found_source_term_results or result_schemas)
+        for result in result_schemas:
+            additional = (
+                result.get("properties", {})
+                .get("additional_senses", {})
+                .get("items", {}))
+            if "Sentences" in additional.get("properties", {}):
+                return True
+    # Contracts before grouped v8, and ordinary non-source contracts, do not
+    # expose term_results. Preserve their historical generated-example
+    # behavior instead of treating an unrecognized schema as lexical-only.
+    return not found_source_term_results
+
+
 def compact_response_format_uses_occurrence_sense_indices(value):
     """Detect frozen per-occurrence accounting from a compact JSON schema."""
     if not isinstance(value, dict):
@@ -741,7 +934,8 @@ def build_source_request_contract(
         protocol_version=SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION,
         reasoning_effort="low",
         model=SOURCE_REQUEST_MODEL,
-        translation_memory_enabled=False):
+        translation_memory_enabled=False,
+        include_source_context_nuance=False):
     """Freeze every mutable input used to construct an OpenAI source call."""
     # Imported lazily so source planning remains usable without importing the
     # OpenAI-facing module until a paid job is explicitly created.
@@ -750,9 +944,23 @@ def build_source_request_contract(
         LOW_REASONING_OUTPUT_RESERVE_MULTIPLIER,
         MODEL_MAX_OUTPUT_TOKENS,
         estimate_chunk_output_tokens,
+        estimate_source_chunk_output_tokens,
     )
 
     chunks = tuple(chunks)
+    if use_source_for_example_sentences:
+        invalid_context_ids = [
+            context.context_id
+            for chunk in chunks
+            for context in chunk.contexts
+            if len(tuple(getattr(context, "sentence_ids", ()))) != 1
+        ]
+        if invalid_context_ids:
+            raise ValueError(
+                "Source sentence cards require every retained context to "
+                "identify exactly one original sentence. Rebuild with "
+                "Current sentence context. Invalid context(s): "
+                + ", ".join(invalid_context_ids))
     chunk_ids = [getattr(chunk, "chunk_id", None) for chunk in chunks]
     if any(
             not isinstance(chunk_id, str) or not chunk_id
@@ -775,6 +983,19 @@ def build_source_request_contract(
     if not isinstance(translation_memory_enabled, bool):
         raise TypeError(
             "Translation-memory request mode must be true or false.")
+    if not isinstance(include_source_context_nuance, bool):
+        raise TypeError(
+            "Source-context nuance mode must be true or false.")
+    if (
+            include_source_context_nuance
+            and not use_source_for_example_sentences):
+        raise ValueError(
+            "Source-context nuance requires retained source sentence cards.")
+    if translation_memory_enabled and include_source_context_nuance:
+        raise ValueError(
+            "Translation memory cannot be combined with source-context "
+            "nuance because remembered translations do not contain a "
+            "validated nuance value.")
     if translation_memory_enabled and not (
             protocol_version == 10
             and use_source_for_example_sentences
@@ -799,6 +1020,9 @@ def build_source_request_contract(
         require_sentence_translations
         and use_source_for_example_sentences
         and protocol_version in {9, 10})
+    include_additional_sense_examples = bool(
+        use_source_for_example_sentences
+        and pipeline_store.get_source_lexical_field_settings(pipeline))
     effective_reasoning_effort = (
         reasoning_effort
         if protocol_version in {9, 10}
@@ -820,11 +1044,18 @@ def build_source_request_contract(
         use_grouped_source_results=uses_v8_grouped_results,
         use_compact_source_results=uses_compact_results,
         compact_source_protocol=protocol_version,
-        translation_memory_enabled=translation_memory_enabled)
+        translation_memory_enabled=translation_memory_enabled,
+        include_source_context_nuance=(
+            include_source_context_nuance))
     response_format = (
         process_text.build_compact_source_response_format(
             pipeline,
-            protocol_version=protocol_version)
+            protocol_version=protocol_version,
+            source_lexical_only=True,
+            include_generated_examples=(
+                include_additional_sense_examples),
+            include_source_context_nuance=(
+                include_source_context_nuance))
         if uses_compact_results
         else process_text.build_response_format(
             pipeline,
@@ -842,6 +1073,39 @@ def build_source_request_contract(
             split_source_context_cards=(
                 require_sentence_translations
                 and use_source_for_example_sentences)))
+    output_safety_multiplier = (
+        1.50
+        * (
+            _V9_OUTPUT_LIMIT_MULTIPLIER
+            if protocol_version in {9, 10}
+            else (
+                LOW_REASONING_OUTPUT_RESERVE_MULTIPLIER
+                if effective_reasoning_effort == "low"
+                else 1.0)))
+    max_output_tokens_by_chunk = {}
+    for chunk in chunks:
+        estimated_output_tokens = (
+            estimate_source_chunk_output_tokens(
+                pipeline,
+                chunk,
+                include_source_context_nuance=(
+                    include_source_context_nuance),
+                high_multiplier=output_safety_multiplier)
+            if (
+                require_sentence_translations
+                and use_source_for_example_sentences)
+            else estimate_chunk_output_tokens(
+                pipeline,
+                len(chunk.words),
+                high_multiplier=output_safety_multiplier))
+        max_output_tokens_by_chunk[chunk.chunk_id] = min(
+            MODEL_MAX_OUTPUT_TOKENS,
+            max(
+                (
+                    8_192
+                    if require_sentence_translations
+                    else 1_024),
+                estimated_output_tokens))
     contract = {
         "schema_version": (
             protocol_version
@@ -860,28 +1124,7 @@ def build_source_request_contract(
         "max_tool_calls": 1 if allow_web_search else 0,
         "use_source_for_example_sentences": bool(
             use_source_for_example_sentences),
-        "max_output_tokens_by_chunk": {
-            chunk.chunk_id: min(
-                MODEL_MAX_OUTPUT_TOKENS,
-                max(
-                    (
-                        8_192
-                        if require_sentence_translations
-                        else 1_024),
-                    estimate_chunk_output_tokens(
-                        pipeline,
-                        len(chunk.words),
-                        high_multiplier=(
-                            1.50
-                            * (
-                                _V9_OUTPUT_LIMIT_MULTIPLIER
-                                if protocol_version in {9, 10}
-                                else (
-                                    LOW_REASONING_OUTPUT_RESERVE_MULTIPLIER
-                                    if effective_reasoning_effort == "low"
-                                    else 1.0))))))
-            for chunk in chunks
-        },
+        "max_output_tokens_by_chunk": max_output_tokens_by_chunk,
     }
     if require_sentence_translations:
         contract["require_sentence_translations"] = True
@@ -889,14 +1132,24 @@ def build_source_request_contract(
             chunk.chunk_id: (
                 process_text.build_grouped_source_response_format(
                     pipeline,
-                    chunk)
+                    chunk,
+                    source_lexical_only=True,
+                    include_generated_examples=(
+                        include_additional_sense_examples),
+                    include_source_context_nuance=(
+                        include_source_context_nuance))
                 if uses_v8_grouped_results
                 else process_text.build_compact_source_response_format(
                     pipeline,
                     protocol_version=protocol_version,
                     chunk=chunk,
                     translation_memory_enabled=(
-                        translation_memory_enabled)))
+                        translation_memory_enabled),
+                    source_lexical_only=True,
+                    include_generated_examples=(
+                        include_additional_sense_examples),
+                    include_source_context_nuance=(
+                        include_source_context_nuance)))
             for chunk in chunks
             if (
                 uses_v8_grouped_results

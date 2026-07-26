@@ -116,15 +116,16 @@ class CompactSourceValidationTests(unittest.TestCase):
             [card[self.term_field] for card in cards],
             ["道", "道", "可"],
         )
-        self.assertEqual(
-            cards[0][self.sentence_translations_field],
-            "The way that can be spoken.",
-        )
-        self.assertIn("<strong>道</strong>可道。", cards[0][
-            self.sentences_field])
+        self.assertNotIn(self.sentences_field, cards[0])
+        self.assertNotIn(self.sentence_translations_field, cards[0])
         self.assertEqual(
             cards[1][self.sentences_field].split("|"),
             self.examples()["Sentences"],
+        )
+        self.assertEqual(
+            report["canonical_response"]["source_contexts"][0][
+                "english_translation"],
+            "The way that can be spoken.",
         )
 
         validator = make_pipeline_response_validator(

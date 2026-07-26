@@ -34,6 +34,10 @@ def build_prompt(
         project_root=None,
         *,
         include_sentence_translations=True,
+        include_example_sentence_instructions=None,
+        requested_field_settings=None,
+        core_component_key=None,
+        include_language_instructions=True,
         sentence_collections_as_arrays=False,
         grouped_source_examples=False,
         compact_source_examples=False,
@@ -53,16 +57,25 @@ def build_prompt(
     sections = []
 
     core_key = (
-        f"core_source_v{compact_source_protocol}"
-        if compact_source_examples
-        else "core")
-    for key in (core_key, f"languages/{language.key}"):
+        core_component_key
+        if core_component_key is not None
+        else (
+            f"core_source_v{compact_source_protocol}"
+            if compact_source_examples
+            else "core"))
+    component_keys = [core_key]
+    if include_language_instructions:
+        component_keys.append(f"languages/{language.key}")
+    for key in component_keys:
         sections.append(_format_component(
             _read_component(components, key),
             key,
             **shared_values))
 
-    if pipeline_store.requires_sentences(pipeline):
+    if include_example_sentence_instructions is None:
+        include_example_sentence_instructions = (
+            pipeline_store.requires_sentences(pipeline))
+    if include_example_sentence_instructions:
         if compact_source_examples:
             key = (
                 f"directions/context_arrays_v"
@@ -103,8 +116,10 @@ def build_prompt(
                 key,
                 **shared_values))
 
-    for field_setting in (
-            pipeline_store.get_requested_field_settings(pipeline)):
+    if requested_field_settings is None:
+        requested_field_settings = (
+            pipeline_store.get_requested_field_settings(pipeline))
+    for field_setting in requested_field_settings:
         field = pipeline_store.get_field_option(
             field_setting.field_key)
         target_language = pipeline_store.get_language(

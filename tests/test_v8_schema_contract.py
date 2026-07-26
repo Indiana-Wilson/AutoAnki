@@ -14,6 +14,8 @@ import process_text
 from source_generation import (
     build_source_request_contract,
     source_request_contract_digest,
+    source_request_includes_context_nuance,
+    source_request_requires_generated_examples,
     source_request_uses_grouped_source_results,
     source_request_uses_occurrence_locators,
     source_request_uses_split_contextual_cards,
@@ -88,8 +90,12 @@ def grouped_chunk():
                 context_id="ctx:shared"),
         ),
         contexts=(
-            SimpleNamespace(context_id="ctx:opening"),
-            SimpleNamespace(context_id="ctx:shared"),
+            SimpleNamespace(
+                context_id="ctx:opening",
+                sentence_ids=("sentence:opening",)),
+            SimpleNamespace(
+                context_id="ctx:shared",
+                sentence_ids=("sentence:shared",)),
         ))
 
 
@@ -108,7 +114,8 @@ def wang_bi_beginning_chunk():
             SimpleNamespace(
                 context_id="ctx:beginning",
                 start_offset=18,
-                text="無名，天地之始，有名，萬物之母。"),
+                text="無名，天地之始，有名，萬物之母。",
+                sentence_ids=("sentence:beginning",)),
         ))
 
 
@@ -255,6 +262,30 @@ class GroupedSourceResponseSchemaTests(unittest.TestCase):
 
 
 class VersionEightSourceContractTests(unittest.TestCase):
+    def test_v8_feature_detectors_use_the_effective_per_chunk_schema(self):
+        chunk = grouped_chunk()
+        contract = build_source_request_contract(
+            context_pipeline(),
+            chunks=(chunk,),
+            use_source_for_example_sentences=True,
+            protocol_version=8,
+            include_source_context_nuance=True)
+
+        self.assertTrue(
+            source_request_includes_context_nuance(contract))
+        self.assertFalse(
+            source_request_requires_generated_examples(contract))
+
+        frozen_old_contract = json.loads(json.dumps(contract))
+        frozen_old_contract["response_formats_by_chunk"][
+            chunk.chunk_id] = (
+                process_text.build_grouped_source_response_format(
+                    context_pipeline(),
+                    chunk))
+        self.assertTrue(
+            source_request_requires_generated_examples(
+                frozen_old_contract))
+
     def test_context_contract_freezes_one_grouped_schema_per_chunk(self):
         chunk = grouped_chunk()
 
@@ -274,7 +305,9 @@ class VersionEightSourceContractTests(unittest.TestCase):
             contract["response_formats_by_chunk"][chunk.chunk_id],
             process_text.build_grouped_source_response_format(
                 context_pipeline(),
-                chunk))
+                chunk,
+                source_lexical_only=True,
+                include_generated_examples=False))
         self.assertGreaterEqual(
             contract["max_output_tokens_by_chunk"][chunk.chunk_id],
             8_192)
@@ -297,35 +330,26 @@ class VersionEightSourceContractTests(unittest.TestCase):
         prompt = contract["composed_prompt"]
         self.assertIn(
             '"term_results" and "source_context_translations"',
-            prompt)
+            " ".join(prompt.split()))
         self.assertIn(
             '"contextual_sense"',
             prompt)
         self.assertIn(
             '"additional_senses"',
             prompt)
-        self.assertIn(
-            "input rank 7 becomes property",
-            prompt)
-        self.assertIn(
-            "This source-specific rule overrides any general instruction",
-            " ".join(prompt.split()))
-        self.assertIn(
-            "Perform an explicit coverage audit for every rank",
-            prompt)
-        self.assertIn(
-            "practical method/course/teaching",
-            " ".join(prompt.split()))
+        self.assertIn("structural association data only", prompt)
+        self.assertIn("empty \"contextual_sense\" object", prompt)
+        self.assertIn("Do not perform or return lexical analysis", prompt)
+        self.assertNotIn("input rank 7 becomes property", prompt)
+        self.assertNotIn("practical method/course/teaching", prompt)
         self.assertIn("FINAL CHECK", prompt)
-        self.assertIn("verify exact rank and context-ID coverage", prompt)
-        self.assertIn("exactly three", prompt)
+        self.assertIn("Verify exact required rank and context-ID coverage", prompt)
+        self.assertNotIn("exactly three", prompt)
+        self.assertNotIn("dictionary senses", prompt)
         self.assertNotIn("<strong>", prompt)
         self.assertNotIn("emphasis", prompt.casefold())
         self.assertTrue(
             prompt.endswith("Here is the source batch JSON:\n"))
-        self.assertLess(
-            prompt.index("TERM RESULTS"),
-            prompt.index("The supplied source batch is a JSON object."))
 
     def test_non_context_contract_keeps_generic_format_and_empty_map(self):
         chunk = grouped_chunk()

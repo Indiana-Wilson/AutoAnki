@@ -90,6 +90,22 @@ class AutomaticExampleRepairTests(unittest.TestCase):
             protocol_version=10,
             reasoning_effort="none",
             translation_memory_enabled=True)
+        # Exercise compatibility with saved pre-refactor v10 jobs whose
+        # frozen schema still requested generated examples for additional
+        # senses. New source-sentence contracts deliberately omit them.
+        self.contract["response_format"] = (
+            process_text.build_compact_source_response_format(
+                self.pipeline,
+                protocol_version=10))
+        self.contract["response_formats_by_chunk"] = {
+            chunk.chunk_id: (
+                process_text.build_compact_source_response_format(
+                    self.pipeline,
+                    protocol_version=10,
+                    chunk=chunk,
+                    translation_memory_enabled=True))
+            for chunk in self.plan.chunks
+        }
         self.job = self.backend.jobs.create(
             self.plan,
             request_metadata={
@@ -272,17 +288,24 @@ class AutomaticExampleRepairTests(unittest.TestCase):
                 isinstance(card.get("Sentences"), str)
                 and "|" not in card["Sentences"])
         ]
-        self.assertTrue(contextual_cards)
-        self.assertTrue(all(
-            card["Sentence Translations (English)"]
-            == "To know the Way."
-            for card in contextual_cards))
+        self.assertFalse(contextual_cards)
+        self.assertEqual(
+            validated["source_contexts"][0]["english_translation"],
+            "To know the Way.")
 
-    def test_non_pair_invalidity_never_triggers_automatic_broad_retry(self):
+    def test_missing_rank_uses_bounded_automatic_selective_repair(self):
         invalid = self.payload()
-        invalid["term_results"].pop()
+        invalid["term_results"][0]["additional_senses"][0][
+            "Sentences"][0] = "知此理。"
+        missing_result = invalid["term_results"].pop()
+        repair = {
+            "term_results": [missing_result],
+            "source_context_translations": list(
+                invalid["source_context_translations"]),
+        }
         responses = SequentialResponses((
             json.dumps(invalid, ensure_ascii=False),
+            json.dumps(repair, ensure_ascii=False),
         ))
         controller = source_workflow.SourceWorkflowController(
             backend=self.backend)
@@ -292,8 +315,81 @@ class AutomaticExampleRepairTests(unittest.TestCase):
             self.pipeline,
             SimpleNamespace(responses=responses))
 
-        self.assertEqual(snapshot.overall_status, "completed_with_failures")
-        self.assertEqual(len(responses.calls), 1)
+        self.assertEqual(snapshot.overall_status, "completed")
+        self.assertEqual(len(responses.calls), 2)
+        latest = self.backend.jobs.latest_attempt_path(
+            self.job.job_id,
+            self.chunk.chunk_id)
+        scope = json.loads(
+            (latest / "repair_scope.json").read_text(encoding="utf-8"))
+        self.assertEqual(scope["kind"], "compact_v10_selective_repair")
+        self.assertTrue(scope["automatic"])
+        self.assertEqual(scope["dispatch_ordinal"], 1)
+
+    def test_lexical_free_source_translation_uses_automatic_context_repair(
+            self):
+        contract = build_source_request_contract(
+            self.pipeline,
+            chunks=self.plan.chunks,
+            use_source_for_example_sentences=True,
+            protocol_version=10,
+            reasoning_effort="none")
+        job = self.backend.jobs.create(
+            self.plan,
+            request_metadata={
+                "pipeline": pipeline_store.pipeline_to_mapping(
+                    self.pipeline),
+                "automatic_repair": True,
+                "max_automatic_repairs": 3,
+                "translation_memory_by_chunk": {
+                    self.chunk.chunk_id: {},
+                },
+            },
+            request_contract=contract)
+        term_results = [
+            {
+                "rank": word.rank,
+                "contextual_sense": {},
+                "additional_senses": [],
+            }
+            for word in self.chunk.words
+        ]
+        context_id = self.chunk.contexts[0].context_id
+        invalid = {
+            "term_results": term_results,
+            "source_context_translations": [{
+                "context_id": context_id,
+                "translation": "",
+            }],
+        }
+        repair = {
+            "term_results": term_results,
+            "source_context_translations": [{
+                "context_id": context_id,
+                "translation": "To know the Way.",
+            }],
+        }
+        responses = SequentialResponses((
+            json.dumps(invalid, ensure_ascii=False),
+            json.dumps(repair, ensure_ascii=False),
+        ))
+        controller = source_workflow.SourceWorkflowController(
+            backend=self.backend)
+
+        snapshot = controller._run_job(
+            job.job_id,
+            self.pipeline,
+            SimpleNamespace(responses=responses))
+
+        self.assertEqual(snapshot.overall_status, "completed")
+        self.assertEqual(len(responses.calls), 2)
+        latest = self.backend.jobs.latest_attempt_path(
+            job.job_id,
+            self.chunk.chunk_id)
+        scope = json.loads(
+            (latest / "repair_scope.json").read_text(encoding="utf-8"))
+        self.assertEqual(scope["replace_context_ids"], [context_id])
+        self.assertTrue(scope["automatic"])
 
     def test_automatic_pair_repair_stops_when_three_dispatches_are_retained(
             self):

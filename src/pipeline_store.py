@@ -427,14 +427,22 @@ def response_field_name(field_setting):
     return f"{field.name} ({language.name})"
 
 
-def get_requested_field_settings(pipeline):
+def get_requested_field_settings(pipeline, *, direction_keys=None):
     settings = get_language_settings(
         pipeline,
         pipeline.language_key)
+    selected_directions = (
+        None
+        if direction_keys is None
+        else frozenset(direction_keys))
     requested = []
     seen = set()
     for card in settings.cards:
-        if not card.enabled:
+        if (
+                not card.enabled
+                or (
+                    selected_directions is not None
+                    and card.direction_key not in selected_directions)):
             continue
         for field_setting in get_effective_fields(settings, card):
             identity = (
@@ -445,6 +453,26 @@ def get_requested_field_settings(pipeline):
             seen.add(identity)
             requested.append(field_setting)
     return tuple(requested)
+
+
+def get_source_lexical_field_settings(pipeline):
+    """Return fields needed by source-mode word-based cards only."""
+    return get_requested_field_settings(
+        pipeline,
+        direction_keys={
+            "word_to_meaning",
+            "meaning_to_word",
+        })
+
+
+def source_lexical_directions_enabled(pipeline):
+    """Return whether source generation will package lexical cards."""
+    return any(
+        card.direction_key in {
+            "word_to_meaning",
+            "meaning_to_word",
+        }
+        for card in get_enabled_cards(pipeline))
 
 
 def requires_sentences(pipeline):

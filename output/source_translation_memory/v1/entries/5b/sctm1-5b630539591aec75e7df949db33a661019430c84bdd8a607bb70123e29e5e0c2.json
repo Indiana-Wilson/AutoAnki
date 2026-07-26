@@ -5,9 +5,9 @@
   "schema_version": 1,
   "source_language_key": "classical_chinese_wang_bi",
   "source_text": "道可道，非常道，名可名，非常名；",
-  "state": "usable",
+  "state": "conflicted",
   "target_language_key": "english",
-  "updated_at": "2026-07-26T09:35:06.959570+00:00",
+  "updated_at": "2026-07-26T12:41:36.282497+00:00",
   "variants": [
     {
       "provenance": [
@@ -29,10 +29,73 @@
           },
           "request_contract_sha256": "085f48fdd675087d33b3cab888bd192f20d198145629e116397bf8bbe4cbea65",
           "validated_at": "2026-07-26T09:35:06.959240+00:00"
+        },
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r30",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "effective_raw_sha256": "bec114f09faf32110bffe25e285d20ebb427b5c16374a1f519c14ce445fe6fbd",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T112252-8781e5596778",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "71fb7c5f3cc8e4a6239de83fd2932d65ebdff41e656f4bfd372f39f3792c615a",
+          "provider_raw_sha256": "bec114f09faf32110bffe25e285d20ebb427b5c16374a1f519c14ce445fe6fbd",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T11:23:29.822403+00:00"
+        },
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r30",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "effective_raw_sha256": "2df1b7a8bba35bae168b5760d1ad83485067ded0592da50b6fbbb35b13cff058",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T120125-ed6c84fd8256",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "19b0993bdad225d5b04783028e1e34329b1f3d2e0b87d8d932c6ad11fa7b5f62",
+          "provider_raw_sha256": "2df1b7a8bba35bae168b5760d1ad83485067ded0592da50b6fbbb35b13cff058",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T12:02:00.104592+00:00"
         }
       ],
       "translation": "The Way that can be spoken of is not the constant Way; the name that can be named is not the constant name.",
       "translation_sha256": "a0a8fc5e1ccdd11f3dbe5dbc9901d1383dc799538339eec8e8d68ca81cff66fe"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r20",
+          "context_id": "source-context-c535f824d57f859c34ac",
+          "effective_raw_sha256": "8693ad8f4a8cdf8b32991c13d09e6f763558fd78b9d2ed1075136f603dc5204e",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T124041-b3df6f8c8217",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "6feb4000c8fe3e1044d8829b7591525a8697df779b1e6441c7e26c0a74b0c6a7",
+          "provider_raw_sha256": "8693ad8f4a8cdf8b32991c13d09e6f763558fd78b9d2ed1075136f603dc5204e",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "260fb61c17cf9d6328db5bb1440799efa61ebc5b81a072b0f182ee075087c68a",
+          "validated_at": "2026-07-26T12:41:36.281337+00:00"
+        }
+      ],
+      "translation": "The Dao that can be spoken is not the constant Dao; the name that can be named is not the constant name.",
+      "translation_sha256": "3b8bcc367ef4c5c27537bc65535391b70f3c992e356bb0eb3a633216e681c5a8"
     }
   ]
 }

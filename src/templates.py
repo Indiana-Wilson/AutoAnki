@@ -20,6 +20,7 @@ JAPANESE_MEANING_TO_WORD_MODEL_ID = 2085400325
 LATIN_CONTEXT_MODEL_ID = 2006934887
 LATIN_WORD_TO_MEANING_MODEL_ID = 1738304675
 LATIN_MEANING_TO_WORD_MODEL_ID = 2021716093
+SOURCE_SENTENCE_MODEL_ID = 1942026101
 
 DECK_ID = 2059400110
 DECK_NAME = "Generated English Words"
@@ -55,6 +56,9 @@ CONTENT_FIELD_NAMES = tuple(
     field_name
     for _field_key, field_name in CONTENT_FIELDS)
 SENTENCE_TRANSLATIONS_FIELD_NAME = "Sentence Translations (English)"
+SOURCE_ORIGINAL_SENTENCE_FIELD_NAME = "Original Sentence"
+SOURCE_ENGLISH_TRANSLATION_FIELD_NAME = "English Translation"
+SOURCE_SENTENCE_NUANCE_FIELD_NAME = "Nuance"
 SOURCE_CONTEXT_BLOCK_PREFIX = "\ue000S"
 SOURCE_CONTEXT_ESCAPE_MARKER = "\ue000"
 
@@ -102,9 +106,9 @@ CARD_CSS = """.card {
   max-width: 44em;
 }
 
-.context-term {
+.context-fallback-term {
   max-width: 44em;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -145,8 +149,10 @@ def _definition_stack():
 def _context_front(term_field):
     return f"""<div id="sentence-source" hidden>{{{{Sentences}}}}</div>
 <div class="context-example">
-  <div class="term context-term">{{{{{term_field}}}}}</div>
   <div id="sentence" class="sentence"></div>
+  <div id="context-fallback-term" class="context-fallback-term" hidden>
+    {{{{{term_field}}}}}
+  </div>
 </div>
 <script>
 (function () {{
@@ -183,7 +189,15 @@ def _context_front(term_field):
       Math.floor(Math.random() * candidateIndices.length)];
     sessionStorage.setItem(key, String(chosenIndex));
   }}
-  document.getElementById("sentence").innerHTML = sentences[chosenIndex];
+  const sentenceElement = document.getElementById("sentence");
+  sentenceElement.innerHTML = sentences[chosenIndex];
+  const fallback = document.getElementById("context-fallback-term");
+  if (
+      fallback
+      && fallback.textContent.trim()
+      && !sentenceElement.querySelector("strong")) {{
+    fallback.hidden = false;
+  }}
 }})();
 </script>"""
 
@@ -272,6 +286,34 @@ def _create_model(language_key, direction_key, model_id):
         css=CARD_CSS)
 
 
+def _create_source_sentence_model():
+    return genanki.Model(
+        SOURCE_SENTENCE_MODEL_ID,
+        "AutoAnki Source Sentence - Sentence to Meaning",
+        fields=[
+            {"name": SOURCE_ORIGINAL_SENTENCE_FIELD_NAME},
+            {"name": SOURCE_ENGLISH_TRANSLATION_FIELD_NAME},
+            {"name": SOURCE_SENTENCE_NUANCE_FIELD_NAME},
+        ],
+        templates=[{
+            "name": "Source Sentence to Meaning",
+            "qfmt": (
+                '<div class="sentence">{{Original Sentence}}</div>'),
+            "afmt": (
+                "<div>{{FrontSide}}<hr>"
+                '<div class="sentence-translation">'
+                "{{English Translation}}</div>"
+                "{{#Nuance}}"
+                '<div class="definition-section">'
+                '<strong class="definition-label">Nuance</strong>'
+                "<div>{{Nuance}}</div>"
+                "</div>"
+                "{{/Nuance}}"
+                "</div>"),
+        }],
+        css=CARD_CSS)
+
+
 MODEL_IDS = {
     ("english", "context"): ENGLISH_CONTEXT_MODEL_ID,
     ("english", "word_to_meaning"): ENGLISH_WORD_TO_MEANING_MODEL_ID,
@@ -333,6 +375,8 @@ CARD_TYPES = {
         for direction_key in DIRECTION_NAMES
     )
 }
+
+SOURCE_SENTENCE_MODEL = _create_source_sentence_model()
 
 LEGACY_CARD_TYPE_KEYS = {
     "english_vocabulary": "english_context",

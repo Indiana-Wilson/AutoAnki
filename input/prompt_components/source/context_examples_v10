@@ -15,9 +15,12 @@ input-rank order, with no duplicate or unrequested rank. Each item contains:
 Sense objects deliberately omit the source-language term field. The processor
 restores the exact input term from its rank; never echo the term inside a sense
 object. "contextual_sense" also omits "Sentences" and
-"Sentence Translations (English)" because the processor inserts its retained
-context and matched translation. Each additional-sense object includes the
-three generated sentences and three aligned translations required by the schema.
+"Sentence Translations (English)" because the processor packages each retained
+context and matched translation as one separate sentence card. Every
+additional-sense object instead contains exactly three natural source-language
+examples in "Sentences" and exactly three aligned English translations in
+"Sentence Translations (English)". They must demonstrate only that additional
+sense and must not reuse the retained source sentence.
 
 When an input word contains "marked_excerpt", the text between literal
 ⟪TARGET⟫ and ⟪/TARGET⟫ is the authoritative selected occurrence. Describe its

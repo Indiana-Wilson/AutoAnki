@@ -1,5 +1,6 @@
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, call
 
@@ -8,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import gui
+import pipeline_store
 
 
 def variable(value):
@@ -78,6 +80,86 @@ class SourceGenerationModeGuiTests(unittest.TestCase):
         self.assertEqual(request["request_protocol"], "v9")
         self.assertEqual(request["reasoning_effort"], "low")
         self.assertEqual(request["execution_mode"], "economy")
+
+    def test_source_card_menu_controls_pipeline_nuance_and_deck_split(self):
+        app = source_request_stub()
+        app.source_use_source_examples = variable(True)
+        app.source_context_label = variable(
+            gui.SOURCE_CONTEXT_LABELS["sentence_neighbors"])
+        app.source_card_direction_variables = {
+            "context": variable(True),
+            "word_to_meaning": variable(True),
+            "meaning_to_word": variable(False),
+        }
+        app.source_include_context_nuance = variable(True)
+        app.source_separate_decks = variable(True)
+        app.get_pipeline_configs = MagicMock(
+            return_value=(pipeline_store.default_pipeline(),))
+
+        request = app._source_request()
+
+        self.assertEqual(
+            request["source_card_directions"],
+            ["context", "word_to_meaning"])
+        self.assertEqual(request["context_mode"], "sentence")
+        self.assertTrue(request["include_source_context_nuance"])
+        self.assertTrue(request["separate_source_decks"])
+        settings = pipeline_store.get_language_settings(
+            request["pipeline"],
+            "middle_english")
+        self.assertFalse(settings.separate_target_decks)
+        self.assertEqual(
+            tuple(
+                card.direction_key
+                for card in pipeline_store.get_enabled_cards(
+                    request["pipeline"])),
+            ("context", "word_to_meaning"))
+
+    def test_source_sentence_only_does_not_need_a_configured_definition_field(
+            self):
+        app = source_request_stub()
+        app.source_use_source_examples = variable(True)
+        app.source_card_direction_variables = {
+            "context": variable(True),
+            "word_to_meaning": variable(False),
+            "meaning_to_word": variable(False),
+        }
+        app.source_include_context_nuance = variable(False)
+        app.source_separate_decks = variable(True)
+        pipeline = pipeline_store.default_pipeline()
+        settings = pipeline_store.get_language_settings(
+            pipeline,
+            "middle_english")
+        settings = replace(
+            settings,
+            share_field_settings=False,
+            cards=tuple(
+                replace(card, fields=())
+                for card in settings.cards))
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,),
+            active_language_key="middle_english")
+        app.get_pipeline_configs = MagicMock(return_value=(pipeline,))
+
+        request = app._source_request()
+
+        self.assertEqual(request["source_card_directions"], ["context"])
+        self.assertEqual(
+            pipeline_store.get_source_lexical_field_settings(
+                request["pipeline"]),
+            ())
+        context_card = pipeline_store.get_enabled_cards(
+            request["pipeline"])[0]
+        request_settings = pipeline_store.get_language_settings(
+            request["pipeline"],
+            "middle_english")
+        self.assertTrue(
+            pipeline_store.get_effective_fields(
+                request_settings,
+                context_card))
+        self.assertFalse(request_settings.separate_target_decks)
 
     def test_legacy_protocol_forces_low_reasoning_and_disables_selector(self):
         app = object.__new__(gui.AutoAnkiApp)

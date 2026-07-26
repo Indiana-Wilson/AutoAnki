@@ -1,6 +1,7 @@
 import json
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 
@@ -8,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import process_text
+import pipeline_store
 from source_generation import (
     ContextUnit,
     GenerationChunk,
@@ -173,7 +175,10 @@ class VersionNineContractTests(unittest.TestCase):
         self.assertEqual(contract["schema_version"], 9)
         self.assertEqual(
             contract["response_format"],
-            process_text.build_compact_source_response_format(pipeline))
+            process_text.build_compact_source_response_format(
+                pipeline,
+                source_lexical_only=True,
+                include_generated_examples=False))
         self.assertEqual(contract["response_formats_by_chunk"], {})
         self.assertEqual(contract["reasoning"], {"effort": "low"})
         self.assertRegex(
@@ -186,9 +191,10 @@ class VersionNineContractTests(unittest.TestCase):
             source_request_uses_grouped_source_results(contract))
         prompt = contract["composed_prompt"]
         self.assertIn(
-            'arrays "term_results" and "source_context_translations"',
+            '"term_results" and "source_context_translations"',
             " ".join(prompt.split()))
-        self.assertIn('"rank": the input word', prompt)
+        self.assertIn("Copy a required numeric \"rank\" exactly", prompt)
+        self.assertIn("Do not perform or return lexical analysis", prompt)
         self.assertNotIn("GROUPED V8 TARGET RULE", prompt)
         self.assertTrue(
             prompt.endswith("Here is the source batch JSON:\n"))
@@ -244,12 +250,14 @@ class VersionNineContractTests(unittest.TestCase):
             contract["response_formats_by_chunk"][chunk.chunk_id],
             process_text.build_grouped_source_response_format(
                 pipeline,
-                chunk))
+                chunk,
+                source_lexical_only=True,
+                include_generated_examples=False))
         self.assertTrue(
             source_request_uses_grouped_source_results(contract))
         self.assertFalse(
             source_request_uses_compact_source_results(contract))
-        self.assertIn("exactly three", contract["composed_prompt"])
+        self.assertNotIn("exactly three", contract["composed_prompt"])
         self.assertNotIn("<strong>", contract["composed_prompt"])
         with self.assertRaisesRegex(ValueError, "v8.*low"):
             build_source_request_contract(
@@ -271,8 +279,22 @@ class VersionNineContractTests(unittest.TestCase):
             normalise_source_request_contract(contract)
 
     def test_detailed_prompt_preserves_language_and_field_semantics(self):
+        pipeline = detailed_context_pipeline()
+        settings = pipeline_store.get_language_settings(
+            pipeline,
+            pipeline.language_key)
+        settings = replace(
+            settings,
+            cards=tuple(
+                replace(card, enabled=True)
+                for card in settings.cards))
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,),
+            active_language_key=pipeline.language_key)
         contract = build_source_request_contract(
-            detailed_context_pipeline(),
+            pipeline,
             chunks=(grouped_chunk(),),
             use_source_for_example_sentences=True,
             protocol_version=9)

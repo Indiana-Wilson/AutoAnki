@@ -5,9 +5,9 @@
   "schema_version": 1,
   "source_language_key": "classical_chinese_wang_bi",
   "source_text": "天下皆知美之為美，斯惡已。",
-  "state": "usable",
+  "state": "conflicted",
   "target_language_key": "english",
-  "updated_at": "2026-07-26T09:35:06.976771+00:00",
+  "updated_at": "2026-07-26T12:41:36.336822+00:00",
   "variants": [
     {
       "provenance": [
@@ -33,6 +33,106 @@
       ],
       "translation": "When all under Heaven know beauty as beauty, there is already ugliness.",
       "translation_sha256": "43044bc75d5c245eb09561eedacbebd58faa118d0d25059c7985e058a7241e7b"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-4413afde456bbd1ce9d9",
+          "effective_raw_sha256": "de01e1ba6b41ed1c76560cef5cc60d96617c908121cd878488a98310cfd2b804",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T112252-8781e5596778",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "fa5df0f2fcc59c116bda7835ebf820d09fd9473f71bd8116ef7b3c91d00ecf62",
+          "provider_raw_sha256": "de01e1ba6b41ed1c76560cef5cc60d96617c908121cd878488a98310cfd2b804",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T11:23:29.852961+00:00"
+        }
+      ],
+      "translation": "All under heaven know beauty as beauty, and this is already ugliness.",
+      "translation_sha256": "43c0b8c150e3ff277180cd62fc98eec2bb915c15422b394eaaa2c4dd86d871aa"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-4413afde456bbd1ce9d9",
+          "effective_raw_sha256": "b760f1709afd519abfb83c594fc94ecd453011e65180454e3fef3294a068a174",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T120125-ed6c84fd8256",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "f8c3b32c5313bc191d499053a01ca3c80d5c0b1c6a4bb7023e7b692473bd4fb3",
+          "provider_raw_sha256": "b760f1709afd519abfb83c594fc94ecd453011e65180454e3fef3294a068a174",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T12:02:00.122400+00:00"
+        }
+      ],
+      "translation": "When everyone under Heaven knows beauty as beauty, there is already ugliness.",
+      "translation_sha256": "537ad951a958c41ae5fe80e30557af1f2912cfa347cdab00ef730306c14e2033"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r21-r40",
+          "context_id": "source-context-4413afde456bbd1ce9d9",
+          "effective_raw_sha256": "eaefcbbed622d99e6bf0cb8e7d6303e7871a529c8cea6dcc009d712eb808583c",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T124041-b3df6f8c8217",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "0c9c201b805eb4fd990abfb491105a09e684a13699b6ba596c2e912c4d0191d7",
+          "provider_raw_sha256": "eaefcbbed622d99e6bf0cb8e7d6303e7871a529c8cea6dcc009d712eb808583c",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "260fb61c17cf9d6328db5bb1440799efa61ebc5b81a072b0f182ee075087c68a",
+          "validated_at": "2026-07-26T12:41:36.318508+00:00"
+        }
+      ],
+      "translation": "When all under heaven know beauty as beauty, ugliness has already appeared.",
+      "translation_sha256": "dde97bd54647bce43e19293354323f9a09268f2a5a2f8f3aa73258834e0d03af"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000003-r41-r58",
+          "context_id": "source-context-4413afde456bbd1ce9d9",
+          "effective_raw_sha256": "adfe3b95e989abfe4d9301bf55eb811a26091348530e1d711b5ab599e208e491",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T124041-b3df6f8c8217",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "515e679ae4ca2e627feb9c9f301e305f9139b1cd9650c6a1c24850cf2c580308",
+          "provider_raw_sha256": "7088c944342df78b662a5fccacaf948bbe469eb1805a70b0c1ff6f325937a651",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "260fb61c17cf9d6328db5bb1440799efa61ebc5b81a072b0f182ee075087c68a",
+          "validated_at": "2026-07-26T12:41:36.336503+00:00"
+        }
+      ],
+      "translation": "When everyone under heaven knows beauty as beauty, ugliness has already appeared.",
+      "translation_sha256": "61ad862e41a715aa6bc51550a090e4fd1a5bed994918b102268ac405dc4ddc26"
     }
   ]
 }

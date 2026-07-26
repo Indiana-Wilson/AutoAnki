@@ -416,7 +416,8 @@ class ResponseSchemaTests(unittest.TestCase):
 
 
 class SentenceTranslationTemplateTests(unittest.TestCase):
-    def test_context_front_shows_term_immediately_above_example(self):
+    def test_context_front_shows_term_below_only_when_local_emphasis_fails(
+            self):
         for language_key, term_field in templates.TERM_FIELD_NAMES.items():
             with self.subTest(language=language_key):
                 model = templates.get_direction_card_type(
@@ -424,20 +425,29 @@ class SentenceTranslationTemplateTests(unittest.TestCase):
                     "context").model
                 question = model.templates[0]["qfmt"]
                 term_markup = (
-                    f'<div class="term context-term">'
-                    f'{{{{{term_field}}}}}</div>')
+                    '<div id="context-fallback-term" '
+                    'class="context-fallback-term" hidden>\n'
+                    f'    {{{{{term_field}}}}}\n'
+                    "  </div>")
                 sentence_markup = (
                     '<div id="sentence" class="sentence"></div>')
 
                 self.assertIn('class="context-example"', question)
                 self.assertIn(
-                    term_markup + "\n  " + sentence_markup,
+                    sentence_markup + "\n  " + term_markup,
                     question)
-                self.assertLess(
+                self.assertGreater(
                     question.index(term_markup),
                     question.index(sentence_markup))
+                self.assertIn(
+                    '!sentenceElement.querySelector("strong")',
+                    question)
+                self.assertIn("fallback.hidden = false", question)
                 self.assertIn("flex-direction: column", model.css)
-                self.assertIn(".context-term", model.css)
+                self.assertIn(
+                    ".context-fallback-term",
+                    model.css)
+                self.assertIn("font-weight: 400", model.css)
 
     def test_other_directions_do_not_render_context_term(self):
         for language_key in templates.TERM_FIELD_NAMES:
@@ -637,7 +647,8 @@ class SentenceEmphasisTests(unittest.TestCase):
 
 
 class ProcessJsonTests(unittest.TestCase):
-    def test_packaging_preserves_model_selected_occurrences(self):
+    def test_packaging_ignores_model_markup_and_emphasizes_exact_term_locally(
+            self):
         card = valid_default_card()
         card["Word"] = "run"
         card["Sentences"] = (
@@ -660,9 +671,10 @@ class ProcessJsonTests(unittest.TestCase):
 
         self.assertEqual(
             note_class.call_args.kwargs["fields"][1],
-            "She <strong>runs</strong> daily.|"
-            "Yesterday she <strong>ran</strong>.|"
-            "They <strong>run</strong> a shop, then run home.")
+            "She runs daily.|"
+            "Yesterday she ran.|"
+            "They <strong>run</strong> a shop, then "
+            "<strong>run</strong> home.")
 
     def test_classical_chinese_era_uses_existing_classical_chinese_model(self):
         pipeline = configured_pipeline(
@@ -791,11 +803,14 @@ class ProcessJsonTests(unittest.TestCase):
 
         context_fields = note_class.call_args_list[0].kwargs["fields"]
         word_fields = note_class.call_args_list[1].kwargs["fields"]
+        locally_processed_sentences = (
+            "Une s'épanouit.|Deux s'épanouissent.|"
+            "Elle s'épanouira.")
         self.assertEqual(
             context_fields,
             [
                 "épanouir",
-                response["Sentences"],
+                locally_processed_sentences,
                 "to flourish",
                 "",
                 "",
@@ -808,7 +823,7 @@ class ProcessJsonTests(unittest.TestCase):
             word_fields,
             [
                 "épanouir",
-                response["Sentences"],
+                locally_processed_sentences,
                 "",
                 "十分に発達すること",
                 "",
@@ -1844,7 +1859,7 @@ class GuiLogicTests(unittest.TestCase):
         self.assertEqual(request["request_stagger_ms"], 100)
         self.assertEqual(
             request["context_mode"],
-            "sentence_neighbors")
+            "sentence")
         self.assertTrue(request["allow_web_search"])
         self.assertTrue(
             request["use_source_for_example_sentences"])

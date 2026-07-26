@@ -1,0 +1,7 @@
+Translate each retained {source_language} source context into complete, natural
+English for one Sentence → Meaning card per original sentence.
+
+The ranked words are local association and ordering metadata only. Do not
+define, pronounce, classify, exemplify, or search for additional senses of
+those words. Return exactly the fields required by the strict response schema,
+never extra fields or null.

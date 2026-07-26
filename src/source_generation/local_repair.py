@@ -419,7 +419,10 @@ def repair_compact_response(
         pipeline,
         chunk,
         *,
-        use_occurrence_sense_indices=False):
+        use_occurrence_sense_indices=False,
+        source_lexical_only=False,
+        include_generated_examples=True,
+        include_source_context_nuance=False):
     """Return a conservative plain-text compact-response candidate.
 
     Invalid JSON and malformed required containers are left for the validator;
@@ -458,6 +461,7 @@ def repair_compact_response(
     occurrence_indices_key = (
         process_text.SOURCE_OCCURRENCE_SENSE_INDICES_KEY)
     translation_key = process_text.SOURCE_CONTEXT_TRANSLATION_FIELD_NAME
+    nuance_key = process_text.SOURCE_CONTEXT_NUANCE_FIELD_NAME
 
     _remove_extra_fields(
         parsed,
@@ -492,20 +496,20 @@ def repair_compact_response(
 
     term_field = pipeline_store.get_language(
         pipeline.language_key).term_field
-    requested_fields = set(process_text.get_response_field_names(
-        pipeline,
-        include_sentence_translations=True))
-    lexical_fields = requested_fields - {
-        term_field,
-        "Sentences",
-        process_text.SENTENCE_TRANSLATIONS_FIELD_NAME,
+    lexical_fields = {
+        pipeline_store.response_field_name(field_setting)
+        for field_setting in (
+            pipeline_store.get_source_lexical_field_settings(pipeline)
+            if source_lexical_only
+            else pipeline_store.get_requested_field_settings(pipeline))
     }
     contextual_fields = set(lexical_fields)
-    additional_fields = {
-        *lexical_fields,
-        "Sentences",
-        process_text.SENTENCE_TRANSLATIONS_FIELD_NAME,
-    }
+    additional_fields = set(lexical_fields)
+    if include_generated_examples:
+        additional_fields.update({
+            "Sentences",
+            process_text.SENTENCE_TRANSLATIONS_FIELD_NAME,
+        })
     if isinstance(term_results, list):
         for result_index, result in enumerate(term_results):
             if not isinstance(result, dict):
@@ -711,18 +715,31 @@ def repair_compact_response(
             entry_path = f"$.{contexts_key}[{entry_index}]"
             _remove_extra_fields(
                 entry,
-                {context_id_key, translation_key},
+                {
+                    context_id_key,
+                    translation_key,
+                    *(
+                        (nuance_key,)
+                        if include_source_context_nuance
+                        else ()),
+                },
                 entry_path,
                 changes)
-            value = entry.get(translation_key)
-            plain = _plain_text(value)
-            if plain != value:
-                entry[translation_key] = plain
-                changes.append(_change(
-                    "remove_model_html",
-                    f"{entry_path}.{translation_key}",
-                    "preserved visible text and removed provider HTML",
-                    context_id=entry.get(context_id_key)))
+            for field_name in (
+                    translation_key,
+                    *(
+                        (nuance_key,)
+                        if include_source_context_nuance
+                        else ())):
+                value = entry.get(field_name)
+                plain = _plain_text(value)
+                if plain != value:
+                    entry[field_name] = plain
+                    changes.append(_change(
+                        "remove_model_html",
+                        f"{entry_path}.{field_name}",
+                        "preserved visible text and removed provider HTML",
+                        context_id=entry.get(context_id_key)))
 
     candidate_raw_text = (
         json.dumps(

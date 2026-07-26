@@ -1,0 +1,18 @@
+Return one root object containing exactly "term_results" and
+"source_context_translations", following their exact response-schema shapes.
+Return one translation for every retained source context and copy each
+required context ID exactly. Translate the complete context once, even when
+several ranked words refer to it. The original sentence is already stored
+locally: do not echo, rewrite, or format it in the response.
+
+Any "term_results" collection is structural association data only. For every
+required rank, return an empty "contextual_sense" object and an empty
+"additional_senses" array. Copy a required numeric "rank" exactly. If the
+schema requests "occurrence_sense_indices", return one 0 for each supplied
+context occurrence. Do not perform or return lexical analysis.
+
+Every translation must be one faithful, complete, natural English string with
+no HTML or pipe delimiter. If the schema requests "nuance", use it only for an
+implied meaning that a learner could not understand without cultural or
+historical knowledge; otherwise return an empty string. Nuance must not repeat
+the translation or define a word.

@@ -5,9 +5,9 @@
   "schema_version": 1,
   "source_language_key": "classical_chinese_wang_bi",
   "source_text": "玄之又玄，眾妙之門。",
-  "state": "usable",
+  "state": "conflicted",
   "target_language_key": "english",
-  "updated_at": "2026-07-26T09:35:06.974907+00:00",
+  "updated_at": "2026-07-26T12:41:36.315237+00:00",
   "variants": [
     {
       "provenance": [
@@ -33,6 +33,81 @@
       ],
       "translation": "Profound and again profound: the gate of all mysteries.",
       "translation_sha256": "a34c347dbbc18c6cab40cfa821a252dc2971d356e18e9aaa1fafdaaf9900553b"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-3388aa6d59c18c53d536",
+          "effective_raw_sha256": "de01e1ba6b41ed1c76560cef5cc60d96617c908121cd878488a98310cfd2b804",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T112252-8781e5596778",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "52bfc2e907fb38dda8b20e44c928a051e1daf90bd6048163f3b2470dc6e39d6d",
+          "provider_raw_sha256": "de01e1ba6b41ed1c76560cef5cc60d96617c908121cd878488a98310cfd2b804",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T11:23:29.848662+00:00"
+        }
+      ],
+      "translation": "The profound again becomes profound: the gate of all subtle wonders.",
+      "translation_sha256": "bad583f83e5d43587095ae5252044762059551cceb14a209b95f92e042243142"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-3388aa6d59c18c53d536",
+          "effective_raw_sha256": "b760f1709afd519abfb83c594fc94ecd453011e65180454e3fef3294a068a174",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T120125-ed6c84fd8256",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "fdd55d57721ee38afe76007ffe1cf765a4bc72982d97c284c10b5a73331d6805",
+          "provider_raw_sha256": "b760f1709afd519abfb83c594fc94ecd453011e65180454e3fef3294a068a174",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T12:02:00.120548+00:00"
+        }
+      ],
+      "translation": "The more it is made mysterious, the more mysterious it becomes; the gate of all subtleties.",
+      "translation_sha256": "4a0650e9fa79719fcb9c2064bbed77f00d9d68aea29d290fd183f3026cfa6716"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r21-r40",
+          "context_id": "source-context-3388aa6d59c18c53d536",
+          "effective_raw_sha256": "eaefcbbed622d99e6bf0cb8e7d6303e7871a529c8cea6dcc009d712eb808583c",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T124041-b3df6f8c8217",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "32e7ad2dc7e3a9a7b679e66754685df4bf22922dc0bbd9d17859eefe6550d8a2",
+          "provider_raw_sha256": "eaefcbbed622d99e6bf0cb8e7d6303e7871a529c8cea6dcc009d712eb808583c",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "260fb61c17cf9d6328db5bb1440799efa61ebc5b81a072b0f182ee075087c68a",
+          "validated_at": "2026-07-26T12:41:36.313602+00:00"
+        }
+      ],
+      "translation": "Mysterious and again mysterious: the gate of all wonders.",
+      "translation_sha256": "46926f61c163aa8f9691d0a269c109b577aea725248f62d33e311a9fee797ed2"
     }
   ]
 }

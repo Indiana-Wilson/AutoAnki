@@ -5,9 +5,9 @@
   "schema_version": 1,
   "source_language_key": "classical_chinese_wang_bi",
   "source_text": "故常無欲，以觀其妙，",
-  "state": "usable",
+  "state": "conflicted",
   "target_language_key": "english",
-  "updated_at": "2026-07-26T09:35:06.963324+00:00",
+  "updated_at": "2026-07-26T12:41:36.291401+00:00",
   "variants": [
     {
       "provenance": [
@@ -33,6 +33,81 @@
       ],
       "translation": "Therefore, always without desire, one can observe its subtle mystery,",
       "translation_sha256": "b6fb44778feb98f631491ca43dc3f842e08278634ecff484007edd6ed69bd8ee"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r30",
+          "context_id": "source-context-a0437bbc6bfb969f44fb",
+          "effective_raw_sha256": "bec114f09faf32110bffe25e285d20ebb427b5c16374a1f519c14ce445fe6fbd",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T112252-8781e5596778",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "53b0ff5bb4bd4aefe8939ce6d46f66aa4daf1f70e2b25fe453c83b7f3d93bca9",
+          "provider_raw_sha256": "bec114f09faf32110bffe25e285d20ebb427b5c16374a1f519c14ce445fe6fbd",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T11:23:29.826141+00:00"
+        }
+      ],
+      "translation": "Therefore, always without desire, one can observe its subtlety,",
+      "translation_sha256": "350c20216caf1ef318fcc97fad8a09325e63f86209cf9108009bfcb9b25cc276"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r30",
+          "context_id": "source-context-a0437bbc6bfb969f44fb",
+          "effective_raw_sha256": "2df1b7a8bba35bae168b5760d1ad83485067ded0592da50b6fbbb35b13cff058",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T120125-ed6c84fd8256",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "c8504c17bd94fb9c57f1696e7a625772c42a3fbc26739677c20a3ae1c68ea062",
+          "provider_raw_sha256": "2df1b7a8bba35bae168b5760d1ad83485067ded0592da50b6fbbb35b13cff058",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T12:02:00.108930+00:00"
+        }
+      ],
+      "translation": "Therefore, always free from desire, one may observe its subtlety,",
+      "translation_sha256": "8c786cbedae91c3ec970c9e78284f667035715cc1e01d35b97ab381e8077e594"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000001-r1-r20",
+          "context_id": "source-context-a0437bbc6bfb969f44fb",
+          "effective_raw_sha256": "8693ad8f4a8cdf8b32991c13d09e6f763558fd78b9d2ed1075136f603dc5204e",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T124041-b3df6f8c8217",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "e444583f864843e2a3ab9ac73f7734a684e666aaa1523bf8a69417056d63bb83",
+          "provider_raw_sha256": "8693ad8f4a8cdf8b32991c13d09e6f763558fd78b9d2ed1075136f603dc5204e",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "260fb61c17cf9d6328db5bb1440799efa61ebc5b81a072b0f182ee075087c68a",
+          "validated_at": "2026-07-26T12:41:36.290857+00:00"
+        }
+      ],
+      "translation": "Therefore, constantly without desire, so as to observe its subtlety,",
+      "translation_sha256": "091f2cac96d72456025baf9499c4b7f141502f109f2eadcf2fed7982f3050257"
     }
   ]
 }

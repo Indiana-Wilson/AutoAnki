@@ -28,6 +28,7 @@ SENTENCE_TRANSLATIONS_FIELD_NAME = (
 SOURCE_CONTEXT_TRANSLATIONS_KEY = "source_context_translations"
 SOURCE_CONTEXT_ID_FIELD_NAME = "context_id"
 SOURCE_CONTEXT_TRANSLATION_FIELD_NAME = "translation"
+SOURCE_CONTEXT_NUANCE_FIELD_NAME = "nuance"
 SOURCE_OCCURRENCE_SENSE_INDICES_KEY = "occurrence_sense_indices"
 _WANG_BI_TIANDI_ZHI_SHI_CONTEXTUAL_FIELDS = {
     "Translation (English)": "beginning; origin",
@@ -219,12 +220,7 @@ def _term_occurrence_pattern(term, language_key):
 
 
 def emphasize_term_in_sentences(sentences_text, term, language_key):
-    """Emphasize literal occurrences in an inserted source-context passage.
-
-    This is retained for context text added after the model response. Generated
-    examples instead preserve the model's sense-aware markup through
-    ``sanitize_emphasized_sentences``.
-    """
+    """Emphasize literal term occurrences locally after model generation."""
     if not isinstance(sentences_text, str):
         raise TypeError("Example sentences must be text.")
     if not isinstance(term, str):
@@ -1051,11 +1047,20 @@ def inspect_generated_response(
                     effective_fields = pipeline_store.get_effective_fields(
                         language_settings,
                         card)
+                    required_direction_fields = tuple(
+                        pipeline_store.response_field_name(
+                            field_setting)
+                        for field_setting in effective_fields
+                        if (
+                            pipeline_store.response_field_name(
+                                field_setting)
+                            not in optional_field_set)
+                    )
+                    if not required_direction_fields:
+                        continue
                     if any(
-                            note_data[
-                                pipeline_store.response_field_name(
-                                    field_setting)].strip()
-                            for field_setting in effective_fields):
+                            note_data.get(field_name, "").strip()
+                            for field_name in required_direction_fields):
                         continue
                     direction_name = pipeline_store.get_direction(
                         card.direction_key).name
@@ -1381,7 +1386,13 @@ def compact_contextual_field_constants(pipeline, word, contexts_by_id):
     }
 
 
-def build_grouped_source_response_format(pipeline, chunk):
+def build_grouped_source_response_format(
+        pipeline,
+        chunk,
+        *,
+        source_lexical_only=False,
+        include_generated_examples=True,
+        include_source_context_nuance=False):
     """Build an exact rank-keyed schema for one retained-source chunk.
 
     The rank and context property names are taken from the immutable chunk,
@@ -1454,16 +1465,13 @@ def build_grouped_source_response_format(pipeline, chunk):
 
     term_field = pipeline_store.get_language(
         pipeline.language_key).term_field
+    lexical_settings = (
+        pipeline_store.get_source_lexical_field_settings(pipeline)
+        if source_lexical_only
+        else pipeline_store.get_requested_field_settings(pipeline))
     lexical_field_names = tuple(
-        field_name
-        for field_name in get_response_field_names(
-            pipeline,
-            include_sentence_translations=True)
-        if field_name not in {
-            term_field,
-            "Sentences",
-            SENTENCE_TRANSLATIONS_FIELD_NAME,
-        })
+        pipeline_store.response_field_name(field_setting)
+        for field_setting in lexical_settings)
 
     def string_properties(field_names, surface, role):
         return {
@@ -1488,6 +1496,8 @@ def build_grouped_source_response_format(pipeline, chunk):
                     pipeline,
                     word,
                     contexts_by_id).items()):
+            if field_name not in properties:
+                continue
             properties[field_name]["enum"] = [required_value]
             properties[field_name]["description"] += (
                 f" For this exact audited occurrence, return exactly "
@@ -1502,11 +1512,12 @@ def build_grouped_source_response_format(pipeline, chunk):
             "additionalProperties": False,
         }
 
-    generated_field_names = (
-        *lexical_field_names,
-        "Sentences",
-        SENTENCE_TRANSLATIONS_FIELD_NAME,
-    )
+    generated_field_names = list(lexical_field_names)
+    if include_generated_examples:
+        generated_field_names.extend((
+            "Sentences",
+            SENTENCE_TRANSLATIONS_FIELD_NAME,
+        ))
 
     def additional_sense_schema(surface):
         properties = string_properties(
@@ -1520,24 +1531,25 @@ def build_grouped_source_response_format(pipeline, chunk):
                 f"complete requested term {surface!r} in this sense. Use "
                 "plain text without HTML."),
         }
-        properties["Sentences"] = {
-            "type": "array",
-            "items": sentence_item_schema,
-            "minItems": 3,
-            "maxItems": 3,
-        }
-        properties[SENTENCE_TRANSLATIONS_FIELD_NAME] = {
-            "type": "array",
-            "items": {
-                "type": "string",
-                "description": (
-                    "One complete natural English translation of the "
-                    "source sentence at the same array position; never copy "
-                    "source-language text and never include HTML."),
-            },
-            "minItems": 3,
-            "maxItems": 3,
-        }
+        if include_generated_examples:
+            properties["Sentences"] = {
+                "type": "array",
+                "items": sentence_item_schema,
+                "minItems": 3,
+                "maxItems": 3,
+            }
+            properties[SENTENCE_TRANSLATIONS_FIELD_NAME] = {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "description": (
+                        "One complete natural English translation of the "
+                        "source sentence at the same array position; never "
+                        "copy source-language text and never include HTML."),
+                },
+                "minItems": 3,
+                "maxItems": 3,
+            }
         return {
             "type": "object",
             "description": (
@@ -1545,7 +1557,7 @@ def build_grouped_source_response_format(pipeline, chunk):
                 f"requested term {surface!r}; never a sense of one component "
                 "character or substring."),
             "properties": properties,
-            "required": list(generated_field_names),
+            "required": generated_field_names,
             "additionalProperties": False,
         }
 
@@ -1564,6 +1576,12 @@ def build_grouped_source_response_format(pipeline, chunk):
                         "array rather than defining a component or repeating "
                         "the contextual sense."),
                     "items": additional_sense_schema(surface),
+                    **(
+                        {"maxItems": 0}
+                        if (
+                            not lexical_field_names
+                            and not include_generated_examples)
+                        else {}),
                 },
             },
             "required": [
@@ -1588,13 +1606,31 @@ def build_grouped_source_response_format(pipeline, chunk):
             SOURCE_CONTEXT_TRANSLATIONS_KEY: {
                 "type": "object",
                 "properties": {
-                    context_id: {
-                        "type": "string",
-                        "description": (
-                            "One complete natural English translation of "
-                            "this entire retained source context, without "
-                            "HTML or a pipe delimiter."),
-                    }
+                    context_id: (
+                        {
+                            "type": "object",
+                            "properties": {
+                                SOURCE_CONTEXT_TRANSLATION_FIELD_NAME: {
+                                    "type": "string",
+                                },
+                                SOURCE_CONTEXT_NUANCE_FIELD_NAME: {
+                                    "type": "string",
+                                },
+                            },
+                            "required": [
+                                SOURCE_CONTEXT_TRANSLATION_FIELD_NAME,
+                                SOURCE_CONTEXT_NUANCE_FIELD_NAME,
+                            ],
+                            "additionalProperties": False,
+                        }
+                        if include_source_context_nuance
+                        else {
+                            "type": "string",
+                            "description": (
+                                "One complete natural English translation "
+                                "of this entire retained source context, "
+                                "without HTML or a pipe delimiter."),
+                        })
                     for context_id in context_ids
                 },
                 "required": context_ids,
@@ -1622,7 +1658,10 @@ def build_compact_source_response_format(
         protocol_version=9,
         chunk=None,
         translation_memory_enabled=False,
-        include_occurrence_sense_indices=None):
+        include_occurrence_sense_indices=None,
+        source_lexical_only=False,
+        include_generated_examples=True,
+        include_source_context_nuance=False):
     """Build a fixed, rank-addressed compact retained-source schema.
 
     Unlike v8's per-chunk schema, this shape contains no source ranks, terms,
@@ -1682,16 +1721,13 @@ def build_compact_source_response_format(
 
     term_field = pipeline_store.get_language(
         pipeline.language_key).term_field
+    lexical_settings = (
+        pipeline_store.get_source_lexical_field_settings(pipeline)
+        if source_lexical_only
+        else pipeline_store.get_requested_field_settings(pipeline))
     lexical_field_names = tuple(
-        field_name
-        for field_name in get_response_field_names(
-            pipeline,
-            include_sentence_translations=True)
-        if field_name not in {
-            term_field,
-            "Sentences",
-            SENTENCE_TRANSLATIONS_FIELD_NAME,
-        })
+        pipeline_store.response_field_name(field_setting)
+        for field_setting in lexical_settings)
 
     def lexical_properties():
         return {
@@ -1706,24 +1742,27 @@ def build_compact_source_response_format(
         "additionalProperties": False,
     }
     additional_properties = lexical_properties()
-    for field_name in (
-            "Sentences",
-            SENTENCE_TRANSLATIONS_FIELD_NAME):
-        additional_properties[field_name] = {
-            "type": "array",
-            "items": {
-                "type": "string",
-            },
-            "minItems": 3,
-            "maxItems": 3,
-        }
+    if include_generated_examples:
+        for field_name in (
+                "Sentences",
+                SENTENCE_TRANSLATIONS_FIELD_NAME):
+            additional_properties[field_name] = {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+                "minItems": 3,
+                "maxItems": 3,
+            }
     additional_sense_schema = {
         "type": "object",
         "properties": additional_properties,
         "required": [
             *lexical_field_names,
-            "Sentences",
-            SENTENCE_TRANSLATIONS_FIELD_NAME,
+            *((
+                "Sentences",
+                SENTENCE_TRANSLATIONS_FIELD_NAME,
+            ) if include_generated_examples else ()),
         ],
         "additionalProperties": False,
     }
@@ -1731,7 +1770,13 @@ def build_compact_source_response_format(
         "type": "array",
         "items": additional_sense_schema,
     }
-    if protocol_version == 10:
+    if (
+            not lexical_field_names
+            and not include_generated_examples):
+        additional_senses_schema.update({
+            "maxItems": 0,
+        })
+    elif protocol_version == 10:
         additional_senses_schema.update({
             "minItems": 0,
             "maxItems": 8,
@@ -1787,6 +1832,13 @@ def build_compact_source_response_format(
         ],
         "additionalProperties": False,
     }
+    if include_source_context_nuance:
+        context_translation_schema["properties"][
+            SOURCE_CONTEXT_NUANCE_FIELD_NAME] = {
+                "type": "string",
+            }
+        context_translation_schema["required"].append(
+            SOURCE_CONTEXT_NUANCE_FIELD_NAME)
     term_results_schema = {
         "type": "array",
         "items": term_result_schema,
@@ -1956,11 +2008,13 @@ def validate_generated_cards(
         *,
         allow_accepted_content_problems=False,
         enforce_sentence_count=True,
-        require_sentence_translations=True):
+        require_sentence_translations=True,
+        optional_fields=()):
     """Parse and validate generated data without writing an Anki package."""
     report = inspect_generated_response(
         text,
         pipeline,
+        optional_fields=optional_fields,
         enforce_sentence_count=enforce_sentence_count,
         require_sentence_translations=require_sentence_translations)
     remaining_problems = [
@@ -2052,7 +2106,10 @@ def process_json_text(
     for note_data in validated_notes:
         sentences = note_data.get("Sentences", "")
         if sentences:
-            sentences = sanitize_emphasized_sentences(sentences)
+            sentences = emphasize_term_in_sentences(
+                sentences,
+                note_data[language.term_field],
+                pipeline.language_key)
         sentence_translations = note_data.get(
             SENTENCE_TRANSLATIONS_FIELD_NAME,
             "")

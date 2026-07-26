@@ -1,0 +1,8 @@
+FINAL CHECK
+
+Verify exact required rank and context-ID coverage. Keep every lexical sense
+object empty and every additional-senses array empty. Verify that each source
+translation is faithful, complete, natural English and adds no substantive
+participant, circumstance, modality, or claim absent from the original.
+Include nuance only when the schema requests it and cultural or historical
+knowledge is genuinely necessary; otherwise use an empty string.

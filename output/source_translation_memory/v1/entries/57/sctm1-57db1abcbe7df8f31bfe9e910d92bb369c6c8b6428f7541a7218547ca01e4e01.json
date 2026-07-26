@@ -5,9 +5,9 @@
   "schema_version": 1,
   "source_language_key": "classical_chinese_wang_bi",
   "source_text": "皆知善之為善，斯不善已。",
-  "state": "usable",
+  "state": "conflicted",
   "target_language_key": "english",
-  "updated_at": "2026-07-26T09:35:06.978505+00:00",
+  "updated_at": "2026-07-26T12:41:36.340690+00:00",
   "variants": [
     {
       "provenance": [
@@ -33,6 +33,81 @@
       ],
       "translation": "When all know good as good, there is already not-good.",
       "translation_sha256": "9d7cd28db7aa0afc9ee1232618187b14fb3b644d9163fc9af52f47d080a48867"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-db83fa5c1feb4c99ba0b",
+          "effective_raw_sha256": "de01e1ba6b41ed1c76560cef5cc60d96617c908121cd878488a98310cfd2b804",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T112252-8781e5596778",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "7c9fa90fbd3f96c2bdee381d0295bd3b7449174a84e037da5c09295ddbdf0734",
+          "provider_raw_sha256": "de01e1ba6b41ed1c76560cef5cc60d96617c908121cd878488a98310cfd2b804",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T11:23:29.857869+00:00"
+        }
+      ],
+      "translation": "They all know goodness as goodness, and this is already not-goodness.",
+      "translation_sha256": "724135607831178fd4ceb74cb51ce9315a96e8e56ac2dbc014abc112a410a8f8"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000002-r31-r58",
+          "context_id": "source-context-db83fa5c1feb4c99ba0b",
+          "effective_raw_sha256": "b760f1709afd519abfb83c594fc94ecd453011e65180454e3fef3294a068a174",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T120125-ed6c84fd8256",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "395ab74d23d0ba9a71cc78b6f7d9fcdbf32b3c1ed2ffc4a21e3807251063cb67",
+          "provider_raw_sha256": "b760f1709afd519abfb83c594fc94ecd453011e65180454e3fef3294a068a174",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "884365d8aaac77a722ef9b30edb19049dceaacf0278ecf29de4af80248810eb0",
+          "validated_at": "2026-07-26T12:02:00.124190+00:00"
+        }
+      ],
+      "translation": "When everyone knows good as good, there is already what is not good.",
+      "translation_sha256": "374ef8a652ef6566c649194b2d16c3cd98aa57c4329df36f2b464252dc0ba186"
+    },
+    {
+      "provenance": [
+        {
+          "attempt": 1,
+          "chunk_id": "000003-r41-r58",
+          "context_id": "source-context-db83fa5c1feb4c99ba0b",
+          "effective_raw_sha256": "adfe3b95e989abfe4d9301bf55eb811a26091348530e1d711b5ab599e208e491",
+          "execution_mode": "standard",
+          "fully_validated": true,
+          "job_id": "20260726T124041-b3df6f8c8217",
+          "manual_acceptance": false,
+          "model": "gpt-5.4-mini",
+          "origin": "provider",
+          "provenance_id": "c20aab3928eb9a0d34159e4b08be9d9e2571a570864512c7cbbbd1f77e829800",
+          "provider_raw_sha256": "7088c944342df78b662a5fccacaf948bbe469eb1805a70b0c1ff6f325937a651",
+          "reasoning": {
+            "effort": "low"
+          },
+          "request_contract_sha256": "260fb61c17cf9d6328db5bb1440799efa61ebc5b81a072b0f182ee075087c68a",
+          "validated_at": "2026-07-26T12:41:36.339603+00:00"
+        }
+      ],
+      "translation": "When everyone knows good as good, then non-good has already appeared.",
+      "translation_sha256": "5f4a063092aa9efd4c11c10d1a0f156e6a3e5f4549306ac15704a42a72c41ef4"
     }
   ]
 }
