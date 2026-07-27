@@ -12,6 +12,7 @@ from tkinter import ttk
 
 import anki_integration
 import credential_store
+import gui_preferences
 import learned_filter_store
 import pipeline_runner
 import pipeline_store
@@ -122,8 +123,8 @@ SOURCE_JOB_COLUMNS = (
     "detail",
 )
 SOURCE_JOB_DETAIL_MIN_WIDTH = 260
-SOURCE_JOBS_TREE_VISIBLE_ROWS = 10
-SOURCE_JOB_INSPECTION_VISIBLE_LINES = 10
+SOURCE_JOBS_TREE_VISIBLE_ROWS = 30
+SOURCE_JOB_INSPECTION_VISIBLE_LINES = 30
 SOURCE_VALIDATION_DIALOG_PREFERRED_WIDTH = 1900
 SOURCE_VALIDATION_DIALOG_PREFERRED_HEIGHT = 1320
 SOURCE_VALIDATION_DIALOG_MIN_WIDTH = 760
@@ -2100,6 +2101,8 @@ class PipelineEditor:
         self.learned_filter_enabled_variables = {}
         self.learned_filter_summary_variables = {}
         self.direction_enabled_variables = {}
+        self.direction_enhanced_variables = {}
+        self.direction_enhanced_checks = {}
         self.card_output_variables = self.direction_enabled_variables
         self.direction_target_deck_variables = {}
         self.direction_target_deck_boxes = {}
@@ -2112,6 +2115,7 @@ class PipelineEditor:
         self.per_card_field_language_variables = {}
         self.per_card_field_language_boxes = {}
         self.per_card_field_containers = {}
+        self.built_language_keys = set()
 
         self.frame = RoundedPanel(
             parent,
@@ -2141,18 +2145,21 @@ class PipelineEditor:
             sticky="nsew")
 
         for language in pipeline_store.list_settings_languages():
-            self._add_language_tab(language, config)
-        active_settings_language_key = pipeline_store.get_language(
-            config.language_key).model_language_key
+            self._register_language_tab(language)
+        active_settings_language_key = (
+            self.app.get_card_setup_generation_language().model_language_key)
         active_tab = self.language_tabs.get(
             active_settings_language_key)
         if active_tab is not None:
             self.language_notebook.select(active_tab)
+            self._ensure_language_tab_built(
+                active_settings_language_key)
         self.last_active_language_key = active_settings_language_key
         self.language_notebook.bind(
             "<<NotebookTabChanged>>",
             self._language_changed)
-        self._update_all_visibility()
+        if active_settings_language_key in self.built_language_keys:
+            self._update_visibility(active_settings_language_key)
 
     def _trace(self, variable, callback=None):
         trace_id = variable.trace_add(
@@ -2292,7 +2299,7 @@ class PipelineEditor:
             language_variables,
             language_boxes)
 
-    def _add_language_tab(self, language, config):
+    def _register_language_tab(self, language):
         tab = ttk.Frame(
             self.language_notebook,
             style="Panel.TFrame")
@@ -2301,6 +2308,25 @@ class PipelineEditor:
         self.language_tabs[language.key] = tab
         self.language_by_tab[str(tab)] = language
 
+    def _ensure_language_tab_built(self, language_key):
+        if language_key in self.built_language_keys:
+            return False
+        language = next(
+            (
+                item
+                for item in pipeline_store.list_settings_languages()
+                if item.key == language_key
+            ),
+            None)
+        if language is None:
+            raise ValueError(
+                f"Unknown Card Setup language: {language_key}")
+        self._build_language_tab(language)
+        self.built_language_keys.add(language_key)
+        return True
+
+    def _build_language_tab(self, language):
+        tab = self.language_tabs[language.key]
         content = ttk.Frame(
             tab,
             padding=(20, 18, 20, 32),
@@ -2308,7 +2334,7 @@ class PipelineEditor:
         content.grid(row=0, column=0, sticky="ew")
         content.columnconfigure(0, weight=1)
         settings = pipeline_store.get_language_settings(
-            config,
+            self.config,
             language.key)
 
         ttk.Label(
@@ -2507,6 +2533,8 @@ class PipelineEditor:
             card.direction_key: card
             for card in settings.cards}
         enabled_variables = {}
+        enhanced_variables = {}
+        enhanced_checks = {}
         deck_variables = {}
         deck_boxes = {}
         field_enabled_by_direction = {}
@@ -2585,11 +2613,38 @@ class PipelineEditor:
                 text=direction.description,
                 style="CardDescription.TLabel",
                 wraplength=850).grid(
-                    row=1,
+                    row=2,
                     column=0,
                     columnspan=3,
                     sticky="w",
                     pady=(5, 6))
+            enhanced = tk.BooleanVar(value=card.enhanced)
+            enhanced_variables[direction.key] = enhanced
+            backend_label = {
+                "japanese": "Style-Bert-VITS2 JP-Extra · Neutral",
+                "english": "Fun-CosyVoice3 0.5B",
+                "classical_chinese": "Fun-CosyVoice3 0.5B",
+                "french": "Fun-CosyVoice3 0.5B",
+                "latin": "No supported local voice",
+            }[language.key]
+            enhanced_check = ttk.Checkbutton(
+                card_panel,
+                text=f"Enhanced · local audio · {backend_label}",
+                variable=enhanced,
+                command=lambda key=language.key: (
+                    self._card_controls_changed(key)),
+                state=(
+                    tk.DISABLED
+                    if language.key == "latin"
+                    else tk.NORMAL),
+                style="CardOption.TCheckbutton")
+            enhanced_check.grid(
+                row=1,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(5, 0))
+            enhanced_checks[direction.key] = enhanced_check
             (
                 field_grid,
                 field_enabled,
@@ -2601,7 +2656,7 @@ class PipelineEditor:
                 card.fields,
                 card.field_languages)
             field_grid.grid(
-                row=2,
+                row=3,
                 column=0,
                 columnspan=3,
                 sticky="ew")
@@ -2613,10 +2668,15 @@ class PipelineEditor:
             field_boxes_by_direction[
                 direction.key] = field_boxes
             self._trace(enabled)
+            self._trace(enhanced)
             self._trace(deck_variable)
 
         self.direction_enabled_variables[
             language.key] = enabled_variables
+        self.direction_enhanced_variables[
+            language.key] = enhanced_variables
+        self.direction_enhanced_checks[
+            language.key] = enhanced_checks
         self.direction_target_deck_variables[
             language.key] = deck_variables
         self.direction_target_deck_boxes[
@@ -2686,6 +2746,8 @@ class PipelineEditor:
 
     def refresh_learned_filter_controls(self):
         for language in pipeline_store.list_settings_languages():
+            if language.key not in self.built_language_keys:
+                continue
             self._update_learned_filter_summary(language.key)
 
     def _field_controls_changed(self, language_key):
@@ -2715,6 +2777,10 @@ class PipelineEditor:
         separate = not same_deck
         sharing = self.share_field_settings_variables[
             language_key].get()
+        concrete_language_key = self._concrete_source_language_key(
+            language_key)
+        enhanced_supported = pipeline_store.enhanced_audio_supported(
+            concrete_language_key)
         if separate:
             self.target_deck_boxes[language_key].configure(
                 state="disabled")
@@ -2728,6 +2794,29 @@ class PipelineEditor:
         for direction in pipeline_store.list_directions():
             enabled = self.direction_enabled_variables[
                 language_key][direction.key].get()
+            enhanced_check = self.direction_enhanced_checks[
+                language_key][direction.key]
+            enhanced_check.configure(
+                text=(
+                    "Enhanced · unavailable for "
+                    f"{pipeline_store.get_language(concrete_language_key).name}"
+                    " · modern-language choice retained"
+                    if not enhanced_supported
+                    else (
+                        "Enhanced · local audio · "
+                        + {
+                            "japanese": (
+                                "Style-Bert-VITS2 JP-Extra · Neutral"),
+                            "english": "Fun-CosyVoice3 0.5B",
+                            "classical_chinese": "Fun-CosyVoice3 0.5B",
+                            "french": "Fun-CosyVoice3 0.5B",
+                            "latin": "No supported local voice",
+                        }[language_key]
+                    )),
+                state=(
+                    tk.DISABLED
+                    if not enhanced_supported or not enabled
+                    else tk.NORMAL))
             self.direction_target_deck_boxes[
                 language_key][direction.key].configure(
                     state=(
@@ -2744,18 +2833,15 @@ class PipelineEditor:
         self._refresh_layout_geometry(language_key)
 
     def _refresh_layout_geometry(self, language_key):
-        """Resize rounded surfaces after their optional controls change."""
+        """Let Tk's configure events resize surfaces without a forced flush.
+
+        Every ``RoundedPanel`` already tracks its interior's ``<Configure>``
+        event. Forcing several synchronous ``update_idletasks`` passes here
+        made startup lay out all five language editors repeatedly before the
+        window could be shown.
+        """
         if not self.frame.winfo_exists():
             return
-        self.frame.update_idletasks()
-        for surface in self.direction_surfaces[
-                language_key].values():
-            surface._fit_to_contents()
-        self.shared_field_containers[
-            language_key]._fit_to_contents()
-        self.frame.update_idletasks()
-        self.frame._fit_to_contents()
-        self.frame.update_idletasks()
         scroll_frame = getattr(
             self.app,
             "pipeline_scroll_frame",
@@ -2765,12 +2851,16 @@ class PipelineEditor:
 
     def _update_all_visibility(self):
         for language in pipeline_store.list_settings_languages():
+            if language.key not in self.built_language_keys:
+                continue
             self._update_visibility(language.key)
 
     def refresh_generation_language(self):
         """Refresh translation targets after the Generate variant changes."""
         for language in pipeline_store.list_settings_languages():
             settings_key = language.key
+            if settings_key not in self.built_language_keys:
+                continue
             concrete_source_key = self._concrete_source_language_key(
                 settings_key)
             groups = [
@@ -2813,14 +2903,25 @@ class PipelineEditor:
                     variables[field.key].set(
                         pipeline_store.get_language(
                             replacement_key).name)
-            self._update_field_box_states(settings_key)
+            self._update_visibility(settings_key)
 
     def _language_changed(self, _event=None):
         language = self.get_active_language()
-        if language.key == self.last_active_language_key:
+        newly_built = self._ensure_language_tab_built(language.key)
+        if (
+                language.key == self.last_active_language_key
+                and not newly_built):
             return
         self.last_active_language_key = language.key
         self._update_visibility(language.key)
+        if newly_built:
+            scroll_frame = getattr(
+                self.app,
+                "pipeline_scroll_frame",
+                None)
+            if scroll_frame is not None:
+                scroll_frame.bind_mousewheel_tree()
+            self.bind_target_deck_mousewheel()
 
     def get_active_language(self):
         selected_tab = self.language_notebook.select()
@@ -2829,48 +2930,61 @@ class PipelineEditor:
             raise ValueError("Select a language.")
         return language
 
+    def _settings_from_built_language(self, language):
+        """Read one materialized language page without touching lazy pages."""
+        shared_fields = self._fields_from_controls(
+            self.shared_field_enabled_variables[language.key],
+            self.shared_field_language_variables[language.key])
+        shared_field_languages = (
+            self._all_field_languages_from_controls(
+                self.shared_field_language_variables[
+                    language.key]))
+        cards = []
+        for direction in pipeline_store.list_directions():
+            fields = self._fields_from_controls(
+                self.per_card_field_enabled_variables[
+                    language.key][direction.key],
+                self.per_card_field_language_variables[
+                    language.key][direction.key])
+            cards.append(pipeline_store.CardSettings(
+                direction_key=direction.key,
+                enabled=self.direction_enabled_variables[
+                    language.key][direction.key].get(),
+                fields=fields,
+                target_deck=self.direction_target_deck_variables[
+                    language.key][direction.key].get().strip(),
+                field_languages=(
+                    self._all_field_languages_from_controls(
+                        self.per_card_field_language_variables[
+                            language.key][direction.key])),
+                enhanced=self.direction_enhanced_variables[
+                    language.key][direction.key].get()))
+        return pipeline_store.LanguageSettings(
+            language_key=language.key,
+            cards=tuple(cards),
+            target_deck=self.target_deck_variables[
+                language.key].get().strip(),
+            separate_target_decks=(
+                not self.separate_target_deck_variables[
+                    language.key].get()),
+            share_field_settings=(
+                self.share_field_settings_variables[
+                    language.key].get()),
+            shared_fields=shared_fields,
+            shared_field_languages=shared_field_languages)
+
     def to_config(self):
         active_language = self.app.get_card_setup_generation_language()
         all_settings = []
         for language in pipeline_store.list_settings_languages():
-            shared_fields = self._fields_from_controls(
-                self.shared_field_enabled_variables[language.key],
-                self.shared_field_language_variables[language.key])
-            shared_field_languages = (
-                self._all_field_languages_from_controls(
-                    self.shared_field_language_variables[
-                        language.key]))
-            cards = []
-            for direction in pipeline_store.list_directions():
-                fields = self._fields_from_controls(
-                    self.per_card_field_enabled_variables[
-                        language.key][direction.key],
-                    self.per_card_field_language_variables[
-                        language.key][direction.key])
-                cards.append(pipeline_store.CardSettings(
-                    direction_key=direction.key,
-                    enabled=self.direction_enabled_variables[
-                        language.key][direction.key].get(),
-                    fields=fields,
-                    target_deck=self.direction_target_deck_variables[
-                        language.key][direction.key].get().strip(),
-                    field_languages=(
-                        self._all_field_languages_from_controls(
-                            self.per_card_field_language_variables[
-                                language.key][direction.key]))))
-            all_settings.append(pipeline_store.LanguageSettings(
-                language_key=language.key,
-                cards=tuple(cards),
-                target_deck=self.target_deck_variables[
-                    language.key].get().strip(),
-                separate_target_decks=(
-                    not self.separate_target_deck_variables[
-                        language.key].get()),
-                share_field_settings=(
-                    self.share_field_settings_variables[
-                        language.key].get()),
-                shared_fields=shared_fields,
-                shared_field_languages=shared_field_languages))
+            if language.key not in self.built_language_keys:
+                all_settings.append(
+                    pipeline_store.get_language_settings(
+                        self.config,
+                        language.key))
+                continue
+            all_settings.append(
+                self._settings_from_built_language(language))
         active_settings = next(
             settings
             for settings in all_settings
@@ -2945,6 +3059,10 @@ class AutoAnkiApp:
             source_prepare_callback=None,
             source_codex_callback=None,
             source_jobs_loader=None,
+            source_pause_callback=None,
+            source_resume_callback=None,
+            source_dispatch_status_loader=None,
+            paid_dispatch_control=None,
             source_retry_callback=None,
             source_inspect_callback=None,
             source_validation_accept_callback=None,
@@ -2952,7 +3070,9 @@ class AutoAnkiApp:
             source_preview_loader=None,
             manual_input_filter_callback=None,
             learned_filter_loader=None,
-            learned_filter_saver=None):
+            learned_filter_saver=None,
+            preference_loader=None,
+            preference_saver=None):
         self.root = root
         try:
             native_scaling = float(
@@ -2977,6 +3097,11 @@ class AutoAnkiApp:
         self.source_prepare_callback = source_prepare_callback
         self.source_codex_callback = source_codex_callback
         self.source_jobs_loader = source_jobs_loader
+        self.source_pause_callback = source_pause_callback
+        self.source_resume_callback = source_resume_callback
+        self.source_dispatch_status_loader = (
+            source_dispatch_status_loader)
+        self.paid_dispatch_control = paid_dispatch_control
         self.source_retry_callback = source_retry_callback
         self.source_inspect_callback = source_inspect_callback
         self.source_validation_accept_callback = (
@@ -2990,6 +3115,25 @@ class AutoAnkiApp:
         self.learned_filter_saver = (
             learned_filter_saver
             or learned_filter_store.save_language_filters)
+        self.preference_loader = (
+            preference_loader or gui_preferences.load_preferences)
+        self.preference_saver = (
+            preference_saver or gui_preferences.save_preferences)
+        try:
+            loaded_preferences = self.preference_loader()
+            self.gui_preferences = gui_preferences.default_preferences()
+            self.gui_preferences.update({
+                key: value
+                for key, value in dict(loaded_preferences).items()
+                if key in self.gui_preferences
+            })
+            self.preference_load_error = None
+        except (OSError, TypeError, ValueError) as error:
+            self.gui_preferences = gui_preferences.default_preferences()
+            self.preference_load_error = error
+        self._preferences_loading = True
+        self.preference_save_after_id = None
+        self.preference_variable_traces = []
         self.result_queue = queue.Queue()
         self.deck_result_queue = queue.Queue()
         self.connection_result_queue = queue.Queue()
@@ -3009,6 +3153,12 @@ class AutoAnkiApp:
         self.source_preview_generation = 0
         self.source_preview_pending = set()
         self.source_preview_polling = False
+        self._pipeline_tab_built = False
+        self._from_source_tab_built = False
+        self._advanced_tab_built = False
+        self._help_tab_built = False
+        self._tracked_preference_variable_ids = set()
+        self._source_preference_tracking_installed = False
 
         root.title("AutoAnki")
         root.configure(background=self.WINDOW_BACKGROUND)
@@ -3018,7 +3168,8 @@ class AutoAnkiApp:
             value=str(process_text.DECK_PATH))
         self.input_count = tk.StringVar(
             value="0 lines · 0 characters")
-        self.pipeline_status = tk.StringVar()
+        self.pipeline_status = tk.StringVar(
+            value="Saved card settings load when this tab is opened.")
         self.deck_status = tk.StringVar(
             value="Checking Anki deck list…")
         try:
@@ -3099,9 +3250,11 @@ class AutoAnkiApp:
             configured_decks | set(cached_decks)))
 
         self._configure_styles()
+        self._install_combobox_wheel_guard()
         self._build_widgets()
-        self._render_pipeline_rows()
         self._set_initial_window_size()
+        self._preferences_loading = False
+        self._install_preference_tracking()
         self.root.bind(
             "<Button-1>",
             self._clear_focus_on_background_click,
@@ -3112,9 +3265,14 @@ class AutoAnkiApp:
             self._main_tab_changed,
             add="+")
         self.root.after(0, self.refresh_anki_decks)
+        self.root.after_idle(self._restore_navigation_preferences)
 
         if self.pipeline_load_error:
             root.after(0, self._show_pipeline_load_error)
+        if self.preference_load_error:
+            self.pipeline_status.set(
+                "Could not read saved GUI preferences; safe defaults were "
+                f"loaded · {self.preference_load_error}")
 
     def _show_pipeline_load_error(self):
         messagebox.showerror(
@@ -3124,9 +3282,258 @@ class AutoAnkiApp:
                 "The default pipeline was loaded instead."),
             parent=self.root)
 
-    def _set_initial_window_size(self):
-        self.root.update_idletasks()
+    @staticmethod
+    def _selected_tab_key(notebook, tabs, fallback):
+        selected = notebook.select()
+        for key, tab in tabs.items():
+            if selected == str(tab):
+                return key
+        return fallback
 
+    def _collect_gui_preferences(self):
+        preferences = gui_preferences.default_preferences()
+        preferences.update({
+            key: value
+            for key, value in self.gui_preferences.items()
+            if key in preferences
+        })
+        if hasattr(self, "prompt_selector_value"):
+            preferences["prompt_key"] = self.prompt_selector_value.get()
+
+        if self._from_source_tab_built:
+            option = self.source_options_by_label.get(
+                self.source_selected_label.get())
+            preferences["source_key"] = (
+                option.key if option is not None else "")
+            language_overrides = dict(
+                preferences.get("source_language_overrides", {}))
+            if option is not None:
+                selected_language = next((
+                    language
+                    for language in pipeline_store.list_languages()
+                    if language.name == self.source_language_label.get()
+                ), None)
+                if selected_language is not None:
+                    language_overrides[option.key] = selected_language.key
+            preferences["source_language_overrides"] = language_overrides
+
+            for key, variable_name in (
+                    ("source_chunk_size", "source_chunk_size"),
+                    (
+                        "source_prefix_token_limit",
+                        "source_prefix_token_limit",
+                    ),
+                    ("source_concurrency", "source_concurrency"),
+                    (
+                        "source_request_stagger_ms",
+                        "source_request_stagger_ms",
+                    ),
+                    (
+                        "source_preview_page_size",
+                        "source_preview_page_size",
+                    ),
+                    ("source_file_language", "source_file_language"),
+                    ("source_codex_language", "source_codex_language")):
+                preferences[key] = getattr(self, variable_name).get()
+            for key, variable_name in (
+                    ("source_limit_to_prefix", "source_limit_to_prefix"),
+                    (
+                        "source_allow_web_search",
+                        "source_allow_web_search",
+                    ),
+                    (
+                        "source_use_source_examples",
+                        "source_use_source_examples",
+                    ),
+                    (
+                        "source_include_context_nuance",
+                        "source_include_context_nuance",
+                    ),
+                    ("source_separate_decks", "source_separate_decks"),
+                    (
+                        "source_automatic_repair",
+                        "source_automatic_repair",
+                    ),
+                    ("source_file_use_gpu", "source_file_use_gpu")):
+                preferences[key] = bool(
+                    getattr(self, variable_name).get())
+
+            preferences["source_card_directions"] = list(
+                self._selected_source_direction_keys())
+            preferences["source_model_key"] = (
+                self._selected_source_model_key())
+            preferences["source_protocol_key"] = (
+                SOURCE_PROTOCOL_KEYS_BY_LABEL.get(
+                    self.source_request_protocol_label.get(),
+                    "v10"))
+            current_protocol = preferences["source_protocol_key"]
+            preferences["source_reasoning_key"] = (
+                getattr(self, "_source_reasoning_before_v8", "low")
+                if current_protocol == "v8"
+                else SOURCE_REASONING_KEYS_BY_LABEL.get(
+                    self.source_reasoning_label.get(),
+                    "low"))
+            preferences["source_execution_key"] = (
+                SOURCE_EXECUTION_KEYS_BY_LABEL.get(
+                    self.source_execution_label.get(),
+                    "standard"))
+            preferences["source_context_key"] = (
+                SOURCE_CONTEXT_KEYS_BY_LABEL.get(
+                    self.source_context_label.get(),
+                    "sentence"))
+            preferences["source_non_example_context_key"] = getattr(
+                self,
+                "_source_context_before_source_examples",
+                "sentence")
+            preferences["source_tab"] = self._selected_tab_key(
+                self.source_notebook,
+                {
+                    "generate": self.source_generate_page,
+                    "inspect": self.source_preview_page,
+                    "prepare": self.source_prepare_page,
+                    "codex": self.source_codex_page,
+                    "jobs": self.source_jobs_page,
+                },
+                "generate")
+
+        preferences["main_tab"] = self._selected_tab_key(
+            self.notebook,
+            {
+                "generate": self.generate_tab,
+                "card_setup": self.pipeline_tab,
+                "advanced": self.advanced_tab,
+                "help": self.help_tab,
+            },
+            "generate")
+        preferences["generate_tab"] = self._selected_tab_key(
+            self.generate_notebook,
+            {
+                "manual": self.manual_generate_tab,
+                "source": self.from_source_tab,
+            },
+            "manual")
+        return preferences
+
+    def _track_preference_variables(self, variables):
+        for variable in variables:
+            variable_id = id(variable)
+            if variable_id in self._tracked_preference_variable_ids:
+                continue
+            trace_id = variable.trace_add(
+                "write",
+                self._schedule_preferences_save)
+            self.preference_variable_traces.append((variable, trace_id))
+            self._tracked_preference_variable_ids.add(variable_id)
+
+    def _install_preference_tracking(self):
+        if self._advanced_tab_built:
+            self._install_advanced_preference_tracking()
+        for notebook in (
+                self.notebook,
+                self.generate_notebook):
+            notebook.bind(
+                "<<NotebookTabChanged>>",
+                self._schedule_preferences_save,
+                add="+")
+        if self._from_source_tab_built:
+            self._install_source_preference_tracking()
+
+    def _install_advanced_preference_tracking(self):
+        if hasattr(self, "prompt_selector_value"):
+            self._track_preference_variables([
+                self.prompt_selector_value,
+            ])
+
+    def _install_source_preference_tracking(self):
+        if self._source_preference_tracking_installed:
+            return
+        self._source_preference_tracking_installed = True
+        self._track_preference_variables([
+            self.source_selected_label,
+            self.source_language_label,
+            self.source_chunk_size,
+            self.source_limit_to_prefix,
+            self.source_prefix_token_limit,
+            self.source_concurrency,
+            self.source_request_stagger_ms,
+            self.source_allow_web_search,
+            self.source_use_source_examples,
+            self.source_include_context_nuance,
+            self.source_separate_decks,
+            self.source_model_label,
+            self.source_request_protocol_label,
+            self.source_reasoning_label,
+            self.source_execution_label,
+            self.source_automatic_repair,
+            self.source_context_label,
+            self.source_preview_page_size,
+            self.source_file_language,
+            self.source_file_use_gpu,
+            self.source_codex_language,
+            *self.source_card_direction_variables.values(),
+        ])
+        self.source_notebook.bind(
+            "<<NotebookTabChanged>>",
+            self._schedule_preferences_save,
+            add="+")
+
+    def _schedule_preferences_save(self, *_args):
+        if self._preferences_loading:
+            return
+        if self.preference_save_after_id is not None:
+            self.root.after_cancel(self.preference_save_after_id)
+        self.preference_save_after_id = self.root.after(
+            350,
+            self._save_gui_preferences)
+
+    def _save_gui_preferences(self):
+        self.preference_save_after_id = None
+        try:
+            preferences = self._collect_gui_preferences()
+            saved = self.preference_saver(preferences)
+        except (OSError, TypeError, ValueError) as error:
+            if hasattr(self, "source_action_status"):
+                self.source_action_status.set(
+                    f"Could not save GUI preferences · {error}")
+            return False
+        self.gui_preferences = (
+            dict(saved) if isinstance(saved, dict) else preferences)
+        return True
+
+    def _restore_navigation_preferences(self):
+        self._preferences_loading = True
+        try:
+            generate_tabs = {
+                "manual": self.manual_generate_tab,
+                "source": self.from_source_tab,
+            }
+            generate_tab = generate_tabs.get(
+                self.gui_preferences.get("generate_tab"))
+            if generate_tab is not None:
+                if generate_tab == self.from_source_tab:
+                    self._ensure_from_source_tab_built()
+                self.generate_notebook.select(generate_tab)
+
+            main_tabs = {
+                "generate": self.generate_tab,
+                "card_setup": self.pipeline_tab,
+                "advanced": self.advanced_tab,
+                "help": self.help_tab,
+            }
+            main_tab = main_tabs.get(
+                self.gui_preferences.get("main_tab"))
+            if main_tab is not None:
+                if main_tab == self.pipeline_tab:
+                    self._ensure_pipeline_tab_built()
+                elif main_tab == self.advanced_tab:
+                    self._ensure_advanced_tab_built()
+                elif main_tab == self.help_tab:
+                    self._ensure_help_tab_built()
+                self.notebook.select(main_tab)
+        finally:
+            self._preferences_loading = False
+
+    def _set_initial_window_size(self):
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         width = min(1860, screen_width - 80)
@@ -3138,11 +3545,21 @@ class AutoAnkiApp:
             f"{width}x{height}+{x_position}+{y_position}")
         self.root.minsize(min(1000, width), min(720, height))
 
+    def _install_combobox_wheel_guard(self):
+        """Never let a closed dropdown change merely because it was hovered."""
+        for sequence in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            self.root.bind_class(
+                "TCombobox",
+                sequence,
+                lambda _event: "break")
+
     def _configure_styles(self):
         style = ttk.Style(self.root)
         if "clam" in style.theme_names():
             style.theme_use("clam")
         self._style_images = []
+        rounded_mask_cache = {}
+        checkbox_mask_cache = {}
 
         def rounded_tile(
                 size,
@@ -3155,12 +3572,6 @@ class AutoAnkiApp:
                 width=size,
                 height=size)
             backdrop = backdrop or fill
-
-            def rgb(colour):
-                value = colour.lstrip("#")
-                return tuple(
-                    int(value[index:index + 2], 16)
-                    for index in (0, 2, 4))
 
             def inside(x, y, inset=0):
                 low = inset
@@ -3179,33 +3590,62 @@ class AutoAnkiApp:
                     + (y - nearest_y) ** 2
                     <= curve ** 2)
 
+            def rgb(colour):
+                value = colour.lstrip("#")
+                return tuple(
+                    int(value[index:index + 2], 16)
+                    for index in (0, 2, 4))
+
+            samples = 4
+            sample_count = samples * samples
+            mask_key = (size, radius)
+            masks = rounded_mask_cache.get(mask_key)
+            if masks is None:
+                masks = []
+                for y in range(size):
+                    mask_row = []
+                    for x in range(size):
+                        fill_count = 0
+                        outline_count = 0
+                        backdrop_count = 0
+                        for sample_y in range(samples):
+                            point_y = y + (sample_y + 0.5) / samples
+                            for sample_x in range(samples):
+                                point_x = x + (
+                                    sample_x + 0.5) / samples
+                                if inside(point_x, point_y, 1):
+                                    fill_count += 1
+                                elif inside(point_x, point_y):
+                                    outline_count += 1
+                                else:
+                                    backdrop_count += 1
+                        mask_row.append((
+                            fill_count,
+                            outline_count,
+                            backdrop_count))
+                    masks.append(tuple(mask_row))
+                masks = tuple(masks)
+                rounded_mask_cache[mask_key] = masks
+
             fill_rgb = rgb(fill)
             outline_rgb = rgb(outline or fill)
             backdrop_rgb = rgb(backdrop)
-            samples = 4
-            sample_count = samples * samples
-            for y in range(size):
-                for x in range(size):
-                    totals = [0, 0, 0]
-                    for sample_y in range(samples):
-                        point_y = y + (sample_y + 0.5) / samples
-                        for sample_x in range(samples):
-                            point_x = x + (
-                                sample_x + 0.5) / samples
-                            if inside(point_x, point_y, 1):
-                                colour = fill_rgb
-                            elif inside(point_x, point_y):
-                                colour = outline_rgb
-                            else:
-                                colour = backdrop_rgb
-                            for channel in range(3):
-                                totals[channel] += colour[channel]
+            image_rows = []
+            for mask_row in masks:
+                image_row = []
+                for fill_count, outline_count, backdrop_count in mask_row:
                     colour = tuple(
-                        round(total / sample_count)
-                        for total in totals)
-                    image.put(
-                        "#%02x%02x%02x" % colour,
-                        (x, y))
+                        round((
+                            fill_rgb[channel] * fill_count
+                            + outline_rgb[channel] * outline_count
+                            + backdrop_rgb[channel] * backdrop_count
+                        ) / sample_count)
+                        for channel in range(3))
+                    image_row.append("#%02x%02x%02x" % colour)
+                image_rows.append(image_row)
+            image.put(" ".join(
+                "{" + " ".join(row) + "}"
+                for row in image_rows))
             self._style_images.append(image)
             return image
 
@@ -3266,44 +3706,62 @@ class AutoAnkiApp:
                     + (y - nearest_y) ** 2
                 ) ** 0.5
 
-            fill_rgb = colour_rgb(fill)
-            outline_rgb = colour_rgb(outline)
-            check_rgb = colour_rgb(check)
-            backdrop_rgb = colour_rgb(backdrop or self.PALE)
             check_segments = (
                 ((5.4, 11.2), (9.2, 14.8)),
                 ((9.2, 14.8), (16.8, 7.2)))
-            for y in range(height):
-                for x in range(width):
-                    totals = [0, 0, 0]
-                    for sample_y in range(samples):
-                        point_y = y + (sample_y + 0.5) / samples
-                        for sample_x in range(samples):
-                            point_x = x + (
-                                sample_x + 0.5) / samples
-                            on_check = selected and any(
-                                segment_distance(
-                                    point_x,
-                                    point_y,
-                                    start,
-                                    end) <= 1.35
-                                for start, end in check_segments)
-                            if on_check:
-                                colour = check_rgb
-                            elif inside(point_x, point_y, 1):
-                                colour = fill_rgb
-                            elif inside(point_x, point_y):
-                                colour = outline_rgb
-                            else:
-                                colour = backdrop_rgb
-                            for channel in range(3):
-                                totals[channel] += colour[channel]
+            masks = checkbox_mask_cache.get(selected)
+            if masks is None:
+                masks = []
+                for y in range(height):
+                    mask_row = []
+                    for x in range(width):
+                        counts = [0, 0, 0, 0]
+                        for sample_y in range(samples):
+                            point_y = y + (sample_y + 0.5) / samples
+                            for sample_x in range(samples):
+                                point_x = x + (
+                                    sample_x + 0.5) / samples
+                                on_check = selected and any(
+                                    segment_distance(
+                                        point_x,
+                                        point_y,
+                                        start,
+                                        end) <= 1.35
+                                    for start, end in check_segments)
+                                if on_check:
+                                    counts[0] += 1
+                                elif inside(point_x, point_y, 1):
+                                    counts[1] += 1
+                                elif inside(point_x, point_y):
+                                    counts[2] += 1
+                                else:
+                                    counts[3] += 1
+                        mask_row.append(tuple(counts))
+                    masks.append(tuple(mask_row))
+                masks = tuple(masks)
+                checkbox_mask_cache[selected] = masks
+
+            colours = (
+                colour_rgb(check),
+                colour_rgb(fill),
+                colour_rgb(outline),
+                colour_rgb(backdrop or self.PALE),
+            )
+            image_rows = []
+            for mask_row in masks:
+                image_row = []
+                for counts in mask_row:
                     colour = tuple(
-                        round(total / sample_count)
-                        for total in totals)
-                    image.put(
-                        "#%02x%02x%02x" % colour,
-                        (x, y))
+                        round(sum(
+                            colours[kind][channel] * count
+                            for kind, count in enumerate(counts)
+                        ) / sample_count)
+                        for channel in range(3))
+                    image_row.append("#%02x%02x%02x" % colour)
+                image_rows.append(image_row)
+            image.put(" ".join(
+                "{" + " ".join(row) + "}"
+                for row in image_rows))
             self._style_images.append(image)
             return image
 
@@ -3851,9 +4309,6 @@ class AutoAnkiApp:
             text="Help")
 
         self._build_generate_tab()
-        self._build_pipeline_tab()
-        self._build_advanced_tab()
-        self._build_help_tab()
 
     def _build_generate_tab(self):
         tab = self.generate_tab
@@ -3885,7 +4340,6 @@ class AutoAnkiApp:
             add="+")
 
         self._build_manual_generate_tab()
-        self._build_from_source_tab()
 
     def _build_manual_generate_tab(self):
         tab = self.manual_generate_tab
@@ -4126,6 +4580,9 @@ class AutoAnkiApp:
                 padx=(14, 0))
 
     def _build_from_source_tab(self):
+        if self._from_source_tab_built:
+            return
+        self._from_source_tab_built = True
         tab = self.from_source_tab
         tab.columnconfigure(0, weight=1)
         tab.rowconfigure(0, weight=1)
@@ -4136,33 +4593,66 @@ class AutoAnkiApp:
         self.source_display_labels_by_key = {}
         self.source_selected_label = tk.StringVar()
         self.source_language_label = tk.StringVar()
-        self.source_chunk_size = tk.StringVar(value="30")
-        self.source_limit_to_prefix = tk.BooleanVar(value=False)
-        self.source_prefix_token_limit = tk.StringVar(value="100")
-        self.source_concurrency = tk.StringVar(value="8")
-        self.source_request_stagger_ms = tk.StringVar(value="100")
-        self.source_allow_web_search = tk.BooleanVar(value=False)
-        self.source_use_source_examples = tk.BooleanVar(value=False)
+        preferences = self.gui_preferences
+        self.source_chunk_size = tk.StringVar(
+            value=preferences["source_chunk_size"])
+        self.source_limit_to_prefix = tk.BooleanVar(
+            value=preferences["source_limit_to_prefix"])
+        self.source_prefix_token_limit = tk.StringVar(
+            value=preferences["source_prefix_token_limit"])
+        self.source_concurrency = tk.StringVar(
+            value=preferences["source_concurrency"])
+        self.source_request_stagger_ms = tk.StringVar(
+            value=preferences["source_request_stagger_ms"])
+        self.source_allow_web_search = tk.BooleanVar(
+            value=preferences["source_allow_web_search"])
+        self.source_use_source_examples = tk.BooleanVar(
+            value=preferences["source_use_source_examples"])
         self.source_card_direction_variables = {
             direction.key: tk.BooleanVar(
-                value=direction.key == "context")
+                value=(
+                    direction.key
+                    in preferences["source_card_directions"]))
             for direction in pipeline_store.list_directions()
         }
         self.source_card_direction_summary = tk.StringVar(
             value="Sentence → Meaning")
-        self.source_include_context_nuance = tk.BooleanVar(value=False)
-        self.source_separate_decks = tk.BooleanVar(value=False)
+        self.source_include_context_nuance = tk.BooleanVar(
+            value=preferences["source_include_context_nuance"])
+        self.source_separate_decks = tk.BooleanVar(
+            value=preferences["source_separate_decks"])
         self.source_model_label = tk.StringVar(
-            value=SOURCE_MODEL_OPTIONS[0][1])
+            value=dict(SOURCE_MODEL_OPTIONS).get(
+                preferences["source_model_key"],
+                SOURCE_MODEL_OPTIONS[0][1]))
         self.source_request_protocol_label = tk.StringVar(
-            value=SOURCE_PROTOCOL_OPTIONS[0][1])
+            value=dict(SOURCE_PROTOCOL_OPTIONS).get(
+                preferences["source_protocol_key"],
+                SOURCE_PROTOCOL_OPTIONS[0][1]))
         self.source_reasoning_label = tk.StringVar(
-            value=SOURCE_REASONING_OPTIONS[0][1])
+            value=dict(SOURCE_REASONING_OPTIONS).get(
+                preferences["source_reasoning_key"],
+                SOURCE_REASONING_OPTIONS[0][1]))
         self.source_execution_label = tk.StringVar(
-            value=SOURCE_EXECUTION_OPTIONS[0][1])
-        self.source_automatic_repair = tk.BooleanVar(value=False)
+            value=dict(SOURCE_EXECUTION_OPTIONS).get(
+                preferences["source_execution_key"],
+                SOURCE_EXECUTION_OPTIONS[0][1]))
+        self.source_automatic_repair = tk.BooleanVar(
+            value=preferences["source_automatic_repair"])
         self.source_context_label = tk.StringVar(
-            value=SOURCE_CONTEXT_LABELS["sentence"])
+            value=SOURCE_CONTEXT_LABELS.get(
+                preferences["source_context_key"],
+                SOURCE_CONTEXT_LABELS["sentence"]))
+        self._source_context_before_source_examples = (
+            preferences["source_non_example_context_key"]
+            if preferences["source_non_example_context_key"]
+            in SOURCE_CONTEXT_LABELS
+            else "sentence")
+        self._source_reasoning_before_v8 = (
+            preferences["source_reasoning_key"]
+            if preferences["source_reasoning_key"]
+            in dict(SOURCE_REASONING_OPTIONS)
+            else "low")
         self.source_context_description = tk.StringVar()
         self.source_summary = tk.StringVar()
         self.source_deck_notice = tk.StringVar()
@@ -4179,11 +4669,20 @@ class AutoAnkiApp:
         self.source_zero_notice_shown = False
         self.source_paid_authorized = tk.BooleanVar(value=False)
         self.source_action_status = tk.StringVar(value="No source job running.")
-        self.source_preview_page_size = tk.StringVar(value="100")
+        self.source_dispatch_status = tk.StringVar(
+            value=(
+                "Ready"
+                if (
+                    self.source_pause_callback is not None
+                    and self.source_resume_callback is not None)
+                else "Emergency control unavailable"))
+        self.source_preview_page_size = tk.StringVar(
+            value=preferences["source_preview_page_size"])
         self.source_preview_status = tk.StringVar(
             value="Choose a prepared source, then load its local metadata.")
         self.source_preview_page_data = None
         self.source_preview_by_tree_id = {}
+        self._source_jobs_page_built = False
 
         self.source_notebook = ttk.Notebook(tab)
         self.source_notebook.grid(
@@ -4231,11 +4730,32 @@ class AutoAnkiApp:
         self._build_source_preview_page()
         self._build_source_prepare_page()
         self._build_source_codex_page()
-        self._build_source_jobs_page()
         self._load_source_catalogue()
         self._update_source_context_description()
         self._update_source_exclusion_controls()
         self._update_source_generate_button_state()
+        self._restore_source_page_selection()
+        self._install_source_preference_tracking()
+
+    def _ensure_from_source_tab_built(self):
+        if not getattr(self, "_from_source_tab_built", False):
+            self._build_from_source_tab()
+
+    def _restore_source_page_selection(self):
+        source_tabs = {
+            "generate": self.source_generate_page,
+            "inspect": self.source_preview_page,
+            "prepare": self.source_prepare_page,
+            "codex": self.source_codex_page,
+            "jobs": self.source_jobs_page,
+        }
+        target = source_tabs.get(
+            self.gui_preferences.get("source_tab"))
+        if target is None:
+            return
+        if target == self.source_jobs_page:
+            self._ensure_source_jobs_page_built()
+        self.source_notebook.select(target)
 
     def _source_header(self, parent, title, body):
         surface = RoundedPanel(
@@ -5324,8 +5844,13 @@ class AutoAnkiApp:
         self.source_file_path = tk.StringVar()
         self.source_file_title = tk.StringVar()
         self.source_file_language = tk.StringVar(
-            value="Classical Chinese (Warring States)")
-        self.source_file_use_gpu = tk.BooleanVar(value=True)
+            value=(
+                self.gui_preferences["source_file_language"]
+                if self.gui_preferences["source_file_language"]
+                in PREPARABLE_SOURCE_LANGUAGE_NAMES
+                else "Classical Chinese (Warring States)"))
+        self.source_file_use_gpu = tk.BooleanVar(
+            value=self.gui_preferences["source_file_use_gpu"])
         form_surface = RoundedPanel(
             content,
             fill=self.PANEL_BACKGROUND,
@@ -5514,7 +6039,11 @@ class AutoAnkiApp:
             ))
 
         self.source_codex_language = tk.StringVar(
-            value="Classical Chinese (Warring States)")
+            value=(
+                self.gui_preferences["source_codex_language"]
+                if self.gui_preferences["source_codex_language"]
+                in PREPARABLE_SOURCE_LANGUAGE_NAMES
+                else "Classical Chinese (Warring States)"))
         self.source_codex_title = tk.StringVar()
         self.source_codex_authorized = tk.BooleanVar(value=False)
         request_surface = RoundedPanel(
@@ -5706,10 +6235,20 @@ class AutoAnkiApp:
         viewport.bind_mousewheel_tree()
 
     def _build_source_jobs_page(self):
-        page = self.source_jobs_page
+        if self._source_jobs_page_built:
+            return
+        self._source_jobs_page_built = True
+        tab = self.source_jobs_page
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+        viewport = ScrollableFrame(
+            tab,
+            background=self.WINDOW_BACKGROUND,
+            frame_style="App.TFrame")
+        viewport.grid(row=0, column=0, sticky="nsew")
+        self.source_jobs_viewport = viewport
+        page = viewport.content
         page.columnconfigure(0, weight=1)
-        page.rowconfigure(1, weight=5, minsize=360)
-        page.rowconfigure(3, weight=4, minsize=220)
         self._source_header(
             page,
             "REQUEST JOBS AND FAILURES",
@@ -5901,8 +6440,66 @@ class AutoAnkiApp:
             column=0,
             sticky="ew",
             pady=(10, 0))
+        safety_controls = ttk.Frame(actions, style="App.TFrame")
+        safety_controls.grid(row=0, column=0, sticky="ew")
+        safety_controls.columnconfigure(2, weight=1)
+        self.source_pause_button = ttk.Button(
+            safety_controls,
+            text="Emergency pause",
+            command=self._pause_source_dispatch,
+            state=(
+                tk.NORMAL
+                if self.source_pause_callback is not None
+                else tk.DISABLED),
+            style="Accent.TButton",
+            cursor="hand2")
+        self.source_pause_button.grid(
+            row=0,
+            column=0,
+            sticky="w")
+        self.source_resume_button = ttk.Button(
+            safety_controls,
+            text="Resume queued work",
+            command=self._resume_source_dispatch,
+            state=(
+                tk.NORMAL
+                if self.source_resume_callback is not None
+                else tk.DISABLED),
+            style="CompactSecondary.TButton",
+            cursor="hand2")
+        self.source_resume_button.grid(
+            row=0,
+            column=1,
+            sticky="w",
+            padx=(8, 12))
+        ttk.Label(
+            safety_controls,
+            textvariable=self.source_dispatch_status,
+            style="Status.TLabel",
+            wraplength=760).grid(
+                row=0,
+                column=2,
+                sticky="w")
+        ttk.Label(
+            safety_controls,
+            text=(
+                "Pause prevents every queued or otherwise unsent paid OpenAI "
+                "request from this app. A request already sent cannot be "
+                "recalled and may still finish or incur its charge."
+            ),
+            style="Status.TLabel",
+            wraplength=1050).grid(
+                row=1,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(5, 0))
         action_buttons = ttk.Frame(actions, style="App.TFrame")
-        action_buttons.grid(row=0, column=0, sticky="w")
+        action_buttons.grid(
+            row=1,
+            column=0,
+            sticky="w",
+            pady=(9, 0))
         ttk.Button(
             action_buttons,
             text="Refresh",
@@ -5971,7 +6568,7 @@ class AutoAnkiApp:
             style="Status.TLabel",
             justify=tk.LEFT,
             wraplength=1050).grid(
-                row=1,
+                row=2,
                 column=0,
                 sticky="ew",
                 pady=(5, 0))
@@ -6049,6 +6646,13 @@ class AutoAnkiApp:
         # Preserve the old attribute for small integrations that customize the
         # inspection widget. It now refers to the response tab.
         self.source_job_inspection = self.source_job_response_inspection
+        viewport.bind_mousewheel_tree(
+            preserve_scrollable_children=True)
+        self._refresh_source_dispatch_status()
+
+    def _ensure_source_jobs_page_built(self):
+        if not getattr(self, "_source_jobs_page_built", False):
+            self._build_source_jobs_page()
 
     def _build_source_job_text_tab(self, tab, explanation):
         tab.columnconfigure(0, weight=1)
@@ -6434,7 +7038,10 @@ class AutoAnkiApp:
         selected_key = (
             selected_option.key
             if selected_option is not None
-            else None)
+            else getattr(
+                self,
+                "gui_preferences",
+                {}).get("source_key") or None)
         loaded = ()
         error = None
         if self.source_catalog_loader is not None:
@@ -6507,11 +7114,25 @@ class AutoAnkiApp:
                 "Select a source to choose the output deck.")
         else:
             if option.source_language_key:
+                preferred_language_key = getattr(
+                    self,
+                    "gui_preferences",
+                    {}).get(
+                    "source_language_overrides",
+                    {}).get(
+                        option.key,
+                        option.source_language_key)
                 try:
                     source_language = pipeline_store.get_language(
-                        option.source_language_key)
+                        preferred_language_key)
                 except ValueError:
-                    self.source_language_label.set("")
+                    try:
+                        source_language = pipeline_store.get_language(
+                            option.source_language_key)
+                    except ValueError:
+                        self.source_language_label.set("")
+                    else:
+                        self.source_language_label.set(source_language.name)
                 else:
                     self.source_language_label.set(source_language.name)
             summary = []
@@ -6580,14 +7201,24 @@ class AutoAnkiApp:
         protocol = SOURCE_PROTOCOL_KEYS_BY_LABEL.get(
             self.source_request_protocol_label.get())
         if protocol == "v8":
+            current_reasoning = SOURCE_REASONING_KEYS_BY_LABEL.get(
+                self.source_reasoning_label.get(),
+                "low")
+            if current_reasoning != "low":
+                self._source_reasoning_before_v8 = current_reasoning
             self.source_reasoning_label.set(
                 dict(SOURCE_REASONING_OPTIONS)["low"])
             if hasattr(self, "source_reasoning_selector"):
                 self.source_reasoning_selector.configure(
                     state=tk.DISABLED)
         else:
-            self.source_reasoning_label.set(
-                dict(SOURCE_REASONING_OPTIONS)["low"])
+            remembered_reasoning = getattr(
+                self,
+                "_source_reasoning_before_v8",
+                "low")
+            if remembered_reasoning in dict(SOURCE_REASONING_OPTIONS):
+                self.source_reasoning_label.set(
+                    dict(SOURCE_REASONING_OPTIONS)[remembered_reasoning])
             if hasattr(self, "source_reasoning_selector"):
                 self.source_reasoning_selector.configure(
                     state="readonly")
@@ -6609,38 +7240,9 @@ class AutoAnkiApp:
             SOURCE_MODEL_OPTIONS[0][0])
 
     def _source_model_changed(self, _event=None):
-        model = self._selected_source_model_key()
-        profile = source_model_profile(model)
-        if profile.local:
-            protocol = getattr(
-                self,
-                "source_request_protocol_label",
-                None)
-            if hasattr(protocol, "set"):
-                protocol.set(
-                    dict(SOURCE_PROTOCOL_OPTIONS)["v10"])
-            execution = getattr(
-                self,
-                "source_execution_label",
-                None)
-            if hasattr(execution, "set"):
-                execution.set(
-                    dict(SOURCE_EXECUTION_OPTIONS)["standard"])
-            for attribute, value in (
-                    ("source_chunk_size",
-                     str(profile.recommended_chunk_size)),
-                    ("source_concurrency",
-                     str(profile.recommended_concurrency)),
-                    ("source_request_stagger_ms", "0")):
-                variable = getattr(self, attribute, None)
-                if hasattr(variable, "set"):
-                    variable.set(value)
-            web_search = getattr(
-                self,
-                "source_allow_web_search",
-                None)
-            if hasattr(web_search, "set"):
-                web_search.set(False)
+        # Model-specific constraints are applied to the effective request.
+        # Keep the user's cloud/local tuning intact while a control is
+        # temporarily unavailable so switching back restores it.
         self._sync_source_model_controls()
         self.source_paid_authorized.set(False)
         self._schedule_source_estimate()
@@ -6708,20 +7310,7 @@ class AutoAnkiApp:
             self.source_execution_label.get())
         local = is_local_source_model(
             self._selected_source_model_key())
-        if local and mode != "standard":
-            self.source_execution_label.set(
-                dict(SOURCE_EXECUTION_OPTIONS)["standard"])
-            mode = "standard"
-        economy = mode == "economy"
-        automatic_variable = getattr(
-            self,
-            "source_automatic_repair",
-            None)
-        if (
-                economy
-                and hasattr(automatic_variable, "get")
-                and automatic_variable.get()):
-            automatic_variable.set(False)
+        economy = mode == "economy" and not local
         if hasattr(self, "source_automatic_repair_check"):
             self.source_automatic_repair_check.configure(
                 state=tk.DISABLED if economy else tk.NORMAL)
@@ -6773,9 +7362,23 @@ class AutoAnkiApp:
 
     def _source_example_setting_changed(self):
         if self.source_use_source_examples.get():
+            current_context = SOURCE_CONTEXT_KEYS_BY_LABEL.get(
+                self.source_context_label.get(),
+                "sentence")
+            if current_context != "sentence":
+                self._source_context_before_source_examples = current_context
             self.source_context_label.set(
                 SOURCE_CONTEXT_LABELS["sentence"])
             self._update_source_context_description()
+        else:
+            remembered_context = getattr(
+                self,
+                "_source_context_before_source_examples",
+                "sentence")
+            if remembered_context in SOURCE_CONTEXT_LABELS:
+                self.source_context_label.set(
+                    SOURCE_CONTEXT_LABELS[remembered_context])
+                self._update_source_context_description()
         self._sync_source_card_options()
         self.source_paid_authorized.set(False)
         self._schedule_source_estimate()
@@ -6827,16 +7430,10 @@ class AutoAnkiApp:
         if context_selector is not None:
             context_selector.configure(
                 state=tk.DISABLED if use_source else "readonly")
-        nuance_variable = getattr(
-            self,
-            "source_include_context_nuance",
-            None)
         nuance_check = getattr(
             self,
             "source_include_context_nuance_check",
             None)
-        if not nuance_enabled and hasattr(nuance_variable, "set"):
-            nuance_variable.set(False)
         if nuance_check is not None:
             nuance_check.configure(
                 state=tk.NORMAL if nuance_enabled else tk.DISABLED)
@@ -6904,8 +7501,6 @@ class AutoAnkiApp:
             context_key != "none"
             and "context" in selected_directions)
         if not enabled:
-            if source_example_variable is not None:
-                source_example_variable.set(False)
             if source_example_check is not None:
                 source_example_check.configure(state=tk.DISABLED)
         elif source_example_check is not None:
@@ -7534,13 +8129,13 @@ class AutoAnkiApp:
             self,
             "source_automatic_repair",
             None)
-        automatic_repair = bool(
+        automatic_repair_preference = bool(
             automatic_variable.get()
             if hasattr(automatic_variable, "get")
             else False)
-        if automatic_repair and execution_mode != "standard":
-            raise ValueError(
-                "Automatic repair currently requires Standard processing.")
+        automatic_repair = (
+            automatic_repair_preference
+            and execution_mode == "standard")
         if execution_mode == "economy" or model_profile.local:
             concurrency = (
                 model_profile.recommended_concurrency
@@ -7561,7 +8156,7 @@ class AutoAnkiApp:
             self,
             "source_use_source_examples",
             None)
-        use_source_examples = bool(
+        use_source_examples_preference = bool(
             use_source_examples_variable.get()
             if hasattr(use_source_examples_variable, "get")
             else False)
@@ -7569,8 +8164,6 @@ class AutoAnkiApp:
             self._selected_source_direction_keys()
             if hasattr(self, "source_card_direction_variables")
             else None)
-        if use_source_examples and context_mode != "sentence":
-            context_mode = "sentence"
         protocol_variable = getattr(
             self,
             "source_request_protocol_label",
@@ -7639,11 +8232,12 @@ class AutoAnkiApp:
                 else ("context",))
         if not selected_source_directions:
             raise ValueError("Select at least one source card type.")
-        if (
-                use_source_examples
-                and "context" not in selected_source_directions):
-            raise ValueError(
-                "Using source sentences requires Sentence → Meaning.")
+        use_source_examples = bool(
+            use_source_examples_preference
+            and context_mode != "none"
+            and "context" in selected_source_directions)
+        if use_source_examples:
+            context_mode = "sentence"
         if selected_language_key:
             source_pipelines = []
             for pipeline in pipelines:
@@ -7872,6 +8466,8 @@ class AutoAnkiApp:
             self.source_estimate_detail.set(detail)
             if (
                     self._estimate_candidate_count(value) == 0
+                    and self._estimate_request_count(value) == 0
+                    and self._estimate_source_sentence_count(value) == 0
                     and self.source_exclude_enabled.get()
                     and not self.source_zero_notice_shown):
                 self.source_zero_notice_shown = True
@@ -7900,6 +8496,41 @@ class AutoAnkiApp:
         return getattr(estimate, "candidate_count", None)
 
     @staticmethod
+    def _estimate_request_count(estimate):
+        if estimate is None:
+            return None
+        if isinstance(estimate, dict):
+            return estimate.get("request_count")
+        return getattr(estimate, "request_count", None)
+
+    @staticmethod
+    def _estimate_source_sentence_count(estimate):
+        if estimate is None:
+            return 0
+        if isinstance(estimate, dict):
+            return estimate.get("source_sentence_card_count", 0)
+        return getattr(
+            estimate,
+            "source_sentence_card_count",
+            0)
+
+    @classmethod
+    def _estimate_has_work(cls, estimate):
+        candidate_count = cls._estimate_candidate_count(estimate)
+        request_count = cls._estimate_request_count(estimate)
+        return (
+            candidate_count != 0
+            or request_count not in (None, 0)
+            or cls._estimate_source_sentence_count(estimate) > 0)
+
+    @classmethod
+    def _estimate_requires_paid_authorization(cls, estimate):
+        request_count = cls._estimate_request_count(estimate)
+        if request_count is not None:
+            return request_count > 0
+        return cls._estimate_candidate_count(estimate) != 0
+
+    @staticmethod
     def _estimate_limit_warning(estimate):
         if estimate is None:
             return None
@@ -7910,15 +8541,16 @@ class AutoAnkiApp:
     def _update_source_generate_button_state(self):
         if not hasattr(self, "source_generate_button"):
             return
-        candidate_count = self._estimate_candidate_count(
-            self.source_estimate_result)
         available = (
             self.source_generate_callback is not None
             and self.source_estimate_result is not None
-            and candidate_count != 0
+            and self._estimate_has_work(self.source_estimate_result)
             and not self._estimate_limit_warning(
                 self.source_estimate_result)
-            and self.source_paid_authorized.get()
+            and (
+                not self._estimate_requires_paid_authorization(
+                    self.source_estimate_result)
+                or self.source_paid_authorized.get())
             and not self.source_action_in_progress)
         self.source_generate_button.configure(
             state=tk.NORMAL if available else tk.DISABLED)
@@ -7932,7 +8564,12 @@ class AutoAnkiApp:
             state=tk.NORMAL if available else tk.DISABLED)
 
     def _start_source_generation(self):
-        if not self.source_paid_authorized.get():
+        requires_paid_authorization = (
+            self._estimate_requires_paid_authorization(
+                self.source_estimate_result))
+        if (
+                requires_paid_authorization
+                and not self.source_paid_authorized.get()):
             messagebox.showwarning(
                 "Paid requests not authorized",
                 "Tick the paid-request authorization before generating.",
@@ -7946,9 +8583,7 @@ class AutoAnkiApp:
                 str(error),
                 parent=self.root)
             return
-        candidate_count = self._estimate_candidate_count(
-            self.source_estimate_result)
-        if candidate_count == 0:
+        if not self._estimate_has_work(self.source_estimate_result):
             messagebox.showinfo(
                 "No new vocabulary",
                 (
@@ -7957,7 +8592,9 @@ class AutoAnkiApp:
                 ),
                 parent=self.root)
             return
-        request["paid_confirmed"] = True
+        request["paid_confirmed"] = bool(
+            requires_paid_authorization
+            and self.source_paid_authorized.get())
         request["estimate"] = self.source_estimate_result
         self._dispatch_source_action(
             "generate",
@@ -8074,6 +8711,66 @@ class AutoAnkiApp:
                 "generate_cards": False,
             })
 
+    @staticmethod
+    def _dispatch_status_message(value, fallback):
+        if isinstance(value, dict):
+            message = value.get("message")
+        else:
+            message = getattr(value, "message", None)
+        return str(message or fallback)
+
+    def _refresh_source_dispatch_status(self):
+        if self.source_dispatch_status_loader is None:
+            self.source_dispatch_status.set(
+                "Emergency control unavailable")
+            return
+        try:
+            value = self.source_dispatch_status_loader({})
+        except Exception as error:
+            self.source_dispatch_status.set(
+                f"Could not read dispatch status · {error}")
+            return
+        status = (
+            value.get("status")
+            if isinstance(value, dict)
+            else None)
+        message = self._dispatch_status_message(value, "Ready")
+        self.source_dispatch_status.set(
+            f"Paused · {message}"
+            if status == "paused" and not message.startswith("Paused")
+            else message)
+
+    def _pause_source_dispatch(self):
+        if self.source_pause_callback is None:
+            self.source_dispatch_status.set(
+                "Emergency control unavailable")
+            return
+        self.source_dispatch_status.set("Pausing…")
+        try:
+            value = self.source_pause_callback({})
+        except Exception as error:
+            self.source_dispatch_status.set(
+                f"Pause failed · {error}")
+            return
+        message = self._dispatch_status_message(
+            value,
+            "No queued paid request will be sent.")
+        self.source_dispatch_status.set(f"Paused · {message}")
+        self.source_action_status.set(
+            "Emergency pause is active. Completed responses remain saved.")
+        self._refresh_source_jobs(show_errors=False)
+
+    def _resume_source_dispatch(self):
+        if self.source_resume_callback is None:
+            self.source_dispatch_status.set(
+                "Emergency control unavailable")
+            return
+        self.source_dispatch_status.set("Connecting…")
+        self._dispatch_source_action(
+            "resume",
+            self.source_resume_callback,
+            {})
+
     def _dispatch_source_action(self, action, callback, request):
         if callback is None:
             messagebox.showerror(
@@ -8093,6 +8790,7 @@ class AutoAnkiApp:
             "prepare": "Preparing and tokenizing the source…",
             "codex": "Codex is retrieving and preparing the source…",
             "retry": "Retrying the explicitly selected failed jobs…",
+            "resume": "Connecting…",
             "inspect": "Loading saved request and response details…",
             "validation_accept": (
                 "Saving the human review and rechecking the response…"),
@@ -8136,6 +8834,12 @@ class AutoAnkiApp:
                 state=retry_state)
             self.source_retry_all_button.configure(
                 state=retry_state)
+        if hasattr(self, "source_resume_button"):
+            self.source_resume_button.configure(
+                state=(
+                    tk.DISABLED
+                    if busy or self.source_resume_callback is None
+                    else tk.NORMAL))
         self._update_source_problem_button_state()
         self._update_validation_problem_button_states()
         self._update_source_generate_button_state()
@@ -8152,6 +8856,28 @@ class AutoAnkiApp:
             return
         self._set_source_action_busy(False)
         if outcome == "error":
+            if action == "resume":
+                error_text = str(value)
+                error_name = type(value).__name__.lower()
+                combined = f"{error_name} {error_text}".lower()
+                if "timeout" in combined:
+                    status = "Connection timeout"
+                elif any(
+                        marker in combined
+                        for marker in (
+                            "connection",
+                            "network",
+                            "socket",
+                            "dns",
+                            "unreachable",
+                        )):
+                    status = "No connection"
+                else:
+                    status = f"Resume failed · {error_text}"
+                self.source_dispatch_status.set(status)
+                self.source_action_status.set(status)
+                self._refresh_source_jobs(show_errors=False)
+                return
             self.source_action_status.set(
                 f"Source action failed · {value}")
             messagebox.showerror(
@@ -8166,6 +8892,15 @@ class AutoAnkiApp:
                 # new tick after a failed generation attempt.
                 self.source_paid_authorized.set(False)
                 self._schedule_source_estimate()
+            return
+
+        if action == "resume":
+            self._refresh_source_jobs(show_errors=False)
+            message = self._dispatch_status_message(
+                value,
+                "Successfully resumed")
+            self.source_dispatch_status.set(message)
+            self.source_action_status.set(message)
             return
 
         if action == "inspect":
@@ -8231,6 +8966,7 @@ class AutoAnkiApp:
                 "prepare": "Source preparation finished.",
                 "codex": "Codex retrieval and source preparation finished.",
                 "retry": "Selected retries finished.",
+                "resume": "Successfully resumed.",
             }.get(action, "Source action finished."))
         requires_attention = (
             isinstance(value, dict)
@@ -8261,6 +8997,8 @@ class AutoAnkiApp:
         self._schedule_source_estimate()
 
     def _refresh_source_jobs(self, *, show_errors=True):
+        if not getattr(self, "_source_jobs_page_built", False):
+            return
         if self.source_jobs_loader is None:
             if show_errors:
                 self.source_action_status.set(
@@ -9394,11 +10132,14 @@ class AutoAnkiApp:
             })
 
     def _generate_mode_changed(self, _event=None):
+        source_selected = (
+            hasattr(self, "generate_notebook")
+            and self.generate_notebook.select()
+            == str(self.from_source_tab))
+        if source_selected:
+            self._ensure_from_source_tab_built()
         self._refresh_card_setup_generation_context()
-        if (
-                hasattr(self, "generate_notebook")
-                and self.generate_notebook.select()
-                == str(self.from_source_tab)):
+        if source_selected:
             self._schedule_source_estimate()
 
     def _refresh_card_setup_generation_context(self):
@@ -9429,9 +10170,13 @@ class AutoAnkiApp:
                         and not self.source_preview_pending):
                     self._request_source_preview(offset=0)
         elif selected == str(self.source_jobs_page):
+            self._ensure_source_jobs_page_built()
             self._refresh_source_jobs(show_errors=False)
 
     def _build_pipeline_tab(self):
+        if self._pipeline_tab_built:
+            return
+        self._pipeline_tab_built = True
         tab = self.pipeline_tab
         tab.columnconfigure(0, weight=1)
         tab.rowconfigure(0, weight=1)
@@ -9500,8 +10245,16 @@ class AutoAnkiApp:
                 column=0,
                 sticky="w",
                 pady=(10, 0))
+        self._render_pipeline_rows()
+
+    def _ensure_pipeline_tab_built(self):
+        if not getattr(self, "_pipeline_tab_built", False):
+            self._build_pipeline_tab()
 
     def _build_advanced_tab(self):
+        if self._advanced_tab_built:
+            return
+        self._advanced_tab_built = True
         tab = self.advanced_tab
         tab.columnconfigure(0, weight=1)
         tab.rowconfigure(1, weight=1)
@@ -9566,9 +10319,13 @@ class AutoAnkiApp:
             for prompt in self.prompt_options
         }
         first_prompt_key = (
-            self.prompt_options[0].key
-            if self.prompt_options
-            else "")
+            self.gui_preferences["prompt_key"]
+            if self.gui_preferences["prompt_key"]
+            in self.prompt_options_by_key
+            else (
+                self.prompt_options[0].key
+                if self.prompt_options
+                else ""))
         self.prompt_selector_value = tk.StringVar(
             value=first_prompt_key)
         self.prompt_editing_enabled = tk.BooleanVar(value=False)
@@ -9718,8 +10475,16 @@ class AutoAnkiApp:
                 "No files were found in input/prompt_components.")
             self.prompt_selector.configure(state=tk.DISABLED)
             self.prompt_editing_checkbox.configure(state=tk.DISABLED)
+        self._install_advanced_preference_tracking()
+
+    def _ensure_advanced_tab_built(self):
+        if not getattr(self, "_advanced_tab_built", False):
+            self._build_advanced_tab()
 
     def _build_help_tab(self):
+        if self._help_tab_built:
+            return
+        self._help_tab_built = True
         tab = self.help_tab
         tab.columnconfigure(0, weight=1)
         tab.rowconfigure(0, weight=1)
@@ -9887,6 +10652,10 @@ class AutoAnkiApp:
                 "in the current Windows user's AppData\\Roaming\\AutoAnki "
                 "folder rather than inside the executable."))
         viewport.bind_mousewheel_tree()
+
+    def _ensure_help_tab_built(self):
+        if not getattr(self, "_help_tab_built", False):
+            self._build_help_tab()
 
     def _copy_anki_addon_code(self):
         self.root.clipboard_clear()
@@ -10226,9 +10995,12 @@ class AutoAnkiApp:
         self._update_pipeline_status()
 
     def get_pipeline_configs(self):
-        pipelines = tuple(
-            row.to_config()
-            for row in self.pipeline_rows)
+        pipelines = (
+            tuple(
+                row.to_config()
+                for row in self.pipeline_rows)
+            if self._pipeline_tab_built
+            else tuple(self.pipeline_configs))
         pipelines = pipeline_store.validate_pipelines(pipelines)
 
         for pipeline in pipelines:
@@ -10285,19 +11057,25 @@ class AutoAnkiApp:
     def _main_tab_changed(self, _event=None):
         selected_tab = self.notebook.select()
         if selected_tab == str(self.advanced_tab):
+            self._ensure_advanced_tab_built()
             self._refresh_prompt_selector_display()
             self.root.after_idle(
                 self._refresh_prompt_selector_display)
+            return
+        if selected_tab == str(self.help_tab):
+            self._ensure_help_tab_built()
             return
         if selected_tab == str(self.generate_tab):
             if (
                     hasattr(self, "generate_notebook")
                     and self.generate_notebook.select()
                     == str(self.from_source_tab)):
+                self._ensure_from_source_tab_built()
                 self._schedule_source_estimate()
             return
         if selected_tab != str(self.pipeline_tab):
             return
+        self._ensure_pipeline_tab_built()
         self.deck_status.set(
             "Connecting to Anki and refreshing decks…")
         self.refresh_anki_decks(launch_if_needed=True)
@@ -10324,6 +11102,7 @@ class AutoAnkiApp:
         return self.get_generation_language()
 
     def _generation_language_changed(self, _event=None):
+        self._ensure_pipeline_tab_built()
         language = self.get_generation_language()
         for editor in getattr(self, "pipeline_rows", ()):
             editor.refresh_generation_language()
@@ -10498,8 +11277,12 @@ class AutoAnkiApp:
         if self.source_estimate_after_id is not None:
             self.root.after_cancel(self.source_estimate_after_id)
             self.source_estimate_after_id = None
+        if self.preference_save_after_id is not None:
+            self.root.after_cancel(self.preference_save_after_id)
+            self.preference_save_after_id = None
         if self.save_pipeline_rows(show_errors=True) is None:
             return
+        self._save_gui_preferences()
         self.root.destroy()
 
     def start_generation(self):
@@ -10682,12 +11465,18 @@ class AutoAnkiApp:
 
     def _generate_in_background(self, words, pipelines):
         try:
+            execution_arguments = {
+                "progress_callback": lambda progress: (
+                    self.result_queue.put(
+                        ("pipeline_progress", progress))),
+            }
+            if self.paid_dispatch_control is not None:
+                execution_arguments["paid_dispatch_control"] = (
+                    self.paid_dispatch_control)
             summary = self.pipeline_executor(
                 words,
                 pipelines,
-                progress_callback=lambda progress: (
-                    self.result_queue.put(
-                        ("pipeline_progress", progress))))
+                **execution_arguments)
         except Exception as error:
             self.result_queue.put(("run_error", error))
             return

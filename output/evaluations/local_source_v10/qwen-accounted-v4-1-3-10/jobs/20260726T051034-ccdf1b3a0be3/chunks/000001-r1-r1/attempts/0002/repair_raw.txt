@@ -1,8 +1,0 @@
-{
-  "repairs": {
-    "p001": {
-      "sentence": "臣道君命，不敢有隱。",
-      "translation": "I speak the king's command, daring not to conceal anything."
-    }
-  }
-}

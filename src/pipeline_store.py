@@ -14,7 +14,7 @@ import runtime_paths
 import templates
 
 
-PIPELINE_CONFIG_VERSION = 7
+PIPELINE_CONFIG_VERSION = 8
 PIPELINE_CONFIG_FILE_NAME = "pipelines.json"
 ANKI_DECK_CACHE_FILE_NAME = "anki_decks.json"
 DEFAULT_PIPELINE_ID = "default-english-vocabulary"
@@ -148,6 +148,7 @@ class CardSettings:
     fields: tuple[FieldSetting, ...]
     target_deck: str
     field_languages: tuple[FieldSetting, ...] = ()
+    enhanced: bool = False
 
 
 @dataclass(frozen=True)
@@ -373,12 +374,25 @@ def get_effective_fields(settings, card):
         else card.fields)
 
 
+def enhanced_audio_supported(language_key):
+    """Whether the concrete source language has a configured local voice."""
+    return get_language(language_key).key not in {
+        "middle_english",
+        "old_english",
+        "latin",
+    }
+
+
 def get_enabled_cards(pipeline):
     settings = get_language_settings(
         pipeline,
         pipeline.language_key)
     return tuple(
-        card
+        (
+            card
+            if enhanced_audio_supported(pipeline.language_key)
+            else replace(card, enhanced=False)
+        )
         for card in settings.cards
         if card.enabled)
 
@@ -389,7 +403,8 @@ def get_card_type_keys(pipeline):
     return tuple(
         templates.get_direction_card_type(
             model_language_key,
-            card.direction_key).key
+            card.direction_key,
+            enhanced=card.enhanced).key
         for card in get_enabled_cards(pipeline))
 
 
@@ -414,7 +429,11 @@ def get_model_target_decks(pipeline):
         (
             templates.get_direction_card_type(
                 model_language_key,
-                direction_key).model.name,
+                direction_key,
+                enhanced=next(
+                    card.enhanced
+                    for card in get_enabled_cards(pipeline)
+                    if card.direction_key == direction_key)).model.name,
             target_deck,
         )
         for direction_key, target_deck
@@ -561,6 +580,8 @@ def _validate_language_settings(
         get_direction(card.direction_key)
         if not isinstance(card.enabled, bool):
             raise ValueError("Card enabled settings must be true or false.")
+        if not isinstance(card.enhanced, bool):
+            raise ValueError("Enhanced-card settings must be true or false.")
         fields = _validate_fields(
             card.fields,
             source_language_key,
@@ -956,7 +977,8 @@ def _card_settings_from_data(data, language_key):
         target_deck=data["target_deck"],
         field_languages=complete_field_languages(
             language_key,
-            saved_languages or fields))
+            saved_languages or fields),
+        enhanced=data.get("enhanced", False))
 
 
 def _language_settings_from_data(data):
@@ -1058,7 +1080,7 @@ def load_pipelines(path=None):
             pipelines = tuple(
                 _migrate_legacy_item(item)
                 for item in data["pipelines"])
-        elif version in (6, PIPELINE_CONFIG_VERSION):
+        elif version in (6, 7, PIPELINE_CONFIG_VERSION):
             pipelines = tuple(
                 pipeline_from_mapping(item)
                 for item in data["pipelines"])

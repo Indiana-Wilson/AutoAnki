@@ -180,7 +180,7 @@ class SourceGenerationModeGuiTests(unittest.TestCase):
         app.source_paid_authorized.set.assert_called_once_with(False)
         app._schedule_source_estimate.assert_called_once_with()
 
-    def test_switching_from_v8_to_v10_restores_low_reasoning(self):
+    def test_switching_from_v8_restores_the_previous_reasoning_choice(self):
         app = object.__new__(gui.AutoAnkiApp)
         app.source_request_protocol_label = variable(
             dict(gui.SOURCE_PROTOCOL_OPTIONS)["v8"])
@@ -199,7 +199,7 @@ class SourceGenerationModeGuiTests(unittest.TestCase):
             app.source_reasoning_label.set.call_args_list,
             [
                 call(dict(gui.SOURCE_REASONING_OPTIONS)["low"]),
-                call(dict(gui.SOURCE_REASONING_OPTIONS)["low"]),
+                call(dict(gui.SOURCE_REASONING_OPTIONS)["none"]),
             ])
         self.assertEqual(
             app.source_reasoning_selector.configure.call_args_list,

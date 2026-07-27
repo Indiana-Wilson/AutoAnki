@@ -1,8 +1,8 @@
 Define the following Latin words or expressions. For each entry, provide
-exactly four idiomatic Latin example sentences separated by the pipe character,
+exactly three idiomatic Latin example sentences separated by the pipe character,
 |, and a reconstructed Classical Latin IPA pronunciation.
 
-For those same four examples, provide four complete, natural English
+For those same three examples, provide three complete, natural English
 translations in the "Sentence Translations (English)" property, separated by |
 in exactly the same order. Translate each whole sentence, not only the defined
 expression, and never use | or HTML inside one translation.
@@ -24,13 +24,9 @@ of example sentences, without reusing sentences between senses, and make the
 intended sense unambiguously inferable from each sentence alone.
 
 Include the requested word or expression, or a grammatically appropriate
-inflected form, at least once in every sentence. In every sentence, wrap EVERY
-occurrence that expresses that card's particular sense in literal <strong>
-and </strong> tags, including relevant repeated and inflected occurrences. If
-the same spelling has a different meaning elsewhere in the sentence, do NOT
-embolden that occurrence. Every sentence must contain a nonempty
-<strong>...</strong> span. Use no other HTML or formatting. Use macrons where
-they are known and useful, while accepting
+inflected form, at least once in every sentence. Return plain text only, with
+no HTML or other formatting.
+Use macrons where they are known and useful, while accepting
 unmarked input. Anything in brackets is context for choosing the intended
 meaning but does not exclude other common meanings. Skip nonexistent entries;
 correct an obvious typo.

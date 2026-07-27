@@ -122,6 +122,7 @@ class SourceGenerationConfig:
     automatic_repair: bool = False
     max_automatic_repairs: int = MAX_AUTOMATIC_REPAIR_ATTEMPTS
     excluded_words: tuple[str, ...] = ()
+    retain_excluded_source_contexts: bool = False
     exclude_anki: AnkiExclusionSpec | None = None
     anki_exclusions: tuple[AnkiExclusionSpec, ...] = ()
 
@@ -244,6 +245,16 @@ class SourceGenerationConfig:
                 not isinstance(word, str)
                 for word in self.excluded_words):
             raise ValueError("Excluded vocabulary entries must be text.")
+        if not isinstance(self.retain_excluded_source_contexts, bool):
+            raise ValueError(
+                "Retaining source contexts for excluded words must be "
+                "enabled or disabled.")
+        if (
+                self.retain_excluded_source_contexts
+                and self.context_mode is ContextMode.NONE):
+            raise ValueError(
+                "Retaining source contexts for sentence cards requires a "
+                "context mode other than None.")
         if (
                 self.exclude_anki is not None
                 and not isinstance(self.exclude_anki, AnkiExclusionSpec)):
@@ -313,6 +324,11 @@ class SourceGenerationConfig:
                 "max_automatic_repairs",
                 MAX_AUTOMATIC_REPAIR_ATTEMPTS),
             excluded_words=tuple(value.get("excluded_words", ())),
+            retain_excluded_source_contexts=value.get(
+                "retain_excluded_source_contexts",
+                bool(value.get(
+                    "use_source_for_example_sentences",
+                    False))),
             exclude_anki=AnkiExclusionSpec.from_mapping(
                 exclusion_value),
             anki_exclusions=tuple(
@@ -514,9 +530,58 @@ class GenerationChunk:
     end_rank: int
     words: tuple[GenerationWord, ...]
     contexts: tuple[ContextUnit, ...]
+    # Excluded/previously learned words can still anchor a retained source
+    # sentence card. They are persisted for ordering and attribution, but are
+    # deliberately omitted from the provider payload's lexical ``words``
+    # collection so no definition is requested or packaged for them.
+    context_anchors: tuple[GenerationWord, ...] = ()
+    # A retained context can be repeated as lexical input when one sentence
+    # straddles a word-count chunk boundary, but its sentence translation is
+    # owned by exactly one chunk. ``None`` preserves legacy saved chunks,
+    # where every retained context was a translation target; an explicit
+    # empty tuple means this chunk owns no source-sentence translation.
+    source_context_translation_ids: tuple[str, ...] | None = None
+
+    def __post_init__(self):
+        target_ids = self.source_context_translation_ids
+        if target_ids is None:
+            return
+        if not isinstance(target_ids, (tuple, list)):
+            raise TypeError(
+                "Source-context translation IDs must be a sequence.")
+        target_ids = tuple(target_ids)
+        if (
+                any(
+                    not isinstance(context_id, str) or not context_id
+                    for context_id in target_ids)
+                or len(target_ids) != len(set(target_ids))):
+            raise ValueError(
+                "Source-context translation IDs must be unique non-empty "
+                "strings.")
+        retained_ids = {
+            context.context_id
+            for context in self.contexts
+        }
+        if not set(target_ids) <= retained_ids:
+            raise ValueError(
+                "Every source-context translation ID must identify a "
+                "retained context in the same chunk.")
+        object.__setattr__(
+            self,
+            "source_context_translation_ids",
+            target_ids)
+
+    @property
+    def requested_source_context_ids(self):
+        """Return translation targets while preserving legacy chunk meaning."""
+        if self.source_context_translation_ids is None:
+            return tuple(
+                context.context_id
+                for context in self.contexts)
+        return self.source_context_translation_ids
 
     def to_dict(self):
-        return {
+        value = {
             "chunk_id": self.chunk_id,
             "index": self.index,
             "total": self.total,
@@ -524,7 +589,15 @@ class GenerationChunk:
             "end_rank": self.end_rank,
             "words": [word.to_dict() for word in self.words],
             "contexts": [context.to_dict() for context in self.contexts],
+            "context_anchors": [
+                word.to_dict()
+                for word in self.context_anchors
+            ],
         }
+        if self.source_context_translation_ids is not None:
+            value["source_context_translation_ids"] = list(
+                self.source_context_translation_ids)
+        return value
 
     def request_payload(self):
         """Return the compact object appended to the generation prompt."""
@@ -553,7 +626,7 @@ class GenerationChunk:
                         word.occurrence_locator.to_dict())
             return value
 
-        return {
+        value = {
             "chunk_id": self.chunk_id,
             "rank_range": [self.start_rank, self.end_rank],
             "words": [
@@ -568,6 +641,10 @@ class GenerationChunk:
                 for context in self.contexts
             ],
         }
+        if self.source_context_translation_ids is not None:
+            value["source_context_translation_ids"] = list(
+                self.source_context_translation_ids)
+        return value
 
     @classmethod
     def from_dict(cls, value):
@@ -589,6 +666,13 @@ class GenerationChunk:
                         "word_ranks": tuple(context["word_ranks"]),
                     })
                 for context in value["contexts"]),
+            context_anchors=tuple(
+                GenerationWord(**word)
+                for word in value.get("context_anchors", ())),
+            source_context_translation_ids=(
+                tuple(value["source_context_translation_ids"])
+                if "source_context_translation_ids" in value
+                else None),
         )
 
 

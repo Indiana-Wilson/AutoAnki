@@ -10,9 +10,22 @@ import pipeline_store
 import prompt_builder
 from response_schema import bounded_response_format_name
 import runtime_paths
-from openai import OpenAI
 import os
 from pathlib import Path
+import tempfile
+
+
+def OpenAI(*args, **kwargs):
+    """Construct the SDK client without importing it during GUI startup.
+
+    Importing the OpenAI SDK accounts for roughly a third of a second of the
+    application's cold-start time.  Keeping this compatibility wrapper under
+    the historical name also leaves existing callers and test injection
+    points unchanged.
+    """
+    from openai import OpenAI as OpenAIClient
+
+    return OpenAIClient(*args, **kwargs)
 
 
 PROJECT_ROOT = runtime_paths.get_resource_root()
@@ -157,6 +170,26 @@ _WANG_BI_COMPACT_CONTEXTUAL_FIELDS = {
         "Part of Speech (English)": "stative verb / adjective",
     },
 }
+
+
+def _source_context_translation_ids(chunk, retained_context_ids):
+    """Resolve new per-chunk owners without changing legacy chunk semantics."""
+    retained_context_ids = tuple(retained_context_ids)
+    explicit = getattr(
+        chunk,
+        "source_context_translation_ids",
+        None)
+    target_ids = (
+        retained_context_ids
+        if explicit is None
+        else tuple(explicit))
+    if (
+            len(target_ids) != len(set(target_ids))
+            or not set(target_ids) <= set(retained_context_ids)):
+        raise ValueError(
+            "Source-context translation targets must be unique retained "
+            "context IDs.")
+    return target_ids
 SOURCE_CONTEXTUAL_CARDS_KEY = "contextual_cards"
 SOURCE_ADDITIONAL_SENSE_CARDS_KEY = "additional_sense_cards"
 SOURCE_TERM_RESULTS_KEY = "term_results"
@@ -1413,9 +1446,6 @@ def build_grouped_source_response_format(
         ) from error
     if not isinstance(chunk_id, str) or not chunk_id:
         raise ValueError("A source generation chunk requires an identifier.")
-    if not words:
-        raise ValueError(
-            "A grouped source response format requires at least one word.")
 
     rank_keys = []
     rank_words = {}
@@ -1462,6 +1492,9 @@ def build_grouped_source_response_format(
         raise ValueError(
             "Every grouped source word must reference a context in its "
             "chunk.")
+    translation_context_ids = _source_context_translation_ids(
+        chunk,
+        context_ids)
 
     term_field = pipeline_store.get_language(
         pipeline.language_key).term_field
@@ -1631,9 +1664,9 @@ def build_grouped_source_response_format(
                                 "of this entire retained source context, "
                                 "without HTML or a pipe delimiter."),
                         })
-                    for context_id in context_ids
+                    for context_id in translation_context_ids
                 },
-                "required": context_ids,
+                "required": list(translation_context_ids),
                 "additionalProperties": False,
             },
         },
@@ -1693,6 +1726,7 @@ def build_compact_source_response_format(
             "Compact source results require the Context card direction.")
     word_count = None
     context_count = None
+    translation_context_ids = None
     if chunk is not None:
         try:
             words = tuple(chunk.words)
@@ -1701,12 +1735,14 @@ def build_compact_source_response_format(
             raise TypeError(
                 "A bounded compact source response format requires a "
                 "generation chunk.") from error
-        if not words:
-            raise ValueError(
-                "A bounded compact source response format requires at least "
-                "one word.")
         word_count = len(words)
-        context_count = len(contexts)
+        translation_context_ids = _source_context_translation_ids(
+            chunk,
+            (
+                context.context_id
+                for context in contexts
+            ))
+        context_count = len(translation_context_ids)
     if include_occurrence_sense_indices is None:
         include_occurrence_sense_indices = bool(
             protocol_version == 10
@@ -1947,6 +1983,7 @@ def fetch_response(
         words,
         *,
         client=None,
+        paid_dispatch_control=None,
         prompt_path=None,
         response_path=None,
         response_log_path=None,
@@ -1978,12 +2015,18 @@ def fetch_response(
         response_format = build_response_format(
             default_pipeline)
 
-    response = client.responses.create(
-        model="gpt-5.4-mini",
-        input=prompt_text + words,
-        reasoning={"effort": "none"},
-        text={"format": response_format},
-    )
+    request_options = {
+        "model": "gpt-5.4-mini",
+        "input": prompt_text + words,
+        "reasoning": {"effort": "none"},
+        "text": {"format": response_format},
+    }
+    request_operation = (
+        lambda: client.responses.create(**request_options))
+    response = (
+        paid_dispatch_control.dispatch(request_operation)
+        if paid_dispatch_control is not None
+        else request_operation())
 
     result = extract_response_text(response)
 
@@ -2073,6 +2116,8 @@ def process_json_text(
         allow_accepted_content_problems=False,
         enforce_sentence_count=True,
         require_sentence_translations=True,
+        audio_service=None,
+        audio_media_directory=None,
         **_legacy_arguments):
     if deck is None:
         deck = templates.my_deck
@@ -2093,6 +2138,73 @@ def process_json_text(
             allow_accepted_content_problems),
         enforce_sentence_count=enforce_sentence_count,
         require_sentence_translations=require_sentence_translations)
+    enhanced_cards = tuple(
+        card
+        for card in enabled_cards
+        if card.enhanced)
+    audio_artifacts_by_slot = {}
+    enhanced_sentences = {}
+    all_audio_artifacts = ()
+    if enhanced_cards:
+        import enhanced_audio
+
+        requests = []
+        slots = []
+        has_word_audio = any(
+            card.direction_key in {
+                "word_to_meaning",
+                "meaning_to_word",
+            }
+            for card in enhanced_cards)
+        has_sentence_audio = any(
+            card.direction_key == "context"
+            for card in enhanced_cards)
+        for note_index, note_data in enumerate(validated_notes):
+            term = note_data[language.term_field]
+            if has_word_audio:
+                slots.append(("word", note_index))
+                requests.append(enhanced_audio.AudioRequest(
+                    term,
+                    pipeline.language_key,
+                    "word"))
+            if has_sentence_audio:
+                sentences = note_data.get("Sentences", "").split("|")
+                translations = note_data.get(
+                    SENTENCE_TRANSLATIONS_FIELD_NAME,
+                    "").split("|")
+                if (
+                        not sentences
+                        or not sentences[0].strip()
+                        or len(sentences) != len(translations)):
+                    raise ValueError(
+                        "Enhanced Sentence → Meaning cards require aligned "
+                        "example sentences and English translations.")
+                choice = enhanced_audio.deterministic_choice_index(
+                    len(sentences),
+                    guid_seed or pipeline.pipeline_id,
+                    pipeline.language_key,
+                    term,
+                    note_index)
+                selected_sentence = emphasize_term_in_sentences(
+                    sentences[choice],
+                    term,
+                    pipeline.language_key)
+                selected_translation = sanitize_sentence_translations(
+                    translations[choice])
+                enhanced_sentences[note_index] = (
+                    selected_sentence,
+                    selected_translation)
+                slots.append(("sentence", note_index))
+                requests.append(enhanced_audio.AudioRequest(
+                    selected_sentence,
+                    pipeline.language_key,
+                    "sentence"))
+        service = audio_service or enhanced_audio.LocalTTSService()
+        all_audio_artifacts = service.synthesize_many(requests)
+        audio_artifacts_by_slot = dict(zip(
+            slots,
+            all_audio_artifacts,
+            strict=True))
     if (
             due_start is not None
             and (
@@ -2103,7 +2215,7 @@ def process_json_text(
             "Anki new-card ordering must start at a positive integer.")
 
     notes_created = 0
-    for note_data in validated_notes:
+    for note_index, note_data in enumerate(validated_notes):
         sentences = note_data.get("Sentences", "")
         if sentences:
             sentences = emphasize_term_in_sentences(
@@ -2119,7 +2231,8 @@ def process_json_text(
         for card in enabled_cards:
             selected_card_type = templates.get_direction_card_type(
                 model_language_key,
-                card.direction_key)
+                card.direction_key,
+                enhanced=card.enhanced)
             effective_fields = pipeline_store.get_effective_fields(
                 language_settings,
                 card)
@@ -2140,6 +2253,46 @@ def process_json_text(
                 ),
                 sentence_translations,
             ]
+            if card.enhanced:
+                import enhanced_audio
+
+                presentation_key = (
+                    enhanced_audio.deterministic_presentation_key(
+                        guid_seed or pipeline.pipeline_id,
+                        pipeline.language_key,
+                        card.direction_key,
+                        note_data[language.term_field],
+                        note_index))
+                audio_first = (
+                    card.direction_key in {
+                        "context",
+                        "word_to_meaning",
+                    }
+                    and enhanced_audio.deterministic_audio_first(
+                        presentation_key))
+                selected_sentence, selected_translation = (
+                    enhanced_sentences.get(
+                        note_index,
+                        ("", "")))
+                word_artifact = audio_artifacts_by_slot.get(
+                    ("word", note_index))
+                sentence_artifact = audio_artifacts_by_slot.get(
+                    ("sentence", note_index))
+                fields.extend([
+                    (
+                        f"[sound:{word_artifact.media_filename}]"
+                        if word_artifact is not None
+                        else ""),
+                    selected_sentence,
+                    selected_translation,
+                    (
+                        f"[sound:{sentence_artifact.media_filename}]"
+                        if sentence_artifact is not None
+                        else ""),
+                    "1" if audio_first else "",
+                    "" if audio_first else "1",
+                    presentation_key,
+                ])
             note_arguments = {
                 "model": selected_card_type.model,
                 "fields": fields,
@@ -2168,7 +2321,38 @@ def process_json_text(
 
     # Export the notes into a deck
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    genanki.Package(deck).write_to_file(output_path)
+    if all_audio_artifacts:
+        import enhanced_audio
+
+        if audio_media_directory is None:
+            with tempfile.TemporaryDirectory(
+                    prefix=".autoanki-audio-",
+                    dir=output_path.parent) as directory:
+                media_directory = Path(directory)
+                enhanced_audio.materialize_media(
+                    all_audio_artifacts,
+                    media_directory)
+                genanki.Package(
+                    deck,
+                    media_files=[
+                        str(media_directory / artifact.media_filename)
+                        for artifact in dict.fromkeys(all_audio_artifacts)
+                    ],
+                ).write_to_file(output_path)
+        else:
+            media_directory = Path(audio_media_directory)
+            enhanced_audio.materialize_media(
+                all_audio_artifacts,
+                media_directory)
+            genanki.Package(
+                deck,
+                media_files=[
+                    str(media_directory / artifact.media_filename)
+                    for artifact in dict.fromkeys(all_audio_artifacts)
+                ],
+            ).write_to_file(output_path)
+    else:
+        genanki.Package(deck).write_to_file(output_path)
     print("Card deck successfully created.")
     return notes_created
 
@@ -2182,6 +2366,7 @@ def generate_deck(
         words,
         *,
         client=None,
+        paid_dispatch_control=None,
         prompt_path=None,
         response_path=None,
         response_log_path=None,
@@ -2191,6 +2376,7 @@ def generate_deck(
         pipeline=None,
         prompt_text=None,
         guid_seed=None,
+        audio_service=None,
         **_legacy_arguments):
     """Generate one fresh Anki deck from the supplied words."""
     response_path = Path(response_path or RESPONSE_PATH)
@@ -2198,22 +2384,41 @@ def generate_deck(
         response_log_path or RESPONSE_LOG_PATH)
     output_path = Path(output_path or DECK_PATH)
     pipeline = pipeline or pipeline_store.default_pipeline()
+    pipeline_store.validate_pipelines((pipeline,))
+    if any(
+            card.enhanced
+            for card in pipeline_store.get_enabled_cards(pipeline)):
+        import enhanced_audio
+
+        enhanced_audio.require_tts_ready(
+            pipeline.language_key,
+            service=audio_service)
     if prompt_text is None and prompt_path is None:
         prompt_text = prompt_builder.build_prompt(pipeline)
+    fetch_arguments = {
+        "client": client,
+        "prompt_path": prompt_path,
+        "prompt_text": prompt_text,
+        "response_path": response_path,
+        "response_log_path": response_log_path,
+        "response_format": build_response_format(pipeline),
+    }
+    if paid_dispatch_control is not None:
+        fetch_arguments["paid_dispatch_control"] = paid_dispatch_control
     response_text = fetch_response(
         words,
-        client=client,
-        prompt_path=prompt_path,
-        prompt_text=prompt_text,
-        response_path=response_path,
-        response_log_path=response_log_path,
-        response_format=build_response_format(pipeline))
+        **fetch_arguments)
+    process_arguments = {
+        "deck": templates.create_deck(deck_id, deck_name),
+        "output_path": output_path,
+        "pipeline": pipeline,
+        "guid_seed": guid_seed,
+    }
+    if audio_service is not None:
+        process_arguments["audio_service"] = audio_service
     process_json_text(
         response_text,
-        deck=templates.create_deck(deck_id, deck_name),
-        output_path=output_path,
-        pipeline=pipeline,
-        guid_seed=guid_seed,
+        **process_arguments,
     )
     return output_path
 

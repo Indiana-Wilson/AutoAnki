@@ -28,6 +28,8 @@ from source_generation import (
     AnkiExclusionSpec,
     GenerationJobRunner,
     MODEL_MAX_OUTPUT_TOKENS,
+    PaidDispatchControl,
+    PaidDispatchPaused,
     PaidResponse,
     SOURCE_REQUEST_MODEL,
     SourceGenerationBackend,
@@ -327,6 +329,8 @@ class SourceWorkflowController:
                 codex_source_retrieval.create_retrieval_job),
             retrieval_job_runner=(
                 codex_source_retrieval.run_retrieval_job),
+            paid_dispatch_control=None,
+            audio_service_factory=None,
             clock=time.monotonic):
         self.anki_client_factory = anki_client_factory
         self.openai_client_factory = (
@@ -340,11 +344,17 @@ class SourceWorkflowController:
         self.source_preparer = source_preparer
         self.retrieval_job_creator = retrieval_job_creator
         self.retrieval_job_runner = retrieval_job_runner
+        self.paid_dispatch_control = (
+            paid_dispatch_control
+            if paid_dispatch_control is not None
+            else PaidDispatchControl())
+        self.audio_service_factory = audio_service_factory
+        self._audio_service_instance = None
         self.clock = clock
         self._anki_vocabulary_cache = {}
         self._anki_cache_seconds = 30
         self._anki_cache_lock = threading.RLock()
-        self._active_jobs = set()
+        self._active_jobs = {}
         self._active_lock = threading.RLock()
         self.backend = backend or SourceGenerationBackend(
             exclusion_resolver=self._resolve_anki_exclusion)
@@ -361,6 +371,10 @@ class SourceWorkflowController:
             "source_prepare_callback": self.prepare,
             "source_codex_callback": self.retrieve_with_codex,
             "source_jobs_loader": self.job_rows,
+            "source_pause_callback": self.pause_paid_dispatch,
+            "source_resume_callback": self.resume_paid_dispatch,
+            "source_dispatch_status_loader": self.paid_dispatch_status,
+            "paid_dispatch_control": self.paid_dispatch_control,
             "source_retry_callback": self.retry,
             "source_inspect_callback": self.inspect,
             "source_validation_accept_callback": (
@@ -370,11 +384,270 @@ class SourceWorkflowController:
             "manual_input_filter_callback": self.filter_manual_input,
         }
 
+    def paid_dispatch_status(self, _request=None):
+        """Return the emergency paid-dispatch gate's current GUI state."""
+        state = self.paid_dispatch_control.status()
+        paused = state["paused"]
+        return {
+            **state,
+            "status": "paused" if paused else "ready",
+            "message": (
+                "Emergency pause active"
+                if paused
+                else "Ready"),
+        }
+
+    def pause_paid_dispatch(self, _request=None):
+        """Stop admitting queued OpenAI calls without waiting on in-flight I/O."""
+        state = self.paid_dispatch_control.pause()
+        active = state["active_dispatches"]
+        return {
+            **state,
+            "status": "paused",
+            "message": (
+                "Emergency pause active. No queued paid request will be "
+                "sent."
+                + (
+                    f" {active:,} request(s) already in flight may finish."
+                    if active
+                    else "")),
+        }
+
+    def _safe_resume_targets(self, requested_job_ids=None):
+        """Recover only undispatched/interrupted/connection-failed chunks."""
+        requested = (
+            None
+            if requested_job_ids is None
+            else set(requested_job_ids))
+        targets = {}
+        for snapshot in self.backend.jobs.list():
+            job_id = snapshot.job_id
+            if requested is not None and job_id not in requested:
+                continue
+            self.backend.jobs.recover_interrupted(job_id)
+            connection_failed = tuple(
+                chunk_id
+                for chunk_id in self.backend.jobs.chunk_ids(job_id)
+                if self.backend.jobs.chunk_status(
+                    job_id,
+                    chunk_id)["status"] == "connection_failed")
+            if connection_failed:
+                self.backend.jobs.reset_for_manual_retry(
+                    job_id,
+                    connection_failed)
+            pending = tuple(
+                chunk_id
+                for chunk_id in self.backend.jobs.chunk_ids(job_id)
+                if self.backend.jobs.chunk_status(
+                    job_id,
+                    chunk_id)["status"] == "pending")
+            if pending:
+                targets[job_id] = pending
+        return targets
+
+    def resume_paid_dispatch(self, request=None):
+        """Reopen paid dispatch and safely continue recoverable saved work.
+
+        This intentionally excludes semantic-invalid, cancelled, and generic
+        failed chunks.  Those still require the existing explicit inspection
+        and retry flow.
+        """
+        request = request if isinstance(request, dict) else {}
+        requested_job_ids = None
+        if request.get("job_ids"):
+            requested_job_ids = {
+                self.backend.split_row_id(row_id)[0]
+                for row_id in request["job_ids"]
+            }
+        targets = self._safe_resume_targets(requested_job_ids)
+        pipelines = self._preflight_job_pipelines(targets)
+        # Keep the emergency gate closed if any selected job cannot complete
+        # its required local-audio stage.  In particular, do not resume and
+        # dispatch an earlier standard job before discovering that a later
+        # Enhanced job has no usable GPU runtime.
+        self.paid_dispatch_control.resume()
+        resumed_jobs = 0
+        resumed_chunks = 0
+        for job_id, chunk_ids in targets.items():
+            pipeline = pipelines[job_id]
+            client = self._client_for_job(job_id)
+            self._mark_active(job_id, True)
+            try:
+                execution_mode = self._manifest(
+                    job_id).get(
+                        "plan",
+                        {}).get("config", {}).get(
+                            "execution_mode",
+                            "standard")
+                snapshot = (
+                    self._run_job(
+                        job_id,
+                        pipeline,
+                        client,
+                        chunk_ids)
+                    if execution_mode == "economy"
+                    else self._run_standard_retry_targets(
+                        job_id,
+                        chunk_ids,
+                        pipeline,
+                        client))
+                self._finalize_if_complete(
+                    job_id,
+                    pipeline,
+                    snapshot)
+            finally:
+                self._mark_active(job_id, False)
+            resumed_jobs += 1
+            resumed_chunks += len(chunk_ids)
+        resumed_statuses = tuple(
+            self.backend.jobs.chunk_status(job_id, chunk_id)
+            for job_id, chunk_ids in targets.items()
+            for chunk_id in chunk_ids)
+        connection_failures = tuple(
+            status
+            for status in resumed_statuses
+            if status.get("status") == "connection_failed")
+        attention_count = sum(
+            1
+            for status in resumed_statuses
+            if status.get("status") in {
+                "failed",
+                "invalid_response",
+            })
+        timeout_failure = any(
+            "timeout" in str(
+                (status.get("last_error") or {}).get(
+                    "type",
+                    "")).lower()
+            for status in connection_failures)
+        no_connection_failure = any(
+            any(
+                marker in str(
+                    (status.get("last_error") or {}).get(
+                        "type",
+                        "")).lower()
+                for marker in (
+                    "connection",
+                    "network",
+                    "socket",
+                    "dns",
+                    "oserror",
+                ))
+            for status in connection_failures)
+        gate_status = self.paid_dispatch_status()
+        if gate_status["paused"]:
+            result_status = "paused"
+            result_message = "Emergency pause active"
+        elif timeout_failure:
+            result_status = "connection_timeout"
+            result_message = "Connection timeout"
+        elif no_connection_failure:
+            result_status = "no_connection"
+            result_message = "No connection"
+        elif connection_failures:
+            result_status = "connection_failed"
+            result_message = "Connection/API retry failed"
+        elif attention_count:
+            result_status = "requires_attention"
+            result_message = (
+                f"Resumed, but {attention_count:,} response(s) now need "
+                "inspection.")
+        else:
+            result_status = "success"
+            result_message = (
+                "Successfully resumed"
+                + (
+                    f" {resumed_chunks:,} queued/interrupted request(s) "
+                    f"across {resumed_jobs:,} job(s)."
+                    if resumed_chunks
+                    else ". No queued or connection-failed requests remain."
+                ))
+        return {
+            **gate_status,
+            "status": result_status,
+            "resumed_jobs": resumed_jobs,
+            "resumed_chunks": resumed_chunks,
+            "message": result_message,
+        }
+
     def catalogue(self):
         return self.backend.catalogue()
 
     def estimate(self, request):
         return self.backend.estimate(request)
+
+    def enhanced_audio_status(self, pipeline):
+        """Return the readiness needed by a pipeline's enabled audio cards."""
+        pipeline = pipeline_store.pipeline_from_mapping(pipeline)
+        enhanced_cards = tuple(
+            card
+            for card in pipeline_store.get_enabled_cards(pipeline)
+            if card.enhanced)
+        if not enhanced_cards:
+            return {
+                "required": False,
+                "ready": True,
+                "message": "Enhanced audio is not selected.",
+            }
+        service = self._audio_service()
+        status = service.backend_status(pipeline.language_key)
+        return {
+            "required": True,
+            "ready": status.ready,
+            "backend": status.backend,
+            "model_id": status.model_id,
+            "device_name": status.device_name,
+            "gpu_available": status.gpu_available,
+            "runtime_available": status.runtime_available,
+            "message": status.message,
+        }
+
+    def _require_enhanced_audio_ready(self, pipeline):
+        status = self.enhanced_audio_status(pipeline)
+        if not status["required"]:
+            return status
+        if not status["ready"]:
+            import enhanced_audio
+
+            raise enhanced_audio.TTSRuntimeUnavailableError(
+                "Enhanced cards were selected, but local GPU audio is not "
+                f"ready: {status['message']} No OpenAI request was sent.")
+        return status
+
+    def _preflight_job_pipelines(self, job_ids):
+        """Load every job pipeline and check all required audio up front.
+
+        Recovery actions can span jobs that use different languages and TTS
+        backends.  Keeping this as a distinct operation-wide phase prevents a
+        paid request for an earlier job from being admitted before a later
+        job's missing local runtime is discovered.
+        """
+        pipelines = {
+            job_id: self._pipeline_for_job(job_id)
+            for job_id in dict.fromkeys(job_ids)
+        }
+        checked_languages = set()
+        for pipeline in pipelines.values():
+            if not any(
+                    card.enhanced
+                    for card in pipeline_store.get_enabled_cards(pipeline)):
+                continue
+            if pipeline.language_key in checked_languages:
+                continue
+            self._require_enhanced_audio_ready(pipeline)
+            checked_languages.add(pipeline.language_key)
+        return pipelines
+
+    def _audio_service(self):
+        if self._audio_service_instance is None:
+            if self.audio_service_factory is not None:
+                self._audio_service_instance = self.audio_service_factory()
+            else:
+                import enhanced_audio
+
+                self._audio_service_instance = (
+                    enhanced_audio.LocalTTSService())
+        return self._audio_service_instance
 
     def _openai_client(self):
         api_key = process_text.get_api_key()
@@ -651,25 +924,46 @@ class SourceWorkflowController:
         return contract, "legacy_reconstructed"
 
     @staticmethod
-    def _response_format_for_chunk(request_contract, chunk_id):
-        if not source_request_uses_grouped_source_results(
-                request_contract):
-            return request_contract["response_format"]
+    def _response_format_for_chunk(request_contract, chunk):
+        chunk_id = (
+            chunk
+            if isinstance(chunk, str)
+            else getattr(chunk, "chunk_id", None))
+        if not isinstance(chunk_id, str) or not chunk_id:
+            raise ValueError(
+                "A source response format requires a valid chunk ID.")
         response_formats = request_contract.get(
             "response_formats_by_chunk")
+        use_per_chunk_format = (
+            source_request_uses_grouped_source_results(
+                request_contract)
+            or (
+                request_contract.get("schema_version") == 10
+                and not isinstance(chunk, str)
+                and getattr(
+                    chunk,
+                    "source_context_translation_ids",
+                    None) is not None))
         if (
-                not isinstance(response_formats, dict)
-                or chunk_id not in response_formats):
+                use_per_chunk_format
+                and isinstance(response_formats, dict)
+                and chunk_id in response_formats):
+            return response_formats[chunk_id]
+        if use_per_chunk_format:
             raise ValueError(
                 "The saved source request contract has no response format "
                 f"for chunk {chunk_id}.")
-        return response_formats[chunk_id]
+        # Frozen v9 and pre-bounded v10 jobs deliberately retain their one
+        # reusable schema. Their request bytes and retry semantics stay
+        # unchanged.
+        return request_contract["response_format"]
 
     def _request_options(
             self,
             request_contract,
             chunk,
-            source_context_translation_memory_by_chunk=None):
+            source_context_translation_memory_by_chunk=None,
+            response_format_override=None):
         try:
             max_output_tokens = request_contract[
                 "max_output_tokens_by_chunk"][chunk.chunk_id]
@@ -683,10 +977,13 @@ class SourceWorkflowController:
                 source_context_translation_memory_by_chunk,
                 dict)
             else {})
-        expected_context_ids = {
-            context.context_id
-            for context in chunk.contexts
-        }
+        expected_context_ids = set(
+            getattr(
+                chunk,
+                "requested_source_context_ids",
+                tuple(
+                    context.context_id
+                    for context in chunk.contexts)))
         chunk_memory = {
             context_id: hit
             for context_id, hit in memory_by_chunk.get(
@@ -703,9 +1000,12 @@ class SourceWorkflowController:
         request_input = (
             request_contract["composed_prompt"]
             + rendered_payload)
-        response_format = self._response_format_for_chunk(
-            request_contract,
-            chunk.chunk_id)
+        response_format = (
+            response_format_override
+            if response_format_override is not None
+            else self._response_format_for_chunk(
+                request_contract,
+                chunk))
         request_options = {
             "model": request_contract["model"],
             "input": request_input,
@@ -734,14 +1034,136 @@ class SourceWorkflowController:
             request_contract,
             source_context_translation_memory_by_chunk=None):
         def request(chunk):
-            response = client.responses.create(
-                **self._request_options(
-                    request_contract,
-                    chunk,
-                    source_context_translation_memory_by_chunk))
+            local_response = self._locally_satisfied_chunk_response(
+                request_contract,
+                chunk,
+                source_context_translation_memory_by_chunk)
+            if local_response is not None:
+                return local_response
+            request_options = self._request_options(
+                request_contract,
+                chunk,
+                source_context_translation_memory_by_chunk)
+            response = self.paid_dispatch_control.dispatch(
+                lambda: client.responses.create(**request_options))
             return _paid_response(response)
 
         return request
+
+    @staticmethod
+    def _locally_satisfied_chunk_response(
+            request_contract,
+            chunk,
+            source_context_translation_memory_by_chunk=None):
+        """Return a provider-shaped no-op only when all work is local."""
+        if chunk.words:
+            return None
+        target_ids = set(
+            getattr(
+                chunk,
+                "requested_source_context_ids",
+                tuple(
+                    context.context_id
+                    for context in chunk.contexts)))
+        memory_by_chunk = (
+            source_context_translation_memory_by_chunk
+            if isinstance(
+                source_context_translation_memory_by_chunk,
+                dict)
+            else {})
+        remembered_ids = set(
+            memory_by_chunk.get(
+                chunk.chunk_id,
+                ()))
+        if not target_ids <= remembered_ids:
+            return None
+        empty_collection = (
+            {}
+            if source_request_uses_grouped_source_results(
+                request_contract)
+            else [])
+        return json.dumps(
+            {
+                process_text.SOURCE_TERM_RESULTS_KEY: empty_collection,
+                process_text.SOURCE_CONTEXT_TRANSLATIONS_KEY: (
+                    empty_collection),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"))
+
+    def _complete_locally_satisfied_chunks(
+            self,
+            job_id,
+            pipeline,
+            request_contract,
+            source_context_translation_memory_by_chunk,
+            chunk_ids=None):
+        """Persist trusted no-op chunks without opening a provider request."""
+        available = self.backend.jobs.chunk_ids(job_id)
+        selected = (
+            set(available)
+            if chunk_ids is None
+            else set(chunk_ids))
+        validator = self._response_validator(
+            pipeline,
+            request_contract,
+            source_context_translation_memory_by_chunk)
+        for chunk_id in available:
+            if (
+                    chunk_id not in selected
+                    or self.backend.jobs.chunk_status(
+                        job_id,
+                        chunk_id)["status"] != "pending"):
+                continue
+            chunk = self.backend.jobs.load_chunk(
+                job_id,
+                chunk_id)
+            raw_text = self._locally_satisfied_chunk_response(
+                request_contract,
+                chunk,
+                source_context_translation_memory_by_chunk)
+            if raw_text is None:
+                continue
+            # Validate before changing durable state. Any programming or
+            # frozen-contract mismatch therefore fails closed without a paid
+            # dispatch and leaves the chunk safely pending.
+            validated = validator(raw_text, chunk)
+            with self.backend.jobs.chunk_lease(
+                    job_id,
+                    chunk_id,
+                    blocking=False) as acquired:
+                if (
+                        not acquired
+                        or self.backend.jobs.chunk_status(
+                            job_id,
+                            chunk_id)["status"] != "pending"):
+                    continue
+                attempt, attempt_path = self.backend.jobs.begin_attempt(
+                    job_id,
+                    chunk_id)
+                self.backend.jobs.write_raw(
+                    attempt_path,
+                    raw_text)
+                self.backend.jobs.write_validated(
+                    attempt_path,
+                    validated)
+                self.backend.jobs._set_chunk_status(
+                    job_id,
+                    chunk_id,
+                    status="succeeded",
+                    worker="local translation memory",
+                    last_error=None,
+                    completed_at=_utc_now())
+                self.backend.jobs.event(
+                    job_id,
+                    chunk_id=chunk_id,
+                    status="succeeded",
+                    message=(
+                        "Completed locally; no lexical result or new source "
+                        "translation required a provider request."),
+                    attempt=attempt)
+        return self.backend.jobs.refresh(job_id)
 
     @staticmethod
     def _response_validator(
@@ -798,6 +1220,12 @@ class SourceWorkflowController:
             {}).get("config", {})
         translation_memory_by_chunk = (
             self._translation_memory_by_chunk(job_id))
+        self._complete_locally_satisfied_chunks(
+            job_id,
+            pipeline,
+            request_contract,
+            translation_memory_by_chunk,
+            chunk_ids)
         if config.get("execution_mode") == "economy":
             snapshot = self._run_economy_job(
                 job_id,
@@ -1318,9 +1746,10 @@ class SourceWorkflowController:
             job_id,
             state)
         with input_path.open("rb") as input_file:
-            uploaded = client.files.create(
-                file=input_file,
-                purpose="batch")
+            uploaded = self.paid_dispatch_control.dispatch(
+                lambda: client.files.create(
+                    file=input_file,
+                    purpose="batch"))
         input_file_id = _response_value(uploaded, "id")
         if not isinstance(input_file_id, str) or not input_file_id:
             raise ValueError(
@@ -1376,14 +1805,30 @@ class SourceWorkflowController:
                 state="economy_batch_submitting",
                 last_error=None)
             try:
-                batch = client.batches.create(
-                    input_file_id=input_file_id,
-                    endpoint=_ECONOMY_BATCH_ENDPOINT,
-                    completion_window="24h",
-                    metadata=metadata,
-                    extra_headers={
-                        "Idempotency-Key": idempotency_key,
-                    })
+                batch = self.paid_dispatch_control.dispatch(
+                    lambda: client.batches.create(
+                        input_file_id=input_file_id,
+                        endpoint=_ECONOMY_BATCH_ENDPOINT,
+                        completion_window="24h",
+                        metadata=metadata,
+                        extra_headers={
+                            "Idempotency-Key": idempotency_key,
+                        }))
+            except PaidDispatchPaused:
+                # Admission failed before the provider call.  Unlike a
+                # network exception, this submission is not ambiguous and
+                # can be resumed safely from the retained uploaded state.
+                state.update({
+                    "stage": "uploaded",
+                    "status": "paused",
+                    "updated_at": _utc_now(),
+                })
+                self._update_workflow(
+                    job_id,
+                    economy_batch=state,
+                    state="economy_batch_paused",
+                    last_error=None)
+                raise
             except Exception as error:
                 reconciled = self._find_matching_economy_batch(
                     client,
@@ -1742,49 +2187,83 @@ class SourceWorkflowController:
                 blocking=False) as acquired:
             if not acquired:
                 return self.backend.jobs.refresh(job_id)
-            self.backend.jobs.recover_interrupted(job_id)
-            pending = self._pending_chunk_ids(
-                job_id,
-                chunk_ids)
-            workflow = self._workflow(job_id)
-            state = workflow.get("economy_batch")
-            if (
-                    isinstance(state, dict)
-                    and not state.get("collected_at")):
-                if state.get("batch_id"):
-                    return self._collect_economy_batch(
+            try:
+                self.backend.jobs.recover_interrupted(job_id)
+                pending = self._pending_chunk_ids(
+                    job_id,
+                    chunk_ids)
+                workflow = self._workflow(job_id)
+                state = workflow.get("economy_batch")
+                if (
+                        isinstance(state, dict)
+                        and not state.get("collected_at")):
+                    if state.get("batch_id"):
+                        return self._collect_economy_batch(
+                            job_id,
+                            pipeline,
+                            client,
+                            request_contract,
+                            state)
+                    return self._resume_economy_submission(
                         job_id,
-                        pipeline,
                         client,
-                        request_contract,
                         state)
-                return self._resume_economy_submission(
+                if not pending:
+                    return self.backend.jobs.refresh(job_id)
+                return self._submit_economy_batch(
                     job_id,
                     client,
-                    state)
-            if not pending:
+                    request_contract,
+                    pending)
+            except PaidDispatchPaused:
+                self.backend.jobs.event(
+                    job_id,
+                    chunk_id=None,
+                    status="paused",
+                    message=(
+                        "Emergency pause retained the Economy Batch before "
+                        "its next paid upload or submission."))
                 return self.backend.jobs.refresh(job_id)
-            return self._submit_economy_batch(
-                job_id,
-                client,
-                request_contract,
-                pending)
 
     def _mark_active(self, job_id, active):
         with self._active_lock:
             if active:
-                self._active_jobs.add(job_id)
+                self._active_jobs[job_id] = (
+                    self._active_jobs.get(job_id, 0) + 1)
             else:
-                self._active_jobs.discard(job_id)
+                remaining = self._active_jobs.get(job_id, 0) - 1
+                if remaining > 0:
+                    self._active_jobs[job_id] = remaining
+                else:
+                    self._active_jobs.pop(job_id, None)
 
     def _is_active(self, job_id):
         with self._active_lock:
-            return job_id in self._active_jobs
+            return self._active_jobs.get(job_id, 0) > 0
 
     def generate(self, request):
-        if request.get("paid_confirmed") is not True:
+        authorized_estimate = (
+            request.get("estimate")
+            if isinstance(request, dict)
+            else None)
+        estimated_request_count = (
+            authorized_estimate.get("request_count")
+            if isinstance(authorized_estimate, dict)
+            else None)
+        source_sentence_card_count = (
+            authorized_estimate.get("source_sentence_card_count", 0)
+            if isinstance(authorized_estimate, dict)
+            else 0)
+        local_only = bool(
+            estimated_request_count == 0
+            and source_sentence_card_count)
+        if (
+                request.get("paid_confirmed") is not True
+                and not local_only):
             raise PermissionError(
                 "Source generation requires explicit confirmation.")
+        pipeline = pipeline_store.pipeline_from_mapping(
+            request.get("pipeline"))
         self._refresh_paid_source_exclusion(request)
         snapshot = self.backend.create_job(request)
         self._update_workflow(
@@ -1803,9 +2282,11 @@ class SourceWorkflowController:
                     "deck was created."),
             }
 
-        pipeline = pipeline_store.pipeline_from_mapping(
-            request.get("pipeline"))
-        client = self._openai_client()
+        self._require_enhanced_audio_ready(pipeline)
+        client = (
+            None
+            if local_only
+            else self._openai_client())
         self._mark_active(snapshot.job_id, True)
         try:
             completed = self._run_job(
@@ -2027,6 +2508,14 @@ class SourceWorkflowController:
                             {}).get(
                                 "shared_source_sentence_cards",
                                 False)),
+                    **(
+                        {"audio_service": self._audio_service()}
+                        if any(
+                            card.enhanced
+                            for card in pipeline_store.get_enabled_cards(
+                                pipeline))
+                        else {}
+                    ),
                     allow_accepted_content_problems=(
                         accepted_content_problem_count > 0))
                 workflow = self._update_workflow(
@@ -2454,7 +2943,7 @@ class SourceWorkflowController:
                 "batch_payload": chunk.request_payload(),
                 "response_format": self._response_format_for_chunk(
                     request_contract,
-                    child_id),
+                    chunk),
                 "tools": request_contract.get("tools", ()),
             }
             inspection["response_view"] = {
@@ -2630,6 +3119,40 @@ class SourceWorkflowController:
                 max(1_024, 192 * len(scope.targets))),
         }
 
+    @staticmethod
+    def _mark_repair_paused(
+            jobs,
+            job_id,
+            chunk_id,
+            attempt,
+            attempt_path,
+            base_raw_text,
+            error,
+            *,
+            worker):
+        """Return an undispatched repair to pending with inspectable evidence."""
+        jobs.write_raw(attempt_path, base_raw_text)
+        error_record = jobs.write_error(
+            attempt_path,
+            error,
+            transient=True)
+        jobs._set_chunk_status(
+            job_id,
+            chunk_id,
+            status="pending",
+            worker="paused",
+            last_error=error_record,
+            completed_at=None)
+        jobs.event(
+            job_id,
+            chunk_id=chunk_id,
+            status="paused",
+            message=(
+                f"Emergency pause retained the queued {worker}; "
+                "no paid repair request was sent."),
+            attempt=attempt)
+        return jobs.refresh(job_id)
+
     def _run_compact_example_repair(
             self,
             job_id,
@@ -2682,25 +3205,32 @@ class SourceWorkflowController:
             _atomic_write_json(
                 attempt_path / "repair_scope.json",
                 scope_record)
-            # This marker is persisted before the API invocation. A crash
-            # cannot silently create a fourth paid dispatch on resume.
-            _atomic_write_json(
-                attempt_path / "automatic_repair_dispatch.json",
-                {
-                    "schema_version": 1,
-                    "kind": "automatic_repair_dispatch",
-                    "automatic": bool(automatic),
-                    "dispatch_ordinal": dispatch_ordinal,
-                    "dispatched_at": _utc_now(),
-                })
             paid_received = False
             merged_raw_text = None
             try:
-                response = client.responses.create(
-                    **self._compact_example_repair_request_options(
+                request_options = (
+                    self._compact_example_repair_request_options(
                         request_contract,
                         scope,
                         pipeline))
+
+                def dispatch_repair():
+                    # Persist only after paid admission.  If emergency pause
+                    # rejects admission, it must not consume an automatic
+                    # repair from the bounded retry allowance.
+                    _atomic_write_json(
+                        attempt_path / "automatic_repair_dispatch.json",
+                        {
+                            "schema_version": 1,
+                            "kind": "automatic_repair_dispatch",
+                            "automatic": bool(automatic),
+                            "dispatch_ordinal": dispatch_ordinal,
+                            "dispatched_at": _utc_now(),
+                        })
+                    return client.responses.create(**request_options)
+
+                response = self.paid_dispatch_control.dispatch(
+                    dispatch_repair)
                 paid = _paid_response(response)
                 jobs.write_response(
                     attempt_path,
@@ -2725,6 +3255,16 @@ class SourceWorkflowController:
                 jobs.write_validated(
                     attempt_path,
                     validated)
+            except PaidDispatchPaused as error:
+                return self._mark_repair_paused(
+                    jobs,
+                    job_id,
+                    chunk_id,
+                    attempt,
+                    attempt_path,
+                    base_raw_text,
+                    error,
+                    worker=worker)
             except Exception as error:
                 retained_response = getattr(
                     error,
@@ -3003,27 +3543,51 @@ class SourceWorkflowController:
                         base_raw_text.encode("utf-8")).hexdigest(),
                     **scope.to_dict(),
                 })
-            if automatic:
-                # Persist before dispatch so a crash cannot exceed the
-                # configured paid automatic-repair bound on resume.
-                _atomic_write_json(
-                    attempt_path / "automatic_repair_dispatch.json",
-                    {
-                        "schema_version": 1,
-                        "kind": "automatic_repair_dispatch",
-                        "automatic": True,
-                        "dispatch_ordinal": dispatch_ordinal,
-                        "dispatched_at": _utc_now(),
-                    })
             paid_received = False
             merged_raw_text = None
             try:
-                response = client.responses.create(
-                    **self._request_options(
-                        request_contract,
-                        repair_chunk,
-                        self._translation_memory_by_chunk(
-                            job_id)))
+                repair_response_format = (
+                    process_text.build_compact_source_response_format(
+                        pipeline,
+                        protocol_version=10,
+                        chunk=repair_chunk,
+                        translation_memory_enabled=bool(
+                            self._translation_memory_by_chunk(
+                                job_id)),
+                        source_lexical_only=True,
+                        include_generated_examples=(
+                            source_request_requires_generated_examples(
+                                request_contract)),
+                        include_source_context_nuance=(
+                            source_request_includes_context_nuance(
+                                request_contract)))
+                    if protocol_version == 10
+                    else None)
+                request_options = self._request_options(
+                    request_contract,
+                    repair_chunk,
+                    self._translation_memory_by_chunk(job_id),
+                    response_format_override=(
+                        repair_response_format))
+
+                def dispatch_repair():
+                    if automatic:
+                        # Count only a request admitted through the paid gate.
+                        # A paused repair remains available on resume.
+                        _atomic_write_json(
+                            attempt_path
+                            / "automatic_repair_dispatch.json",
+                            {
+                                "schema_version": 1,
+                                "kind": "automatic_repair_dispatch",
+                                "automatic": True,
+                                "dispatch_ordinal": dispatch_ordinal,
+                                "dispatched_at": _utc_now(),
+                            })
+                    return client.responses.create(**request_options)
+
+                response = self.paid_dispatch_control.dispatch(
+                    dispatch_repair)
                 paid = _paid_response(response)
                 jobs.write_response(
                     attempt_path,
@@ -3040,7 +3604,12 @@ class SourceWorkflowController:
                     base_raw_text,
                     paid.raw_text,
                     chunk,
-                    scope)
+                    scope,
+                    remembered_context_ids=set(
+                        self._translation_memory_by_chunk(
+                            job_id).get(
+                                chunk_id,
+                                ())))
                 jobs.write_raw(
                     attempt_path,
                     merged_raw_text)
@@ -3050,6 +3619,16 @@ class SourceWorkflowController:
                 jobs.write_validated(
                     attempt_path,
                     validated)
+            except PaidDispatchPaused as error:
+                return self._mark_repair_paused(
+                    jobs,
+                    job_id,
+                    chunk_id,
+                    attempt,
+                    attempt_path,
+                    base_raw_text,
+                    error,
+                    worker=repair_worker)
             except Exception as error:
                 retained_response = getattr(
                     error,
@@ -3257,6 +3836,8 @@ class SourceWorkflowController:
                 "to migrate to v8. Affected job(s): "
                 + ", ".join(obsolete_job_ids))
 
+        pipelines = self._preflight_job_pipelines(
+            sorted(selected_job_ids))
         grouped = {}
         if regular_rows:
             grouped = self.backend.manual_retry_targets({
@@ -3268,7 +3849,7 @@ class SourceWorkflowController:
         for job_id, chunk_ids in grouped.items():
             if not chunk_ids:
                 continue
-            pipeline = self._pipeline_for_job(job_id)
+            pipeline = pipelines[job_id]
             client = self._client_for_job(job_id)
             self._mark_active(job_id, True)
             try:
@@ -3297,7 +3878,7 @@ class SourceWorkflowController:
                 self._mark_active(job_id, False)
 
         for job_id in finalize_jobs - completed_jobs:
-            pipeline = self._pipeline_for_job(job_id)
+            pipeline = pipelines[job_id]
             self._mark_active(job_id, True)
             try:
                 self._finalize_if_complete(job_id, pipeline)

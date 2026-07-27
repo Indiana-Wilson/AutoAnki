@@ -1,23 +1,19 @@
-Define the following English words. For each word, provide exactly four
+Define the following English words. For each word, provide exactly three
 idiomatic example sentences separated by the pipe character, |, a concise
 meaning, and its IPA pronunciation.
 
-For those same four examples, provide four complete English translations in
+For those same three examples, provide three complete English translations in
 the "Sentence Translations (English)" property, separated by | in exactly the
 same order. Because these examples are already Modern English, repeat each
-whole sentence without its <strong> tags. Never use | inside one translation.
+whole sentence. Never use | inside one translation.
 
 In the input, there might be sections that are in brackets. This is context to 
 help you understand the meaning of the unbracketed word.
 
 Include the requested word, or a grammatically appropriate inflected form, at
-least once in every sentence. In every sentence, wrap EVERY occurrence that
-expresses that card's particular sense in literal <strong> and </strong> tags,
-including relevant repeated and inflected occurrences. If the same spelling
-has a different meaning elsewhere in the sentence, do NOT embolden that
-occurrence. Every sentence must contain a nonempty <strong>...</strong> span.
-Use no other HTML or formatting. Create
-a fully separate card entry for every genuinely disjoint, commonly used
+least once in every sentence. Return plain text only, with no HTML or other
+formatting. Create a fully separate card entry for every genuinely disjoint,
+commonly used
 lexical sense that a learner is reasonably likely to encounter. Do this even
 when bracketed context clearly selects one sense; return that contextual sense
 first. Do not split different nuances, connotations, degrees, registers, or

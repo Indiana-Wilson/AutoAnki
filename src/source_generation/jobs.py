@@ -49,6 +49,60 @@ LOCAL_REPAIR_FILE_NAME = "local_repair.json"
 REPAIRED_RAW_FILE_NAME = "repaired_raw.txt"
 
 
+class PaidDispatchPaused(RuntimeError):
+    """Raised before a paid provider call when emergency pause is active."""
+
+
+class PaidDispatchControl:
+    """Non-blocking admission gate for calls that can incur provider cost.
+
+    ``pause()`` closes admission immediately without waiting for calls already
+    admitted to return.  Existing calls may therefore finish, but subsequent
+    calls fail with :class:`PaidDispatchPaused` and their workers can return
+    cleanly instead of blocking application shutdown.
+    """
+
+    def __init__(self, *, paused=False):
+        self._lock = threading.RLock()
+        self._paused = bool(paused)
+        self._active_dispatches = 0
+
+    def pause(self):
+        with self._lock:
+            self._paused = True
+            return self.status()
+
+    def resume(self):
+        with self._lock:
+            self._paused = False
+            return self.status()
+
+    def status(self):
+        with self._lock:
+            return {
+                "paused": self._paused,
+                "active_dispatches": self._active_dispatches,
+            }
+
+    def dispatch(self, operation):
+        """Admit and execute one paid operation without waiting while paused."""
+        if not callable(operation):
+            raise TypeError("A paid dispatch operation must be callable.")
+        with self._lock:
+            if self._paused:
+                raise PaidDispatchPaused(
+                    "Emergency pause is active; no paid request was sent.")
+            # Once admitted, this operation is considered in flight.  Pause
+            # deliberately does not wait for it because a provider request
+            # may take an unbounded amount of time to return.
+            self._active_dispatches += 1
+        try:
+            return operation()
+        finally:
+            with self._lock:
+                self._active_dispatches -= 1
+
+
 def _utc_now():
     return datetime.now(timezone.utc).isoformat()
 
@@ -1626,6 +1680,27 @@ class GenerationJobRunner:
             try:
                 response = self.request_callable(chunk)
             except Exception as error:
+                if isinstance(error, PaidDispatchPaused):
+                    error_record = self.store.write_error(
+                        attempt_path,
+                        error,
+                        transient=True)
+                    self.store._set_chunk_status(
+                        self.job_id,
+                        chunk_id,
+                        status=CHUNK_PENDING,
+                        worker="paused",
+                        last_error=error_record,
+                        completed_at=None,
+                    )
+                    self._emit(
+                        chunk_id=chunk_id,
+                        status="paused",
+                        message=(
+                            "Emergency pause retained this queued chunk; "
+                            "no paid request was sent."),
+                        attempt=attempt)
+                    return
                 transient = is_transient_request_error(error)
                 retained_response = getattr(
                     error,

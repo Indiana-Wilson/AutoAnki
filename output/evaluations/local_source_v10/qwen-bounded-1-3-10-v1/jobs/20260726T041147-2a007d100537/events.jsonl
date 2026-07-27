@@ -1,5 +1,0 @@
-{"attempt": null, "chunk_id": null, "job_id": "20260726T041147-2a007d100537", "message": "Starting 1 source chunks with at most 1 concurrent requests.", "status": "running", "timestamp": "2026-07-26T04:11:47.497234+00:00"}
-{"attempt": 1, "chunk_id": "000001-r1-r3", "job_id": "20260726T041147-2a007d100537", "message": "Requesting source chunk 1/1.", "status": "running", "timestamp": "2026-07-26T04:11:47.504689+00:00"}
-{"attempt": 1, "chunk_id": "000001-r1-r3", "job_id": "20260726T041147-2a007d100537", "message": "Validated source chunk 1/1.", "status": "succeeded", "timestamp": "2026-07-26T04:13:53.469545+00:00"}
-{"attempt": null, "chunk_id": null, "job_id": "20260726T041147-2a007d100537", "message": "Source generation pass finished; all completed output and failures were retained.", "status": "completed", "timestamp": "2026-07-26T04:13:53.484243+00:00"}
-{"attempt": 1, "chunk_id": "000001-r1-r3", "job_id": "20260726T041147-2a007d100537", "message": "The bounded local semantic audit accepted 4 additional-sense example(s) across 1 batch(es).", "status": "succeeded", "timestamp": "2026-07-26T04:13:57.343845+00:00"}

@@ -1,7 +1,32 @@
-output/output.apkg
-output/corpora/
-output/codex_source_jobs/
-output/source_generation_jobs/
-.idea/
+# AutoAnki generated/runtime state
+/output/
+/recovery/
+*.apkg
+
+# Python environments, caches, and test reports
 .venv/
+venv/
+env/
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build products
+/build/
+/dist/
+*.egg-info/
+*.whl
+
+# Editors, operating-system metadata, and local secrets
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example

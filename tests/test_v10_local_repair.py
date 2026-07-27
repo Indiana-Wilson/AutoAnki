@@ -189,6 +189,50 @@ class CompactLocalRepairTests(unittest.TestCase):
             result.audit_record()["candidate_sha256"],
             result.candidate_sha256)
 
+    def test_discards_translation_for_retained_but_non_owned_context(self):
+        request_chunk = chunk("難易", "知")
+        request_chunk.source_context_translation_ids = ("context-1",)
+
+        result = repair_compact_response(
+            json.dumps(self.payload(), ensure_ascii=False),
+            self.pipeline,
+            request_chunk)
+        repaired = json.loads(result.candidate_raw_text)
+
+        self.assertEqual(
+            repaired["source_context_translations"],
+            [{
+                "context_id": "context-1",
+                "translation": "First context.",
+            }])
+        self.assertIn(
+            "drop_unrequested_identity",
+            {
+                change["rule_id"]
+                for change in result.changes
+            })
+
+    def test_discards_redundant_translation_memory_echo(self):
+        result = repair_compact_response(
+            json.dumps(self.payload(), ensure_ascii=False),
+            self.pipeline,
+            self.chunk,
+            remembered_source_context_ids={"context-2"})
+        repaired = json.loads(result.candidate_raw_text)
+
+        self.assertEqual(
+            repaired["source_context_translations"],
+            [{
+                "context_id": "context-1",
+                "translation": "First context.",
+            }])
+        self.assertIn(
+            "drop_unrequested_identity",
+            {
+                change["rule_id"]
+                for change in result.changes
+            })
+
     def test_repair_is_idempotent(self):
         first = repair_compact_response(
             json.dumps(self.payload(), ensure_ascii=False),

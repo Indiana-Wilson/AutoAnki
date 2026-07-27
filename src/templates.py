@@ -21,6 +21,7 @@ LATIN_CONTEXT_MODEL_ID = 2006934887
 LATIN_WORD_TO_MEANING_MODEL_ID = 1738304675
 LATIN_MEANING_TO_WORD_MODEL_ID = 2021716093
 SOURCE_SENTENCE_MODEL_ID = 1942026101
+ENHANCED_SOURCE_SENTENCE_MODEL_ID = 1190000041
 
 DECK_ID = 2059400110
 DECK_NAME = "Generated English Words"
@@ -61,6 +62,23 @@ SOURCE_ENGLISH_TRANSLATION_FIELD_NAME = "English Translation"
 SOURCE_SENTENCE_NUANCE_FIELD_NAME = "Nuance"
 SOURCE_CONTEXT_BLOCK_PREFIX = "\ue000S"
 SOURCE_CONTEXT_ESCAPE_MARKER = "\ue000"
+WORD_AUDIO_FIELD_NAME = "Word Audio"
+ENHANCED_SENTENCE_FIELD_NAME = "Enhanced Sentence"
+ENHANCED_SENTENCE_TRANSLATION_FIELD_NAME = (
+    "Enhanced Sentence Translation")
+SENTENCE_AUDIO_FIELD_NAME = "Sentence Audio"
+AUDIO_FIRST_FIELD_NAME = "Audio First"
+WRITTEN_FIRST_FIELD_NAME = "Written First"
+PRESENTATION_KEY_FIELD_NAME = "Presentation Key"
+ENHANCED_FIELD_NAMES = (
+    WORD_AUDIO_FIELD_NAME,
+    ENHANCED_SENTENCE_FIELD_NAME,
+    ENHANCED_SENTENCE_TRANSLATION_FIELD_NAME,
+    SENTENCE_AUDIO_FIELD_NAME,
+    AUDIO_FIRST_FIELD_NAME,
+    WRITTEN_FIRST_FIELD_NAME,
+    PRESENTATION_KEY_FIELD_NAME,
+)
 
 CARD_CSS = """.card {
   box-sizing: border-box;
@@ -98,6 +116,23 @@ CARD_CSS = """.card {
   text-align: center;
 }
 
+.term-pronunciation {
+  margin-top: 0.35em;
+}
+
+.enhanced-audio {
+  min-height: 2.4em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.enhanced-audio .replay-button,
+.enhanced-audio .replaybutton,
+.enhanced-audio .soundLink {
+  cursor: pointer;
+}
+
 .context-example {
   display: inline-flex;
   flex-direction: column;
@@ -130,9 +165,17 @@ CARD_CSS = """.card {
 """
 
 
-def _definition_stack():
+def _definition_stack(
+        *,
+        excluded_field_keys=(),
+        empty_fallback=None):
+    excluded_field_keys = frozenset(excluded_field_keys)
     sections = []
-    for _field_key, field_name in CONTENT_FIELDS:
+    included_field_names = []
+    for field_key, field_name in CONTENT_FIELDS:
+        if field_key in excluded_field_keys:
+            continue
+        included_field_names.append(field_name)
         sections.append(
             f"""{{{{#{field_name}}}}}
 <div class="definition-section">
@@ -140,10 +183,168 @@ def _definition_stack():
   <div>{{{{{field_name}}}}}</div>
 </div>
 {{{{/{field_name}}}}}""")
+    if empty_fallback:
+        opening_guards = "\n".join(
+            f"{{{{^{field_name}}}}}"
+            for field_name in included_field_names)
+        closing_guards = "\n".join(
+            f"{{{{/{field_name}}}}}"
+            for field_name in reversed(included_field_names))
+        sections.append(
+            f"""{opening_guards}
+<div class="definition-section">{empty_fallback}</div>
+{closing_guards}""")
     return (
         '<div class="definition-stack">\n'
         + "\n".join(sections)
         + "\n</div>")
+
+
+def _meaning_to_word_answer(term_field):
+    return f"""<div>{{{{FrontSide}}}}<hr>
+<div class="term">
+  <div>{{{{{term_field}}}}}</div>
+  {{{{#Pronunciation}}}}
+  <div class="term-pronunciation">{{{{Pronunciation}}}}</div>
+  {{{{/Pronunciation}}}}
+</div>
+</div>"""
+
+
+def _autoplay_script():
+    # This mirrors the user's established Anki template.  The replay control
+    # remains visible; the click makes playback reliable on installations
+    # where deck autoplay has been disabled.
+    return """<script>
+(function () {
+  const root = document.getElementById("autoplay");
+  if (!root) return;
+  const button = root.querySelector(
+    ".soundLink, .replaybutton, .replay-button");
+  if (button) button.click();
+})();
+</script>"""
+
+
+def _enhanced_audio_block(field_name):
+    return (
+        '<div id="autoplay" class="enhanced-audio">'
+        f"{{{{{field_name}}}}}"
+        "</div>"
+        + _autoplay_script())
+
+
+def _presentation_anchor():
+    # genanki must be able to identify at least one unconditionally required
+    # front field.  The stable key is populated on every Enhanced note and is
+    # deliberately hidden from the learner.
+    return (
+        f'<span hidden aria-hidden="true">'
+        f"{{{{{PRESENTATION_KEY_FIELD_NAME}}}}}"
+        "</span>")
+
+
+def _enhanced_sentence_block(term_field, identity):
+    """Render one selected sentence and the optional plain fallback below it."""
+    sentence_id = f"enhanced-sentence-{identity}"
+    fallback_id = f"enhanced-fallback-{identity}"
+    return f"""<div class="context-example">
+  <div id="{sentence_id}" class="sentence">
+    {{{{{ENHANCED_SENTENCE_FIELD_NAME}}}}}
+  </div>
+  <div id="{fallback_id}" class="context-fallback-term" hidden>
+    {{{{{term_field}}}}}
+  </div>
+</div>
+<script>
+(function () {{
+  const sentence = document.getElementById("{sentence_id}");
+  const fallback = document.getElementById("{fallback_id}");
+  if (
+      sentence
+      && fallback
+      && fallback.textContent.trim()
+      && !sentence.querySelector("strong")) {{
+    fallback.hidden = false;
+  }}
+}})();
+</script>"""
+
+
+def _enhanced_context_question(term_field):
+    return f"""{_presentation_anchor()}
+{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
+{_enhanced_audio_block(SENTENCE_AUDIO_FIELD_NAME)}
+{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
+{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
+{_enhanced_sentence_block(term_field, "front")}
+{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}"""
+
+
+def _enhanced_context_answer(term_field):
+    return f"""<div>
+{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
+{_enhanced_sentence_block(term_field, "back")}
+{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
+{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
+{_enhanced_audio_block(SENTENCE_AUDIO_FIELD_NAME)}
+{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}
+<hr>
+{{{{#{ENHANCED_SENTENCE_TRANSLATION_FIELD_NAME}}}}}
+<div class="sentence-translation">
+  {{{{{ENHANCED_SENTENCE_TRANSLATION_FIELD_NAME}}}}}
+</div>
+{{{{/{ENHANCED_SENTENCE_TRANSLATION_FIELD_NAME}}}}}
+{_definition_stack()}
+</div>"""
+
+
+def _enhanced_question(language_key, direction_key):
+    term_field = TERM_FIELD_NAMES[language_key]
+    if direction_key == "context":
+        return _enhanced_context_question(term_field)
+    if direction_key == "word_to_meaning":
+        return f"""{_presentation_anchor()}
+{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
+{_enhanced_audio_block(WORD_AUDIO_FIELD_NAME)}
+{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
+{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
+<div class="term">{{{{{term_field}}}}}</div>
+{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}"""
+    return (
+        _presentation_anchor()
+        + _definition_stack(
+            excluded_field_keys=("pronunciation",),
+            empty_fallback=(
+                "No meaning field was configured for this card.")))
+
+
+def _enhanced_answer(language_key, direction_key):
+    term_field = TERM_FIELD_NAMES[language_key]
+    if direction_key == "context":
+        return _enhanced_context_answer(term_field)
+    if direction_key == "word_to_meaning":
+        return f"""<div>
+{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
+<div class="term">{{{{{term_field}}}}}</div>
+{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
+{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
+{_enhanced_audio_block(WORD_AUDIO_FIELD_NAME)}
+{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}
+<hr>
+{_definition_stack()}
+</div>"""
+    return f"""<div>
+{{{{FrontSide}}}}
+<hr>
+<div class="term">
+  <div>{{{{{term_field}}}}}</div>
+  {_enhanced_audio_block(WORD_AUDIO_FIELD_NAME)}
+  {{{{#Pronunciation}}}}
+  <div class="term-pronunciation">{{{{Pronunciation}}}}</div>
+  {{{{/Pronunciation}}}}
+</div>
+</div>"""
 
 
 def _context_front(term_field):
@@ -269,10 +470,11 @@ def _create_model(language_key, direction_key, model_id):
             + _definition_stack()
             + "</div>")
     else:
-        question = _definition_stack()
-        answer = (
-            "<div>{{FrontSide}}<hr>"
-            f'<div class="term">{{{{{term_field}}}}}</div></div>')
+        question = _definition_stack(
+            excluded_field_keys=("pronunciation",),
+            empty_fallback=(
+                "No meaning field was configured for this card."))
+        answer = _meaning_to_word_answer(term_field)
 
     return genanki.Model(
         model_id,
@@ -282,6 +484,28 @@ def _create_model(language_key, direction_key, model_id):
             "name": f"{language_name} {direction_name}",
             "qfmt": question,
             "afmt": answer,
+        }],
+        css=CARD_CSS)
+
+
+def _create_enhanced_model(language_key, direction_key, model_id):
+    language_name = LANGUAGE_NAMES[language_key]
+    direction_name = DIRECTION_NAMES[direction_key]
+    term_field = TERM_FIELD_NAMES[language_key]
+    return genanki.Model(
+        model_id,
+        f"AutoAnki Enhanced {language_name} - {direction_name}",
+        fields=[
+            {"name": term_field},
+            {"name": "Sentences"},
+            *({"name": field_name} for field_name in CONTENT_FIELD_NAMES),
+            {"name": SENTENCE_TRANSLATIONS_FIELD_NAME},
+            *({"name": field_name} for field_name in ENHANCED_FIELD_NAMES),
+        ],
+        templates=[{
+            "name": f"Enhanced {language_name} {direction_name}",
+            "qfmt": _enhanced_question(language_key, direction_key),
+            "afmt": _enhanced_answer(language_key, direction_key),
         }],
         css=CARD_CSS)
 
@@ -314,6 +538,50 @@ def _create_source_sentence_model():
         css=CARD_CSS)
 
 
+def _create_enhanced_source_sentence_model():
+    return genanki.Model(
+        ENHANCED_SOURCE_SENTENCE_MODEL_ID,
+        "AutoAnki Enhanced Source Sentence - Sentence to Meaning",
+        fields=[
+            {"name": SOURCE_ORIGINAL_SENTENCE_FIELD_NAME},
+            {"name": SOURCE_ENGLISH_TRANSLATION_FIELD_NAME},
+            {"name": SOURCE_SENTENCE_NUANCE_FIELD_NAME},
+            {"name": SENTENCE_AUDIO_FIELD_NAME},
+            {"name": AUDIO_FIRST_FIELD_NAME},
+            {"name": WRITTEN_FIRST_FIELD_NAME},
+            {"name": PRESENTATION_KEY_FIELD_NAME},
+        ],
+        templates=[{
+            "name": "Enhanced Source Sentence to Meaning",
+            "qfmt": f"""{_presentation_anchor()}
+{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
+{_enhanced_audio_block(SENTENCE_AUDIO_FIELD_NAME)}
+{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
+{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
+<div class="sentence">{{{{{SOURCE_ORIGINAL_SENTENCE_FIELD_NAME}}}}}</div>
+{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}""",
+            "afmt": f"""<div>
+{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
+<div class="sentence">{{{{{SOURCE_ORIGINAL_SENTENCE_FIELD_NAME}}}}}</div>
+{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
+{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
+{_enhanced_audio_block(SENTENCE_AUDIO_FIELD_NAME)}
+{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}
+<hr>
+<div class="sentence-translation">
+  {{{{{SOURCE_ENGLISH_TRANSLATION_FIELD_NAME}}}}}
+</div>
+{{{{#{SOURCE_SENTENCE_NUANCE_FIELD_NAME}}}}}
+<div class="definition-section">
+  <strong class="definition-label">Nuance</strong>
+  <div>{{{{{SOURCE_SENTENCE_NUANCE_FIELD_NAME}}}}}</div>
+</div>
+{{{{/{SOURCE_SENTENCE_NUANCE_FIELD_NAME}}}}}
+</div>""",
+        }],
+        css=CARD_CSS)
+
+
 MODEL_IDS = {
     ("english", "context"): ENGLISH_CONTEXT_MODEL_ID,
     ("english", "word_to_meaning"): ENGLISH_WORD_TO_MEANING_MODEL_ID,
@@ -340,6 +608,20 @@ MODEL_IDS = {
     ("latin", "word_to_meaning"): LATIN_WORD_TO_MEANING_MODEL_ID,
     ("latin", "meaning_to_word"): LATIN_MEANING_TO_WORD_MODEL_ID,
 }
+ENHANCED_MODEL_IDS = {
+    ("english", "context"): 1190000001,
+    ("english", "word_to_meaning"): 1190000002,
+    ("english", "meaning_to_word"): 1190000003,
+    ("classical_chinese", "context"): 1190000011,
+    ("classical_chinese", "word_to_meaning"): 1190000012,
+    ("classical_chinese", "meaning_to_word"): 1190000013,
+    ("french", "context"): 1190000021,
+    ("french", "word_to_meaning"): 1190000022,
+    ("french", "meaning_to_word"): 1190000023,
+    ("japanese", "context"): 1190000031,
+    ("japanese", "word_to_meaning"): 1190000032,
+    ("japanese", "meaning_to_word"): 1190000033,
+}
 
 
 @dataclass(frozen=True)
@@ -350,33 +632,58 @@ class CardType:
     language_key: str
     direction_key: str
     term_field: str
+    enhanced: bool = False
 
 
-def _create_card_type(language_key, direction_key):
+def _create_card_type(language_key, direction_key, *, enhanced=False):
     language_name = LANGUAGE_NAMES[language_key]
     direction_name = DIRECTION_NAMES[direction_key]
+    suffix = "_enhanced" if enhanced else ""
     return CardType(
-        key=f"{language_key}_{direction_key}",
-        name=f"{language_name} {direction_name}",
-        model=_create_model(
-            language_key,
-            direction_key,
-            MODEL_IDS[(language_key, direction_key)]),
+        key=f"{language_key}_{direction_key}{suffix}",
+        name=(
+            f"Enhanced {language_name} {direction_name}"
+            if enhanced
+            else f"{language_name} {direction_name}"),
+        model=(
+            _create_enhanced_model(
+                language_key,
+                direction_key,
+                ENHANCED_MODEL_IDS[(language_key, direction_key)])
+            if enhanced
+            else _create_model(
+                language_key,
+                direction_key,
+                MODEL_IDS[(language_key, direction_key)])),
         language_key=language_key,
         direction_key=direction_key,
-        term_field=TERM_FIELD_NAMES[language_key])
+        term_field=TERM_FIELD_NAMES[language_key],
+        enhanced=enhanced)
 
 
 CARD_TYPES = {
     card_type.key: card_type
-    for card_type in (
+    for card_type in tuple(
         _create_card_type(language_key, direction_key)
         for language_key in LANGUAGE_NAMES
         for direction_key in DIRECTION_NAMES
-    )
+    ) + tuple(
+        _create_card_type(
+            language_key,
+            direction_key,
+            enhanced=True)
+        for language_key in (
+            "english",
+            "classical_chinese",
+            "french",
+            "japanese",
+        )
+        for direction_key in DIRECTION_NAMES)
 }
 
 SOURCE_SENTENCE_MODEL = _create_source_sentence_model()
+ENHANCED_SOURCE_SENTENCE_MODEL = (
+    _create_enhanced_source_sentence_model())
 
 LEGACY_CARD_TYPE_KEYS = {
     "english_vocabulary": "english_context",
@@ -441,12 +748,22 @@ def get_card_type(card_type_key):
             f"Unknown card type: {card_type_key}") from error
 
 
-def get_direction_card_type(language_key, direction_key):
-    return get_card_type(f"{language_key}_{direction_key}")
+def get_direction_card_type(
+        language_key,
+        direction_key,
+        *,
+        enhanced=False):
+    suffix = "_enhanced" if enhanced else ""
+    return get_card_type(
+        f"{language_key}_{direction_key}{suffix}")
 
 
-def list_card_types():
-    return tuple(CARD_TYPES.values())
+def list_card_types(*, include_enhanced=False):
+    """List registered direction models without breaking the legacy API."""
+    return tuple(
+        card_type
+        for card_type in CARD_TYPES.values()
+        if include_enhanced or not card_type.enhanced)
 
 
 def create_deck(deck_id=DECK_ID, deck_name=DECK_NAME):

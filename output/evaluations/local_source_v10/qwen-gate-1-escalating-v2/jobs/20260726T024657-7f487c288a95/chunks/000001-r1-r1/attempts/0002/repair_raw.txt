@@ -1,8 +1,0 @@
-{
-  "repairs": {
-    "p001": {
-      "sentence": "君子之道，不可言也。",
-      "translation": "The way of the gentleman cannot be expressed in words."
-    }
-  }
-}

@@ -67,6 +67,7 @@ def run_pipelines(
         project_root=None,
         output_root=None,
         progress_callback=None,
+        paid_dispatch_control=None,
         openai_client=None,
         anki_client=None,
         generator=process_text.generate_deck,
@@ -108,18 +109,23 @@ def run_pipelines(
                 stage="generating"))
 
         try:
+            generation_arguments = {
+                "client": openai_client,
+                "prompt_text": prompt_text,
+                "response_path": output_paths["response"],
+                "response_log_path": output_paths["response_log"],
+                "output_path": output_paths["package"],
+                "deck_id": pipeline.generated_deck_id,
+                "deck_name": pipeline.generated_deck_name,
+                "pipeline": pipeline,
+                "guid_seed": pipeline.pipeline_id,
+            }
+            if paid_dispatch_control is not None:
+                generation_arguments["paid_dispatch_control"] = (
+                    paid_dispatch_control)
             package_path = generator(
                 words,
-                client=openai_client,
-                prompt_text=prompt_text,
-                response_path=output_paths["response"],
-                response_log_path=output_paths["response_log"],
-                output_path=output_paths["package"],
-                deck_id=pipeline.generated_deck_id,
-                deck_name=pipeline.generated_deck_name,
-                pipeline=pipeline,
-                guid_seed=pipeline.pipeline_id,
-            )
+                **generation_arguments)
         except Exception as error:
             failures.append(PipelineFailure(
                 pipeline=pipeline,

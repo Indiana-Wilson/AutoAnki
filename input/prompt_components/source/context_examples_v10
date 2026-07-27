@@ -32,8 +32,11 @@ additional senses to that work.
 
 SOURCE CONTEXT TRANSLATIONS
 
-Return exactly one "source_context_translations" item for every input context,
-with no duplicate or unrequested context ID. Copy "context_id" exactly and put
-one complete, natural English translation of the entire context in
-"translation". Translate a shared context only once. The translation must be
-one plain JSON string with no |, HTML, or source-only text.
+Return exactly one "source_context_translations" item for every ID in
+"source_context_translation_ids", with no duplicate or unrequested context ID.
+Copy each target "context_id" exactly and put one complete, natural English
+translation of the entire matching context in "translation". Contexts absent
+from the target list are lexical evidence only. If the target list is absent
+from a legacy batch, every input context is a target. Translate a shared
+target context only once. The translation must be one plain JSON string with
+no |, HTML, or source-only text.

@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 import sys
 import tempfile
@@ -14,13 +15,21 @@ import pipeline_store
 import process_text
 from source_generation import (
     ContextMode,
+    GenerationChunk,
+    PaidDispatchControl,
     SourceGenerationBackend,
     SourceGenerationConfig,
     build_source_request_contract,
     plan_source_generation,
+    render_chunk_input,
 )
 from source_generation.translation_memory import (
     SourceContextTranslationMemory,
+)
+from source_generation.repair import (
+    CompactRepairScope,
+    build_compact_repair_chunk,
+    merge_compact_repair,
 )
 import source_workflow
 from tests.test_source_generation import (
@@ -81,7 +90,8 @@ class AutomaticExampleRepairTests(unittest.TestCase):
                 request_protocol="v10",
                 reasoning_effort="none",
                 automatic_repair=True,
-                max_automatic_repairs=3))
+                max_automatic_repairs=3,
+                retain_excluded_source_contexts=True))
         self.chunk = self.plan.chunks[0]
         self.contract = build_source_request_contract(
             self.pipeline,
@@ -159,6 +169,242 @@ class AutomaticExampleRepairTests(unittest.TestCase):
             }],
         }
 
+    def test_new_v10_dispatches_bounded_schema_but_legacy_chunk_stays_fixed(
+            self):
+        controller = source_workflow.SourceWorkflowController(
+            backend=self.backend)
+
+        current = controller._request_options(
+            self.contract,
+            self.chunk,
+            {})
+        legacy_mapping = self.chunk.to_dict()
+        legacy_mapping.pop("source_context_translation_ids")
+        legacy_chunk = GenerationChunk.from_dict(legacy_mapping)
+        legacy = controller._request_options(
+            self.contract,
+            legacy_chunk,
+            {})
+
+        self.assertEqual(
+            current["text"]["format"],
+            self.contract["response_formats_by_chunk"][
+                self.chunk.chunk_id])
+        term_results = current["text"]["format"]["schema"]["properties"][
+            "term_results"]
+        self.assertEqual(
+            (term_results["minItems"], term_results["maxItems"]),
+            (len(self.chunk.words), len(self.chunk.words)))
+        self.assertEqual(
+            legacy["text"]["format"],
+            self.contract["response_format"])
+
+    def test_all_known_context_only_dispatch_has_zero_term_bounds(self):
+        source = make_source(section_texts=("知道。",))
+        plan = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                chunk_size=10,
+                context_mode=ContextMode.SENTENCE,
+                request_protocol="v10",
+                reasoning_effort="none",
+                excluded_words=("知", "道"),
+                retain_excluded_source_contexts=True))
+        chunk = plan.chunks[0]
+        contract = build_source_request_contract(
+            self.pipeline,
+            chunks=plan.chunks,
+            use_source_for_example_sentences=True,
+            protocol_version=10,
+            reasoning_effort="none")
+
+        options = source_workflow.SourceWorkflowController(
+            backend=self.backend)._request_options(
+                contract,
+                chunk,
+                {})
+        term_results = options["text"]["format"]["schema"]["properties"][
+            "term_results"]
+
+        self.assertEqual(
+            (term_results["minItems"], term_results["maxItems"]),
+            (0, 0))
+        self.assertEqual(
+            options["text"]["format"],
+            contract["response_formats_by_chunk"][chunk.chunk_id])
+
+    def test_non_owner_lexical_repair_keeps_context_as_input_only(self):
+        source = make_source(section_texts=("知道。",))
+        plan = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                chunk_size=1,
+                context_mode=ContextMode.SENTENCE,
+                request_protocol="v10",
+                reasoning_effort="none",
+                retain_excluded_source_contexts=True))
+        chunk = plan.chunks[1]
+        context_id = chunk.contexts[0].context_id
+        self.assertEqual(chunk.requested_source_context_ids, ())
+        scope = CompactRepairScope(
+            replace_ranks=(chunk.words[0].rank,),
+            replace_context_ids=(),
+            request_ranks=(chunk.words[0].rank,),
+            request_context_ids=(context_id,))
+
+        repair_chunk = build_compact_repair_chunk(
+            chunk,
+            scope)
+        response_format = process_text.build_compact_source_response_format(
+            self.pipeline,
+            protocol_version=10,
+            chunk=repair_chunk,
+            source_lexical_only=True,
+            include_generated_examples=True)
+        translations = response_format["schema"]["properties"][
+            "source_context_translations"]
+        request_payload = json.loads(render_chunk_input(
+            repair_chunk,
+            protocol_version=10))
+        term_result = self.payload()["term_results"][0]
+        term_result["rank"] = chunk.words[0].rank
+        merged = json.loads(merge_compact_repair(
+            json.dumps({
+                "term_results": [],
+                "source_context_translations": [],
+            }),
+            json.dumps({
+                "term_results": [term_result],
+                "source_context_translations": [],
+            }),
+            chunk,
+            scope))
+
+        self.assertEqual(
+            request_payload["contexts"][0]["context_id"],
+            context_id)
+        self.assertEqual(
+            request_payload["source_context_translation_ids"],
+            [])
+        self.assertEqual(
+            (translations["minItems"], translations["maxItems"]),
+            (0, 0))
+        self.assertEqual(
+            merged["source_context_translations"],
+            [])
+
+    def test_selective_lexical_repair_preserves_omitted_memory_translation(
+            self):
+        context_id = self.chunk.requested_source_context_ids[0]
+        base = self.payload()
+        missing = base["term_results"].pop(0)
+        base["source_context_translations"] = []
+        rank = missing["rank"]
+        scope = CompactRepairScope(
+            replace_ranks=(rank,),
+            replace_context_ids=(),
+            request_ranks=(rank,),
+            request_context_ids=(
+                next(
+                    word.context_id
+                    for word in self.chunk.words
+                    if word.rank == rank),))
+
+        merged = json.loads(merge_compact_repair(
+            json.dumps(base, ensure_ascii=False),
+            json.dumps({
+                "term_results": [missing],
+                "source_context_translations": [],
+            }, ensure_ascii=False),
+            self.chunk,
+            scope,
+            remembered_context_ids={context_id}))
+
+        self.assertEqual(
+            [item["rank"] for item in merged["term_results"]],
+            [word.rank for word in self.chunk.words])
+        self.assertEqual(
+            merged["source_context_translations"],
+            [])
+
+    def test_context_only_invalid_translation_uses_selective_repair(self):
+        source = make_source(section_texts=("知道。",))
+        plan = plan_source_generation(
+            source,
+            SourceGenerationConfig(
+                source_key=source.key,
+                chunk_size=10,
+                context_mode=ContextMode.SENTENCE,
+                request_protocol="v10",
+                reasoning_effort="none",
+                automatic_repair=True,
+                max_automatic_repairs=3,
+                retain_excluded_source_contexts=True))
+        original_chunk = plan.chunks[0]
+        chunk = replace(
+            original_chunk,
+            words=(),
+            context_anchors=original_chunk.words)
+        plan = replace(
+            plan,
+            chunks=(chunk,))
+        contract = build_source_request_contract(
+            self.pipeline,
+            chunks=plan.chunks,
+            use_source_for_example_sentences=True,
+            protocol_version=10,
+            reasoning_effort="none",
+            translation_memory_enabled=True)
+        job = self.backend.jobs.create(
+            plan,
+            request_metadata={
+                "pipeline": pipeline_store.pipeline_to_mapping(
+                    self.pipeline),
+                "automatic_repair": True,
+                "max_automatic_repairs": 3,
+                "translation_memory_by_chunk": {
+                    chunk.chunk_id: {},
+                },
+            },
+            request_contract=contract)
+        context_id = chunk.requested_source_context_ids[0]
+        responses = SequentialResponses((
+            json.dumps({
+                "term_results": [],
+                "source_context_translations": [{
+                    "context_id": context_id,
+                    "translation": "知道。",
+                }],
+            }, ensure_ascii=False),
+            json.dumps({
+                "term_results": [],
+                "source_context_translations": [{
+                    "context_id": context_id,
+                    "translation": "To know the Way.",
+                }],
+            }, ensure_ascii=False),
+        ))
+
+        snapshot = source_workflow.SourceWorkflowController(
+            backend=self.backend)._run_job(
+                job.job_id,
+                self.pipeline,
+                SimpleNamespace(responses=responses))
+
+        self.assertEqual(snapshot.overall_status, "completed")
+        self.assertEqual(len(responses.calls), 2)
+        latest = self.backend.jobs.latest_attempt_path(
+            job.job_id,
+            chunk.chunk_id)
+        scope = json.loads(
+            (latest / "repair_scope.json").read_text(encoding="utf-8"))
+        self.assertEqual(scope["replace_ranks"], [])
+        self.assertEqual(
+            scope["replace_context_ids"],
+            [context_id])
+
     def test_automatic_repair_uses_tiny_pair_call_and_preserves_other_fields(
             self):
         invalid = self.payload()
@@ -213,6 +459,49 @@ class AutomaticExampleRepairTests(unittest.TestCase):
             self.backend.jobs.usage_summary(
                 self.job.job_id)["attempt_count"],
             2)
+
+    def test_pause_before_automatic_repair_preserves_retry_allowance(self):
+        class PauseAfterFirstDispatch(PaidDispatchControl):
+            def __init__(inner_self):
+                super().__init__()
+                inner_self.completed = 0
+
+            def dispatch(inner_self, operation):
+                result = super().dispatch(operation)
+                inner_self.completed += 1
+                if inner_self.completed == 1:
+                    inner_self.pause()
+                return result
+
+        responses = SequentialResponses((
+            json.dumps(self.payload(), ensure_ascii=False),
+        ))
+        control = PauseAfterFirstDispatch()
+        controller = source_workflow.SourceWorkflowController(
+            backend=self.backend,
+            paid_dispatch_control=control)
+
+        snapshot = controller._run_job(
+            self.job.job_id,
+            self.pipeline,
+            SimpleNamespace(responses=responses))
+
+        self.assertEqual(snapshot.overall_status, "ready")
+        self.assertEqual(len(responses.calls), 1)
+        status = self.backend.jobs.chunk_status(
+            self.job.job_id,
+            self.chunk.chunk_id)
+        self.assertEqual(status["status"], "pending")
+        latest = self.backend.jobs.latest_attempt_path(
+            self.job.job_id,
+            self.chunk.chunk_id)
+        self.assertFalse(
+            (latest / "automatic_repair_dispatch.json").exists())
+        self.assertEqual(
+            controller._automatic_repair_dispatch_count(
+                self.job.job_id,
+                self.chunk.chunk_id),
+            0)
 
     def test_repeated_exact_chinese_term_is_accepted_without_repair(
             self):
@@ -300,8 +589,7 @@ class AutomaticExampleRepairTests(unittest.TestCase):
         missing_result = invalid["term_results"].pop()
         repair = {
             "term_results": [missing_result],
-            "source_context_translations": list(
-                invalid["source_context_translations"]),
+            "source_context_translations": [],
         }
         responses = SequentialResponses((
             json.dumps(invalid, ensure_ascii=False),

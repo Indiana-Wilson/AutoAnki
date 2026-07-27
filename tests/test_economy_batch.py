@@ -256,6 +256,60 @@ class EconomyBatchTests(unittest.TestCase):
                 "web_search_calls": 0,
             })
 
+    def test_pause_before_economy_upload_sends_nothing_and_retains_input(self):
+        self.controller.pause_paid_dispatch()
+        client = FakeClient()
+
+        snapshot = self.controller._run_job(
+            self.job_id,
+            self.pipeline,
+            client)
+
+        self.assertEqual(snapshot.overall_status, "ready")
+        self.assertEqual(client.files.create_calls, [])
+        self.assertEqual(client.batches.create_calls, [])
+        state = self.controller._workflow(
+            self.job_id)["economy_batch"]
+        self.assertEqual(state["stage"], "prepared")
+        self.assertTrue(Path(state["input_path"]).is_file())
+
+    def test_pause_between_economy_upload_and_submit_does_not_reupload(self):
+        controller = self.controller
+
+        class PauseAfterUploadFiles(FakeFiles):
+            def create(inner_self, **kwargs):
+                result = super().create(**kwargs)
+                controller.pause_paid_dispatch()
+                return result
+
+        client = FakeClient(files=PauseAfterUploadFiles())
+
+        paused = controller._run_job(
+            self.job_id,
+            self.pipeline,
+            client)
+
+        self.assertEqual(paused.overall_status, "ready")
+        self.assertEqual(len(client.files.create_calls), 1)
+        self.assertEqual(client.batches.create_calls, [])
+        state = controller._workflow(self.job_id)["economy_batch"]
+        self.assertEqual(state["stage"], "uploaded")
+        self.assertEqual(state["status"], "paused")
+
+        controller.paid_dispatch_control.resume()
+        resumed = controller._run_job(
+            self.job_id,
+            self.pipeline,
+            client)
+
+        self.assertEqual(resumed.overall_status, "ready")
+        self.assertEqual(len(client.files.create_calls), 1)
+        self.assertEqual(len(client.batches.create_calls), 1)
+        self.assertEqual(
+            controller._workflow(
+                self.job_id)["economy_batch"]["stage"],
+            "submitted")
+
     def test_ambiguous_create_is_reconciled_without_a_second_create(self):
         first = FakeClient(
             batches=FakeBatches(

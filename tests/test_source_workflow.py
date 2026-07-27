@@ -14,6 +14,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import anki_integration
 import codex_source_retrieval
+import enhanced_audio
 import pipeline_store
 from source_generation import (
     build_source_request_contract,
@@ -63,6 +64,23 @@ def context_source_pipeline():
             replace(
                 card,
                 enabled=card.direction_key == "context")
+            for card in settings.cards))
+    return pipeline_store.replace_active_language_settings(
+        pipeline,
+        settings,
+        (settings,),
+        active_language_key="classical_chinese")
+
+
+def enhanced_source_pipeline():
+    pipeline = source_pipeline()
+    settings = pipeline_store.get_language_settings(
+        pipeline,
+        "classical_chinese")
+    settings = replace(
+        settings,
+        cards=tuple(
+            replace(card, enhanced=card.enabled)
             for card in settings.cards))
     return pipeline_store.replace_active_language_settings(
         pipeline,
@@ -131,6 +149,22 @@ class FakeResponses:
 class FakeOpenAIClient:
     def __init__(self, output_texts):
         self.responses = FakeResponses(output_texts)
+
+
+class UnavailableAudioService:
+    def __init__(self):
+        self.status_languages = []
+
+    def backend_status(self, language):
+        self.status_languages.append(language)
+        return SimpleNamespace(
+            ready=False,
+            backend=enhanced_audio.COSYVOICE_BACKEND,
+            model_id=enhanced_audio.COSYVOICE_MODEL_ID,
+            device_name=None,
+            gpu_available=False,
+            runtime_available=False,
+            message="The test GPU audio runtime is unavailable.")
 
 
 class PreparedFixture:
@@ -209,6 +243,169 @@ class SourceWorkflowTests(unittest.TestCase):
         self.assertIs(
             hooks["manual_input_filter_callback"].__self__,
             controller)
+        self.assertIs(
+            hooks["source_pause_callback"].__self__,
+            controller)
+        self.assertIs(
+            hooks["source_resume_callback"].__self__,
+            controller)
+        self.assertIs(
+            hooks["source_dispatch_status_loader"].__self__,
+            controller)
+        self.assertIs(
+            hooks["paid_dispatch_control"],
+            controller.paid_dispatch_control)
+
+    def test_resume_targets_only_pending_interrupted_and_connection_failed(
+            self):
+        plans = (
+            one_word_plan(),
+            replace(one_word_plan(), plan_id="connection-plan"),
+            replace(one_word_plan(), plan_id="invalid-plan"),
+        )
+        jobs = []
+        for plan in plans:
+            jobs.append(self.backend.jobs.create(
+                plan,
+                request_metadata={
+                    "pipeline": pipeline_store.pipeline_to_mapping(
+                        self.pipeline),
+                }))
+        pending_job, connection_job, invalid_job = jobs
+        connection_chunk = connection_job.chunks[0]["chunk_id"]
+        invalid_chunk = invalid_job.chunks[0]["chunk_id"]
+        self.backend.jobs._set_chunk_status(
+            connection_job.job_id,
+            connection_chunk,
+            status="connection_failed",
+            completed_at=source_workflow._utc_now())
+        self.backend.jobs._set_chunk_status(
+            invalid_job.job_id,
+            invalid_chunk,
+            status="invalid_response",
+            completed_at=source_workflow._utc_now())
+        controller = self.controller(
+            openai_client_factory=lambda _key: object())
+        controller.pause_paid_dispatch()
+        resumed = []
+
+        def run_targets(job_id, chunk_ids, _pipeline, _client):
+            resumed.append((job_id, tuple(chunk_ids)))
+            return self.backend.jobs.refresh(job_id)
+
+        with (
+                patch.object(
+                    source_workflow.process_text,
+                    "get_api_key",
+                    return_value="test-key"),
+                patch.object(
+                    controller,
+                    "_run_standard_retry_targets",
+                    side_effect=run_targets),
+                patch.object(
+                    controller,
+                    "_finalize_if_complete")):
+            result = controller.resume_paid_dispatch()
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["resumed_jobs"], 2)
+        self.assertEqual(result["resumed_chunks"], 2)
+        self.assertEqual(
+            {job_id for job_id, _chunk_ids in resumed},
+            {pending_job.job_id, connection_job.job_id})
+        self.assertNotIn(
+            invalid_job.job_id,
+            {job_id for job_id, _chunk_ids in resumed})
+        self.assertEqual(
+            self.backend.jobs.chunk_status(
+                invalid_job.job_id,
+                invalid_chunk)["status"],
+            "invalid_response")
+
+    def test_resume_reports_connection_timeout_from_retained_runner_status(
+            self):
+        job = self.backend.jobs.create(
+            one_word_plan(),
+            request_metadata={
+                "pipeline": pipeline_store.pipeline_to_mapping(
+                    self.pipeline),
+            })
+
+        class TimeoutResponses:
+            def __init__(inner_self):
+                inner_self.calls = 0
+
+            def create(inner_self, **_kwargs):
+                inner_self.calls += 1
+                raise TimeoutError("provider timed out")
+
+        responses = TimeoutResponses()
+        controller = self.controller(
+            openai_client_factory=lambda _key: SimpleNamespace(
+                responses=responses))
+        with patch.object(
+                source_workflow.process_text,
+                "get_api_key",
+                return_value="test-key"):
+            result = controller.resume_paid_dispatch()
+
+        self.assertEqual(result["status"], "connection_timeout")
+        self.assertEqual(result["message"], "Connection timeout")
+        self.assertEqual(responses.calls, 1)
+        self.assertEqual(
+            self.backend.jobs.chunk_status(
+                job.job_id,
+                job.chunks[0]["chunk_id"])["status"],
+            "connection_failed")
+
+    def test_resume_preflights_every_job_before_reopening_paid_dispatch(self):
+        standard_job = self.backend.jobs.create(
+            replace(one_word_plan(), plan_id="standard-resume-plan"),
+            request_metadata={
+                "pipeline": pipeline_store.pipeline_to_mapping(
+                    self.pipeline),
+            })
+        enhanced_job = self.backend.jobs.create(
+            replace(one_word_plan(), plan_id="enhanced-resume-plan"),
+            request_metadata={
+                "pipeline": pipeline_store.pipeline_to_mapping(
+                    enhanced_source_pipeline()),
+            })
+        client_factory = MagicMock(return_value=object())
+        audio_service = UnavailableAudioService()
+        controller = self.controller(
+            openai_client_factory=client_factory,
+            audio_service_factory=lambda: audio_service)
+        controller.pause_paid_dispatch()
+
+        with (
+                patch.object(
+                    source_workflow.process_text,
+                    "get_api_key") as get_api_key,
+                patch.object(
+                    controller,
+                    "_run_standard_retry_targets") as dispatch):
+            with self.assertRaisesRegex(
+                    enhanced_audio.TTSRuntimeUnavailableError,
+                    "No OpenAI request was sent"):
+                controller.resume_paid_dispatch({
+                    "job_ids": (
+                        self.backend._row_id(
+                            standard_job.job_id,
+                            standard_job.chunks[0]["chunk_id"]),
+                        self.backend._row_id(
+                            enhanced_job.job_id,
+                            enhanced_job.chunks[0]["chunk_id"]),
+                    ),
+                })
+
+        get_api_key.assert_not_called()
+        client_factory.assert_not_called()
+        dispatch.assert_not_called()
+        self.assertEqual(
+            audio_service.status_languages,
+            ["classical_chinese"])
+        self.assertTrue(controller.paid_dispatch_status()["paused"])
 
     def test_paid_request_passes_bounded_optional_web_search_to_api(self):
         client = FakeOpenAIClient((self.valid_output(),))
@@ -299,6 +496,31 @@ class SourceWorkflowTests(unittest.TestCase):
         self.assertEqual(
             controller._workflow(result["job_id"])["state"],
             "nothing_to_generate")
+
+    def test_generate_preflights_audio_before_creating_openai_client(self):
+        self.install_plan(one_word_plan())
+        client_factory = MagicMock(return_value=object())
+        audio_service = UnavailableAudioService()
+        controller = self.controller(
+            openai_client_factory=client_factory,
+            audio_service_factory=lambda: audio_service)
+
+        with patch.object(
+                source_workflow.process_text,
+                "get_api_key") as get_api_key:
+            with self.assertRaisesRegex(
+                    enhanced_audio.TTSRuntimeUnavailableError,
+                    "No OpenAI request was sent"):
+                controller.generate({
+                    "pipeline": enhanced_source_pipeline(),
+                    "paid_confirmed": True,
+                })
+
+        get_api_key.assert_not_called()
+        client_factory.assert_not_called()
+        self.assertEqual(
+            audio_service.status_languages,
+            ["classical_chinese"])
 
     def test_fresh_exclusion_to_zero_bypasses_stale_paid_authorization_safely(
             self):
@@ -464,6 +686,55 @@ class SourceWorkflowTests(unittest.TestCase):
         self.assertEqual(
             controller._workflow(first["job_id"])["state"],
             "imported")
+
+    def test_retry_preflights_mixed_jobs_before_any_paid_dispatch(self):
+        jobs = []
+        for plan_id, pipeline in (
+                ("standard-retry-plan", self.pipeline),
+                ("enhanced-retry-plan", enhanced_source_pipeline())):
+            job = self.backend.jobs.create(
+                replace(one_word_plan(), plan_id=plan_id),
+                request_metadata={
+                    "pipeline": pipeline_store.pipeline_to_mapping(
+                        pipeline),
+                })
+            chunk_id = job.chunks[0]["chunk_id"]
+            self.backend.jobs._set_chunk_status(
+                job.job_id,
+                chunk_id,
+                status="invalid_response")
+            jobs.append((job, chunk_id))
+
+        client_factory = MagicMock(return_value=object())
+        audio_service = UnavailableAudioService()
+        controller = self.controller(
+            openai_client_factory=client_factory,
+            audio_service_factory=lambda: audio_service)
+        row_ids = tuple(
+            self.backend._row_id(job.job_id, chunk_id)
+            for job, chunk_id in jobs)
+
+        with (
+                patch.object(
+                    source_workflow.process_text,
+                    "get_api_key") as get_api_key,
+                patch.object(
+                    controller,
+                    "_run_standard_retry_targets") as dispatch):
+            with self.assertRaisesRegex(
+                    enhanced_audio.TTSRuntimeUnavailableError,
+                    "No OpenAI request was sent"):
+                controller.retry({
+                    "job_ids": row_ids,
+                    "paid_confirmed": True,
+                })
+
+        get_api_key.assert_not_called()
+        client_factory.assert_not_called()
+        dispatch.assert_not_called()
+        self.assertEqual(
+            audio_service.status_languages,
+            ["classical_chinese"])
 
     def test_retry_refuses_obsolete_v4_to_v6_context_protocol_before_work(
             self):

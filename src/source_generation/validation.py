@@ -24,6 +24,18 @@ _GROUPED_CONTEXT_TRANSLATION_PLACEHOLDER = (
     "[AutoAnki validated source-context translation]")
 
 
+def _requested_source_context_ids(chunk):
+    explicit = getattr(
+        chunk,
+        "source_context_translation_ids",
+        None)
+    if explicit is None:
+        return tuple(
+            context.context_id
+            for context in chunk.contexts)
+    return tuple(explicit)
+
+
 class ValidatedPipelineResponse(dict):
     """Canonical cards plus non-JSON metadata for durable local-repair audit."""
 
@@ -497,10 +509,8 @@ def _normalize_grouped_source_results(
             additional_indices.add(card_index)
 
     raw_translations = parsed.get(translation_key, missing_marker)
-    expected_context_ids = {
-        context.context_id
-        for context in chunk.contexts
-    }
+    expected_context_ids = set(
+        _requested_source_context_ids(chunk))
     source_language = pipeline_store.get_language(
         pipeline.language_key)
     requires_english_translation = (
@@ -923,7 +933,8 @@ def _normalize_compact_source_results(
                 full_retry_required=True))
             continue
         contexts_by_id[context_id] = context
-    expected_context_ids = set(contexts_by_id)
+    expected_context_ids = set(
+        _requested_source_context_ids(chunk))
     if source_context_translation_memory is None:
         source_context_translation_memory = {}
     if not isinstance(source_context_translation_memory, dict):
@@ -2142,7 +2153,9 @@ def inspect_pipeline_response(
             include_generated_examples=(
                 require_generated_examples),
             include_source_context_nuance=(
-                include_source_context_nuance))
+                include_source_context_nuance),
+            remembered_source_context_ids=(
+                source_context_translation_memory or ()))
         effective_raw_text = local_repair.candidate_raw_text
     validation_text = effective_raw_text
     additional_senses_missing_sentences = set()
@@ -2815,8 +2828,15 @@ def inspect_pipeline_response(
             word.rank: word
             for word in chunk.words
         }
+        context_words_by_rank = {
+            word.rank: word
+            for word in (
+                *chunk.words,
+                *getattr(chunk, "context_anchors", ()),
+            )
+        }
         word_ranks_by_context = {}
-        for word in chunk.words:
+        for word in context_words_by_rank.values():
             word_ranks_by_context.setdefault(
                 getattr(word, "context_id", None),
                 []).append(word.rank)
@@ -2866,17 +2886,17 @@ def inspect_pipeline_response(
                     ""),
                 "word_ranks": list(context_word_ranks),
                 "terms": [
-                    words_by_rank[rank].surface
+                    context_words_by_rank[rank].surface
                     for rank in context_word_ranks
-                    if rank in words_by_rank
+                    if rank in context_words_by_rank
                 ],
                 "ranked_terms": [
                     {
                         "rank": rank,
-                        "term": words_by_rank[rank].surface,
+                        "term": context_words_by_rank[rank].surface,
                     }
                     for rank in context_word_ranks
-                    if rank in words_by_rank
+                    if rank in context_words_by_rank
                 ],
             })
         canonical["source_contexts"] = source_context_records
@@ -3135,10 +3155,8 @@ def make_pipeline_response_validator(
             "Source-context translation memory by chunk must be an object.")
 
     def validate(raw_text, chunk):
-        expected_context_ids = {
-            context.context_id
-            for context in chunk.contexts
-        }
+        expected_context_ids = set(
+            _requested_source_context_ids(chunk))
         chunk_memory = {
             context_id: hit
             for context_id, hit in

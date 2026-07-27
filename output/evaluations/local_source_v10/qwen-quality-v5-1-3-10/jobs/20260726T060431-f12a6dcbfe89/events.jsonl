@@ -1,2 +1,0 @@
-{"attempt": null, "chunk_id": null, "job_id": "20260726T060431-f12a6dcbfe89", "message": "Starting 1 source chunks with at most 1 concurrent requests.", "status": "running", "timestamp": "2026-07-26T06:04:31.636113+00:00"}
-{"attempt": 1, "chunk_id": "000001-r1-r3", "job_id": "20260726T060431-f12a6dcbfe89", "message": "Requesting source chunk 1/1.", "status": "running", "timestamp": "2026-07-26T06:04:31.643489+00:00"}

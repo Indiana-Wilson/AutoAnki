@@ -195,12 +195,23 @@ class SourceContextTranslationMemory:
         result = {}
         for chunk in chunks:
             hits = {}
-            for context in chunk.contexts:
+            contexts_by_id = {
+                context.context_id: context
+                for context in chunk.contexts
+            }
+            target_ids = getattr(
+                chunk,
+                "source_context_translation_ids",
+                None)
+            if target_ids is None:
+                target_ids = tuple(contexts_by_id)
+            for context_id in target_ids:
+                context = contexts_by_id[context_id]
                 hit = self.lookup(
                     source_language_key,
                     context.text)
                 if hit is not None:
-                    hits[context.context_id] = hit
+                    hits[context_id] = hit
             result[chunk.chunk_id] = hits
         return result
 

@@ -24,15 +24,16 @@ src/process_text.py: Converts schema-constrained provider JSON into genanki
 packages. Responses use a strict JSON schema and are validated again locally
 before any package is written.
 
-src/templates.py: Contains fifteen registered genanki card types: three
-directions for each of English, Classical Chinese, French, Japanese, and
-Latin. Each model has stable fields for Translation, Dictionary Meaning,
-Pronunciation, Part of Speech, Register, and Nuance. Empty optional fields
-are hidden by the card template. Context models also retain an English
-translation for every example sentence and show the translation matching the
-randomly selected front example above the definitions on the back. The
-immutable card term appears immediately above the front example, so it remains
-visible when an inflected form cannot be matched and highlighted locally.
+src/templates.py: Contains three ordinary genanki card directions for each of
+English, Classical Chinese, French, Japanese, and Latin, plus separate
+Enhanced audio models for supported languages. Each model has stable fields
+for Translation, Dictionary Meaning, Pronunciation, Part of Speech, Register,
+and Nuance. Empty optional fields are hidden by the card template. Context
+models also retain an English translation for every example sentence and show
+the translation matching the selected front example above the definitions on
+the back. AutoAnki emphasizes an exact term match locally. When it cannot do
+so safely, the unbolded term appears below the sentence; a successful match
+does not add a duplicate label.
 
 Classical Chinese also has Ming, Warring States, early-Han Mawangdui, and
 Wang-Bi-recension input variants. These variants add period- or
@@ -78,14 +79,15 @@ Inspect Source before authorizing paid definitions.
 From Source uses the prepared source's matching Card setup language,
 directions, fields, and response languages. It can send no context, the current
 sentence, current plus neighbouring sentences, or one complete text span per
-request chunk. Identical and overlapping contexts are shared within a request
-rather than copied for every word. An optional prefix limit selects terms whose
-first occurrence falls within the first N running source tokens, before
-deduplication and learned-word exclusion. Changing that cutoff or the words per
-request immediately updates a local, cache-aware cost estimate based on the
-exact compact payload and strict schema, shared prompt-prefix repetition,
-expected response shape, and selected card detail. The headline is the
-modelled central estimate; a wider low/high range remains visible.
+request chunk. Identical contexts are translated only once across the complete
+plan, including when lexical chunk boundaries need to retain the same context.
+An optional prefix limit selects terms whose first occurrence falls within the
+first N running source tokens, before deduplication and learned-word exclusion.
+Changing that cutoff or the words per request immediately updates a local,
+cache-aware cost estimate based on the exact compact payload and strict schema,
+shared prompt-prefix repetition, expected response shape, and selected card
+detail. The headline is the modelled central estimate; a wider low/high range
+remains visible.
 `gpt-5.4-mini` is the supported source-generation model. OpenAI prices are
 frozen, dated, and not fetched live.
 
@@ -94,7 +96,8 @@ Compact v9 and grouped v8 remain selectable as frozen rollback protocols; v8
 retains its required low-reasoning behavior. In v10, the provider returns
 plain example sentences without HTML. AutoAnki adds strong emphasis locally
 when the exact term can be matched safely; an unmatched or inflected form is
-left unchanged and remains identifiable from the term displayed above it.
+left unchanged and remains identifiable from the unbolded term displayed below
+it.
 No reasoning remains available as a lower-cost option for smaller chunks.
 Standard processing dispatches each chunk directly through a bounded,
 staggered worker pool. Economy processing submits OpenAI requests as a
@@ -142,8 +145,17 @@ one of that note type's fields. AutoAnki unions the visible field values from
 all rows before filtering. A newly added row copies the preceding row to make
 same-deck setups quick. Card templates are not part of this selector because
 fields belong to notes and a note type may generate several card templates
-from the same stored fields. If no new candidate remains, AutoAnki sends
-nothing to the selected provider and creates no package or deck.
+from the same stored fields. If no new lexical candidate remains, AutoAnki
+requests no definitions. A selected retained-source Sentence → Meaning
+direction can still translate and package its deduplicated source sentences;
+otherwise AutoAnki sends nothing and creates no package or deck.
+
+Card setup can opt supported directions into Enhanced audio without changing
+ordinary saved cards. Japanese uses the installed Style-Bert-VITS2 JP-Extra
+Neutral voice; English, French, and Chinese use Fun-CosyVoice3 0.5B. Audio is
+generated locally on CUDA, cached outside the repository, and packaged as Anki
+media. See `docs/local_tts_installation.md` for the isolated shared-runtime
+installer, supported-language limits, licenses, and GPU-only smoke tests.
 
 An estimate can reuse a matching read-only Anki result briefly, but confirmed
 generation forces a fresh, ready-collection read immediately before its

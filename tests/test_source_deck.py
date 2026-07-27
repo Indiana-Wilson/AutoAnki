@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sqlite3
 import sys
 import tempfile
@@ -15,9 +16,10 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 import pipeline_store
 import source_deck
 import templates
+import enhanced_audio
 
 
-def all_direction_french_pipeline():
+def all_direction_french_pipeline(*, enhanced=False):
     pipeline = pipeline_store.default_pipeline()
     settings = pipeline_store.get_language_settings(
         pipeline,
@@ -34,7 +36,8 @@ def all_direction_french_pipeline():
             replace(
                 card,
                 enabled=True,
-                fields=fields)
+                fields=fields,
+                enhanced=enhanced)
             for card in settings.cards),
         share_field_settings=True,
         shared_fields=fields)
@@ -43,6 +46,48 @@ def all_direction_french_pipeline():
         settings,
         (settings,),
         active_language_key="french")
+
+
+class FakeAudioService:
+    def __init__(self, root):
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.requests = []
+        self.artifacts = {}
+
+    def synthesize_many(self, requests):
+        result = []
+        for request in requests:
+            self.requests.append(request)
+            identity = (
+                f"{enhanced_audio.normalize_tts_text(request.text)}\0"
+                f"{request.language}\0{request.role}")
+            cache_key = hashlib.sha256(
+                identity.encode("utf-8")).hexdigest()
+            artifact = self.artifacts.get(cache_key)
+            if artifact is None:
+                path = self.root / f"{cache_key}.wav"
+                path.write_bytes(b"RIFF" + cache_key.encode("ascii"))
+                manifest_path = self.root / f"{cache_key}.json"
+                manifest_path.write_text("{}", encoding="utf-8")
+                artifact = enhanced_audio.AudioArtifact(
+                    cache_key=cache_key,
+                    path=path,
+                    manifest_path=manifest_path,
+                    media_filename=f"_test_tts_{cache_key[:16]}.wav",
+                    sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                    byte_count=path.stat().st_size,
+                    codec="wav",
+                    encoder="pcm_s16le",
+                    language=request.language,
+                    role=request.role,
+                    backend="fake",
+                    model_id="fake-model",
+                    model_revision="fake-revision",
+                    voice_id="fake-neutral")
+                self.artifacts[cache_key] = artifact
+            result.append(artifact)
+        return tuple(result)
 
 
 def source_sentence_response():
@@ -294,6 +339,118 @@ class SourceDeckTests(unittest.TestCase):
                     "A cultural implication.",
                 ],
             ])
+
+    def test_source_sentence_is_packaged_when_all_associated_words_are_known(
+            self):
+        pipeline = all_direction_french_pipeline()
+        response = {
+            "cards": [],
+            "source_contexts": [{
+                "context_id": "known-context",
+                "sentence_id": "known-sentence",
+                "original_sentence": "Alpha bêta.",
+                "english_translation": "Alpha and beta.",
+                "nuance": "",
+                "word_ranks": [1, 2],
+                "terms": ["alpha", "bêta"],
+                "ranked_terms": [
+                    {"rank": 1, "term": "alpha"},
+                    {"rank": 2, "term": "bêta"},
+                ],
+            }],
+            "expected_source_sentence_ids": ["known-sentence"],
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "all-known-source-sentence.apkg"
+            package_path, count = source_deck.create_source_package(
+                response,
+                source_title="A Work",
+                source_key="work-key",
+                pipeline=pipeline,
+                output_path=output,
+                use_source_for_example_sentences=True)
+            rows = package_rows(package_path, directory)
+
+        self.assertEqual(count, 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(
+            rows[0]["model_id"],
+            templates.SOURCE_SENTENCE_MODEL_ID)
+        self.assertEqual(
+            rows[0]["fields"],
+            ["Alpha bêta.", "Alpha and beta.", ""])
+
+    def test_enhanced_source_package_contains_audio_models_and_media(self):
+        pipeline = all_direction_french_pipeline(enhanced=True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = FakeAudioService(root / "audio-cache")
+            output = root / "enhanced-source.apkg"
+            package_path, count = source_deck.create_source_package(
+                source_sentence_response(),
+                source_title="A Work",
+                source_key="enhanced-work-key",
+                pipeline=pipeline,
+                output_path=output,
+                use_source_for_example_sentences=True,
+                audio_service=service,
+                audio_media_directory=root / "package-media")
+            rows = package_rows(package_path, root / "extracted")
+            with zipfile.ZipFile(package_path) as archive:
+                media = json.loads(
+                    archive.read("media").decode("utf-8"))
+
+        self.assertEqual(count, 8)
+        self.assertEqual(
+            [row["model_id"] for row in rows],
+            [
+                templates.ENHANCED_MODEL_IDS[
+                    ("french", "word_to_meaning")],
+                templates.ENHANCED_MODEL_IDS[
+                    ("french", "meaning_to_word")],
+                templates.ENHANCED_MODEL_IDS[
+                    ("french", "word_to_meaning")],
+                templates.ENHANCED_MODEL_IDS[
+                    ("french", "meaning_to_word")],
+                templates.ENHANCED_SOURCE_SENTENCE_MODEL_ID,
+                templates.ENHANCED_MODEL_IDS[
+                    ("french", "word_to_meaning")],
+                templates.ENHANCED_MODEL_IDS[
+                    ("french", "meaning_to_word")],
+                templates.ENHANCED_SOURCE_SENTENCE_MODEL_ID,
+            ])
+        lexical_rows = [
+            row
+            for row in rows
+            if row["model_id"] != templates.ENHANCED_SOURCE_SENTENCE_MODEL_ID
+        ]
+        self.assertTrue(all(
+            row["fields"][9].startswith("[sound:_test_tts_")
+            for row in lexical_rows))
+        self.assertTrue(all(
+            bool(row["fields"][13]) != bool(row["fields"][14])
+            for row in lexical_rows))
+        sentence_rows = [
+            row
+            for row in rows
+            if row["model_id"] == templates.ENHANCED_SOURCE_SENTENCE_MODEL_ID
+        ]
+        self.assertTrue(all(
+            row["fields"][3].startswith("[sound:_test_tts_")
+            for row in sentence_rows))
+        self.assertTrue(all(
+            bool(row["fields"][4]) != bool(row["fields"][5])
+            for row in sentence_rows))
+        packaged_names = set(media.values())
+        referenced_names = {
+            field.removeprefix("[sound:").removesuffix("]")
+            for row in rows
+            for field in row["fields"]
+            if field.startswith("[sound:")
+        }
+        self.assertEqual(packaged_names, referenced_names)
 
     def test_additional_source_sense_examples_follow_its_lexical_cards(self):
         pipeline = all_direction_french_pipeline()

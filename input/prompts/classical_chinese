@@ -1,10 +1,10 @@
 Define the following Classical Chinese words or expressions.
 
-For each word or expression, provide four short, idiomatic example sentences
+For each word or expression, provide three short, idiomatic example sentences
 in Classical Chinese. Separate the sentences with the pipe character, |.
 Give the pronunciation in Hanyu Pinyin with tone marks.
 
-For those same four examples, provide four complete, natural English
+For those same three examples, provide three complete, natural English
 translations in the "Sentence Translations (English)" property, separated by |
 in exactly the same order. Translate each whole sentence, not only the defined
 expression, and never use | or HTML inside one translation.
@@ -28,12 +28,8 @@ alone.
 
 Include the requested expression, or a contextually appropriate inflected or
 variant form where applicable, at least once in every example sentence. In
-every sentence, wrap EVERY occurrence that expresses that card's particular
-sense in literal <strong> and </strong> tags, including relevant repeated
-occurrences. If the same spelling has a different meaning elsewhere in the
-sentence, do NOT embolden that occurrence. Every sentence must contain a
-nonempty <strong>...</strong> span. Use no other HTML or formatting. Preserve
-traditional Chinese characters unless the input
+every sentence, use plain text only, with no HTML or other formatting.
+Preserve traditional Chinese characters unless the input
 explicitly uses or requests a different form. Anything in brackets is context
 for identifying the contextual meaning, not for excluding other common
 meanings.

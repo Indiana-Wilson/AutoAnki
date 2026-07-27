@@ -21,7 +21,10 @@ From Source contains five pages:
    package/import step. Each deck-generation job is an expandable group, with
    its request chunks in order and its Deck packaging/import row last.
    **Inspect selected stage** separates the exact request from the retained
-   response in two tabs; it inspects one chunk, not the whole job.
+   response in two tabs; it inspects one chunk, not the whole job. **Emergency
+   pause** immediately closes the shared paid-dispatch gate for queued/unsent
+   work, while **Resume** reconnects and continues only safely recoverable
+   pending, interrupted, or connection-failed requests.
 
 Daodejing and Journey to the West are the built-in presets. Locally prepared
 files appear in the same source selector after preparation succeeds. A preset
@@ -47,12 +50,17 @@ controls:
   - Complete source span covered by the chunk
 - **Use source for example sentences**, available when source context and the
   Context card direction are enabled
+- a **Card types** menu with independent Sentence → Meaning, Word → Meaning,
+  and Meaning → Word selections
+- optional cultural/historical sentence **Nuance**
+- optional separate subdecks for the selected card directions
 - optional **Generate only from the first N token occurrences**, measured in
   running source words before vocabulary deduplication
 - **Words per provider request**, which is the generation chunk size
 - **Request protocol**
   - Compact v10, the default local-first fixed-schema protocol
-  - Compact v9, a frozen compact rollback with provider-authored emphasis
+  - Compact v9, a frozen compact rollback with plain provider sentences and
+    local term emphasis
   - Legacy v8, a frozen grouped rollback that preserves its required
     low-reasoning behavior
 - **Reasoning**
@@ -483,6 +491,11 @@ available for inspection; when that job is resumed, the orphaned chunk is
 returned to pending. Completed chunks remain completed. A package/import
 failure leaves the validated combined JSON and any completed `.apkg` in the
 job directory, so retrying the **Deck** row does not repeat provider work.
+The paid-dispatch pause never cancels a request already in flight, but it
+prevents every worker that has not yet crossed the shared gate from sending.
+Resume reports connecting, success, timeout, no-connection, or attention
+states beside the controls; semantic-invalid results still require the
+explicit inspection/retry path.
 
 Each chunk also has an operating-system advisory worker lease. If two
 AutoAnki processes open the same saved job, only the process holding that
@@ -494,11 +507,20 @@ database or a promise that arbitrary manual edits to job files are safe.
 
 ## Source-deck import semantics
 
-A completed source run creates and imports:
+A completed source run normally creates and imports:
 
 ```text
 Vocabulary from <source title>
 ```
+
+When separate card-type decks are selected, that deck becomes the parent of
+Sentence to Meaning, Word to Meaning, and/or Meaning to Word subdecks. In a
+combined retained-source deck, each word's selected lexical directions appear
+in first-occurrence order, Word → Meaning before Meaning → Word. A shared
+source sentence follows all associated words, including learned words omitted
+from lexical generation. Each additional sense instead keeps its three
+generated examples and places its Sentence → Meaning card immediately after
+that sense's selected lexical cards.
 
 Unlike Manual Input's temporary-deck workflow, this deck is the intended final
 deck. AutoAnki does not move its cards to a Card setup target deck, empty it,

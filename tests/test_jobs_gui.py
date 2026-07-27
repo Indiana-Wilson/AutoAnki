@@ -13,22 +13,11 @@ import gui
 
 
 class SourceJobsGuiTests(unittest.TestCase):
-    def test_jobs_and_inspection_readers_have_bounded_fallback_sizes(self):
-        # Grid weights fill the actual notebook viewport. These values are
-        # merely natural-size fallbacks and must not recreate the giant
-        # scrolling page that previously hid the action controls.
-        self.assertGreaterEqual(
-            gui.SOURCE_JOBS_TREE_VISIBLE_ROWS,
-            8)
-        self.assertLessEqual(
-            gui.SOURCE_JOBS_TREE_VISIBLE_ROWS,
-            14)
-        self.assertGreaterEqual(
-            gui.SOURCE_JOB_INSPECTION_VISIBLE_LINES,
-            10)
-        self.assertLessEqual(
-            gui.SOURCE_JOB_INSPECTION_VISIBLE_LINES,
-            18)
+    def test_jobs_and_inspection_readers_are_tripled(self):
+        # The whole Jobs page now owns an outer scrollbar, so both readers can
+        # expose three times the former ten-line working area.
+        self.assertEqual(gui.SOURCE_JOBS_TREE_VISIBLE_ROWS, 30)
+        self.assertEqual(gui.SOURCE_JOB_INSPECTION_VISIBLE_LINES, 30)
 
     def test_problem_reviewer_geometry_never_exceeds_the_display(self):
         for screen_width, screen_height in (
@@ -89,6 +78,7 @@ class SourceJobsGuiTests(unittest.TestCase):
 
     def test_refresh_inserts_explicit_group_boundaries(self):
         app = object.__new__(gui.AutoAnkiApp)
+        app._source_jobs_page_built = True
         app.source_jobs_loader = MagicMock(return_value={"jobs": (
             {
                 "job_id": "job-a::chunk-1",
@@ -531,6 +521,45 @@ class SourceJobsGuiTests(unittest.TestCase):
                 "problem_ids": ("problem-a", "problem-b"),
                 "reason": "Reviewed in context",
             })
+
+    def test_emergency_pause_is_immediate_even_during_other_work(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.source_action_in_progress = True
+        app.source_pause_callback = MagicMock(return_value={
+            "status": "paused",
+            "message": (
+                "Emergency pause active. No queued paid request will be "
+                "sent."),
+            "active_dispatches": 1,
+        })
+        app.source_dispatch_status = MagicMock()
+        app.source_action_status = MagicMock()
+        app._refresh_source_jobs = MagicMock()
+
+        app._pause_source_dispatch()
+
+        app.source_pause_callback.assert_called_once_with({})
+        app.source_dispatch_status.set.assert_any_call("Pausing…")
+        self.assertIn(
+            "Paused",
+            app.source_dispatch_status.set.call_args.args[0])
+        app._refresh_source_jobs.assert_called_once_with(
+            show_errors=False)
+
+    def test_resume_uses_safe_background_controller_hook(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.source_resume_callback = sentinel.resume_callback
+        app.source_dispatch_status = MagicMock()
+        app._dispatch_source_action = MagicMock()
+
+        app._resume_source_dispatch()
+
+        app.source_dispatch_status.set.assert_called_once_with(
+            "Connecting…")
+        app._dispatch_source_action.assert_called_once_with(
+            "resume",
+            sentinel.resume_callback,
+            {})
 
 
 if __name__ == "__main__":

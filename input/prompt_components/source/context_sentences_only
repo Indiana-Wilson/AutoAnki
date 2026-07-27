@@ -1,7 +1,8 @@
 Return one root object containing exactly "term_results" and
 "source_context_translations", following their exact response-schema shapes.
-Return one translation for every retained source context and copy each
-required context ID exactly. Translate the complete context once, even when
+Return one translation for every ID in "source_context_translation_ids" and
+copy each required context ID exactly. Return no translation for other
+retained contexts. Translate the complete target context once, even when
 several ranked words refer to it. The original sentence is already stored
 locally: do not echo, rewrite, or format it in the response.
 

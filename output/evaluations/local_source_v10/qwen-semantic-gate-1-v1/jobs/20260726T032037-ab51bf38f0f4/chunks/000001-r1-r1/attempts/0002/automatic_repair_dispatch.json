@@ -1,8 +1,0 @@
-{
-  "automatic": true,
-  "dispatch_ordinal": 1,
-  "dispatched_at": "2026-07-26T03:22:56.122548+00:00",
-  "kind": "automatic_repair_dispatch",
-  "repair_kind": "selective_scope",
-  "schema_version": 1
-}

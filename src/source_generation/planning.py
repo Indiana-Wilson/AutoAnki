@@ -678,7 +678,20 @@ def plan_source_generation(loaded_source, config):
             word.surface,
             source_language_key) not in excluded
     )
-    groups = _partition_words(selected_words, config.chunk_size)
+    selected_ranks = {
+        word.rank
+        for word in selected_words
+    }
+    # Source sentence cards are independent of lexical cards. When requested,
+    # partition all prefix words so a sentence remains translatable even if
+    # every word anchoring it was excluded as already learned. Excluded words
+    # become local-only context anchors and never enter the provider's lexical
+    # ``words`` payload.
+    planning_words = (
+        prefix_words
+        if config.retain_excluded_source_contexts
+        else selected_words)
+    groups = _partition_words(planning_words, config.chunk_size)
     occurrences_by_normalized = (
         _load_selected_source_occurrences(
             loaded_source,
@@ -690,16 +703,35 @@ def plan_source_generation(loaded_source, config):
         else {})
     total = len(groups)
     chunks = []
-    for index, words in enumerate(groups, start=1):
+    owned_source_context_ids = set()
+    for index, planning_group in enumerate(groups, start=1):
+        words = tuple(
+            word
+            for word in planning_group
+            if word.rank in selected_ranks)
+        context_anchors = tuple(
+            word
+            for word in planning_group
+            if word.rank not in selected_ranks)
         context_units, rank_to_context = _make_context_units(
             loaded_source.build,
-            words,
+            planning_group,
             config.context_mode,
             source_build_id=loaded_source.build_id)
         contexts_by_id = {
             context.context_id: context
             for context in context_units
         }
+        source_context_translation_ids = (
+            tuple(
+                context.context_id
+                for context in context_units
+                if context.context_id not in owned_source_context_ids)
+            if config.retain_excluded_source_contexts
+            else None)
+        if source_context_translation_ids is not None:
+            owned_source_context_ids.update(
+                source_context_translation_ids)
         context_occurrences_by_rank = (
             _chunk_context_occurrences(
                 loaded_source,
@@ -710,34 +742,52 @@ def plan_source_generation(loaded_source, config):
             if config.request_protocol == "v10"
             else {})
         chunk_id = (
-            f"{index:06d}-r{words[0].rank}-r{words[-1].rank}")
+            f"{index:06d}-r{planning_group[0].rank}"
+            f"-r{planning_group[-1].rank}")
+
+        def generation_word(word, *, include_occurrence_data):
+            context = contexts_by_id.get(
+                rank_to_context.get(word.rank))
+            return GenerationWord(
+                rank=word.rank,
+                surface=word.surface,
+                normalized=word.normalized,
+                section_id=word.section_id,
+                sentence_id=word.sentence_id,
+                context_id=rank_to_context.get(word.rank),
+                start_offset=word.start_offset,
+                end_offset=word.end_offset,
+                occurrence_locator=(
+                    _make_occurrence_locator(word, context)
+                    if include_occurrence_data
+                    else None),
+                context_occurrences=(
+                    context_occurrences_by_rank.get(
+                        word.rank,
+                        ())
+                    if include_occurrence_data
+                    else ()))
+
         chunks.append(GenerationChunk(
             chunk_id=chunk_id,
             index=index,
             total=total,
-            start_rank=words[0].rank,
-            end_rank=words[-1].rank,
+            start_rank=planning_group[0].rank,
+            end_rank=planning_group[-1].rank,
             words=tuple(
-                GenerationWord(
-                    rank=word.rank,
-                    surface=word.surface,
-                    normalized=word.normalized,
-                    section_id=word.section_id,
-                    sentence_id=word.sentence_id,
-                    context_id=rank_to_context.get(word.rank),
-                    start_offset=word.start_offset,
-                    end_offset=word.end_offset,
-                    occurrence_locator=_make_occurrence_locator(
-                        word,
-                        contexts_by_id.get(
-                            rank_to_context.get(word.rank))),
-                    context_occurrences=(
-                        context_occurrences_by_rank.get(
-                            word.rank,
-                            ())))
+                generation_word(
+                    word,
+                    include_occurrence_data=True)
                 for word in words
             ),
             contexts=context_units,
+            context_anchors=tuple(
+                generation_word(
+                    word,
+                    include_occurrence_data=False)
+                for word in context_anchors),
+            source_context_translation_ids=(
+                source_context_translation_ids),
         ))
 
     identity = {
@@ -749,6 +799,11 @@ def plan_source_generation(loaded_source, config):
         "selected_ranks": [
             word.rank
             for word in selected_words
+        ],
+        "context_anchor_ranks": [
+            word.rank
+            for word in planning_words
+            if word.rank not in selected_ranks
         ],
     }
     return GenerationPlan(
@@ -915,6 +970,13 @@ def _source_chunk_output_tokens(
         additional_senses_per_word
         if detail.field_keys
         else 0)
+    target_context_ids = set(
+        getattr(
+            chunk,
+            "requested_source_context_ids",
+            tuple(
+                context.context_id
+                for context in chunk.contexts)))
     context_translation_tokens = sum(
         (
             math.ceil(
@@ -923,10 +985,12 @@ def _source_chunk_output_tokens(
                 * context_translation_token_ratio)
             + _SOURCE_CONTEXT_TRANSLATION_OVERHEAD_TOKENS)
         for context in chunk.contexts
-        if context.context_id not in remembered_context_ids
+        if (
+            context.context_id in target_context_ids
+            and context.context_id not in remembered_context_ids)
     )
     context_nuance_tokens = (
-        len(chunk.contexts) * _SOURCE_CONTEXT_NUANCE_OUTPUT_TOKENS
+        len(target_context_ids) * _SOURCE_CONTEXT_NUANCE_OUTPUT_TOKENS
         if include_source_context_nuance
         else 0)
     return math.ceil(
@@ -1187,10 +1251,10 @@ def estimate_plan_cost(
             "Choose either one fixed response format or per-chunk response "
             "formats, not both.")
     if (
-            request_protocol in {"v9", "v10"}
+            request_protocol == "v9"
             and response_formats_by_chunk is not None):
         raise ValueError(
-            "Compact source request protocols require one fixed response "
+            "Compact source request protocol v9 requires one fixed response "
             "format.")
     if (
             request_protocol == "v8"
@@ -1225,11 +1289,23 @@ def estimate_plan_cost(
             raise TypeError(
                 f"Translation-memory hits for {chunk_id} must be an object.")
 
+    request_chunks = tuple(
+        chunk
+        for chunk in plan.chunks
+        if (
+            not use_source_for_example_sentences
+            or bool(chunk.words)
+            or bool(
+                set(chunk.requested_source_context_ids)
+                - set(translation_memory_by_chunk.get(
+                    chunk.chunk_id,
+                    ())))))
+
     # Imported here to keep planning's module import independent from the
     # request module, whose contract builder imports estimator constants.
     from source_generation.requests import render_chunk_input
 
-    request_count = len(plan.chunks)
+    request_count = len(request_chunks)
     prompt_tokens_per_request = estimate_text_tokens(prompt_text)
     prompt_tokens = prompt_tokens_per_request * request_count
     payload_tokens_by_chunk = {
@@ -1241,7 +1317,7 @@ def estimate_plan_cost(
                 source_context_translation_memory=(
                     translation_memory_by_chunk.get(
                         chunk.chunk_id))))
-        for chunk in plan.chunks
+        for chunk in request_chunks
     }
     payload_tokens = sum(payload_tokens_by_chunk.values())
 
@@ -1253,14 +1329,14 @@ def estimate_plan_cost(
             _canonical_json(response_format))
         schema_tokens_by_chunk = {
             chunk.chunk_id: schema_tokens_per_request
-            for chunk in plan.chunks
+            for chunk in request_chunks
         }
         schema_estimation_mode = "fixed_exact"
     elif response_formats_by_chunk is None:
         schema_tokens_per_request = _schema_token_estimate(detail)
         schema_tokens_by_chunk = {
             chunk.chunk_id: schema_tokens_per_request
-            for chunk in plan.chunks
+            for chunk in request_chunks
         }
         schema_estimation_mode = "detail_approximation"
     else:
@@ -1280,13 +1356,17 @@ def estimate_plan_cost(
             for chunk_id in expected_chunk_ids
         }
         schema_tokens_by_chunk = {
-            chunk_id: estimate_text_tokens(canonical)
-            for chunk_id, canonical in canonical_formats.items()
+            chunk.chunk_id: estimate_text_tokens(
+                canonical_formats[chunk.chunk_id])
+            for chunk in request_chunks
         }
         schema_tokens_per_request = max(
             schema_tokens_by_chunk.values(),
             default=0)
-        schema_cache_shared = len(set(canonical_formats.values())) <= 1
+        schema_cache_shared = len({
+            canonical_formats[chunk.chunk_id]
+            for chunk in request_chunks
+        }) <= 1
         schema_estimation_mode = "per_chunk_exact"
     schema_tokens = sum(schema_tokens_by_chunk.values())
     input_tokens = prompt_tokens + payload_tokens + schema_tokens
@@ -1307,7 +1387,7 @@ def estimate_plan_cost(
                             ())),
                     include_source_context_nuance=(
                         include_source_context_nuance))
-                for chunk in plan.chunks),
+                for chunk in request_chunks),
             "central": tuple(
                 _source_chunk_output_tokens(
                     detail,
@@ -1322,7 +1402,7 @@ def estimate_plan_cost(
                             ())),
                     include_source_context_nuance=(
                         include_source_context_nuance))
-                for chunk in plan.chunks),
+                for chunk in request_chunks),
             "high": tuple(
                 _source_chunk_output_tokens(
                     detail,
@@ -1337,7 +1417,7 @@ def estimate_plan_cost(
                             ())),
                     include_source_context_nuance=(
                         include_source_context_nuance))
-                for chunk in plan.chunks),
+                for chunk in request_chunks),
         }
         response_shape = "source_sentences_plus_lexical_senses"
         output_shape_assumptions = {
@@ -1375,19 +1455,19 @@ def estimate_plan_cost(
                     detail,
                     len(chunk.words),
                     senses_per_word=low_senses_per_word)
-                for chunk in plan.chunks),
+                for chunk in request_chunks),
             "central": tuple(
                 estimate_chunk_output_tokens(
                     detail,
                     len(chunk.words),
                     senses_per_word=senses_per_word)
-                for chunk in plan.chunks),
+                for chunk in request_chunks),
             "high": tuple(
                 estimate_chunk_output_tokens(
                     detail,
                     len(chunk.words),
                     senses_per_word=high_senses_per_word)
-                for chunk in plan.chunks),
+                for chunk in request_chunks),
         }
         response_shape = "generated_examples_for_each_sense"
         output_shape_assumptions = {
@@ -1419,7 +1499,7 @@ def estimate_plan_cost(
         prompt_tokens_per_request
         + schema_tokens_by_chunk[chunk.chunk_id]
         + payload_tokens_by_chunk[chunk.chunk_id]
-        for chunk in plan.chunks
+        for chunk in request_chunks
     )
     largest_input = max(request_input_tokens, default=0)
     largest_output = max(request_output_tokens, default=0)
@@ -1521,7 +1601,7 @@ def estimate_plan_cost(
     if automatic_repair_max_requests:
         per_round_input = 0
         per_round_output = 0
-        for chunk in plan.chunks:
+        for chunk in request_chunks:
             target_count = min(
                 _AUTOMATIC_REPAIR_MAX_PAIRS_PER_CALL,
                 len(chunk.words) * 4)
@@ -1617,6 +1697,7 @@ def estimate_plan_cost(
             "pricing": pricing.to_dict(),
             "prompt_tokens_per_request": prompt_tokens_per_request,
             "schema_estimation_mode": schema_estimation_mode,
+            "schema_cache_shared": schema_cache_shared,
             "schema_tokens_per_request": schema_tokens_per_request,
             "schema_tokens_by_chunk": dict(schema_tokens_by_chunk),
             "central_cache_assumption": (
@@ -1651,7 +1732,9 @@ def estimate_plan_cost(
                     detail.include_example_sentences
                     and not use_source_for_example_sentences)
                 else 0),
-            "context_deduplication_scope": "within each request",
+            "context_deduplication_scope": (
+                "translation ownership across the complete plan; retained "
+                "lexical context may repeat across request boundaries"),
             "translation_memory_hit_count": (
                 translation_memory_hit_count),
             "translation_memory_sha256": (

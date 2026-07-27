@@ -345,6 +345,7 @@ class VersionTenContractTests(unittest.TestCase):
             use_source_for_example_sentences=True,
             protocol_version=10)
         prompt = contract["composed_prompt"]
+        normalized_prompt = " ".join(prompt.split())
 
         for forbidden in (
                 "<strong>",
@@ -357,7 +358,7 @@ class VersionTenContractTests(unittest.TestCase):
         self.assertNotIn("complete lexical item", prompt)
         self.assertIn(
             "one Sentence → Meaning card",
-            prompt)
+            normalized_prompt)
         self.assertIn("Do not perform or return lexical analysis", prompt)
         self.assertNotIn("dictionary meaning", prompt.casefold())
         self.assertTrue(
@@ -410,14 +411,14 @@ class VersionTenContractTests(unittest.TestCase):
             },
             {
                 "prompt": (
-                    "16053d585d5593f6a0ad441447d36f3a6f1c9a4acbc12b22489c3e"
-                    "01fb76dabe"),
+                    "f40a9e490b5f9fcf64db9005360d1fa9c41544ca7085275888f38ed"
+                    "b2791c64a"),
                 "schema": (
                     "d8d231db57644a066a89cbd5414a200bf7db38d56cfc01c609f8ad"
                     "1a8eededce"),
                 "contract": (
-                    "691a82cf7022ad7723049460b8300f367b8c7c2c33c0cfe91d6ae30"
-                    "ccace1ef6"),
+                    "120a899860ef6ec7cf08be86c1ec2ea37db9127fb9c133cd816a220a0"
+                    "a6df4b2"),
                 "payload": (
                     "3f569818c47eedc9bfc4337da31da0bf14f7f0a08c3ffc67859e8ed"
                     "cca4f1351"),

@@ -79,9 +79,12 @@ separately, once per retained context, for the contextual sense.
 SOURCE CONTEXT TRANSLATIONS
 
 "source_context_translations" is keyed by the exact "context_id" strings
-required by the response schema. For every object in the input "contexts"
-array, copy its "context_id" character-for-character as one JSON property name.
-Return every required context ID exactly once and add no other property.
+required by the response schema. The input "source_context_translation_ids"
+array lists those targets. Copy each listed ID character-for-character as one
+JSON property name. Return every required context ID exactly once and add no
+other property. Contexts whose IDs are absent from that list are lexical
+evidence only and must not receive a translation in this response. If the
+target list is absent from a legacy batch, every input context is a target.
 
 Follow the response schema for each context-ID value. It is either one complete,
 natural English translation directly as a JSON string, or an object containing

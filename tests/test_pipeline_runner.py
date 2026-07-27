@@ -107,6 +107,25 @@ class PipelineRunnerTests(unittest.TestCase):
             source_deck=pipeline.generated_deck_name,
             client="anki-client")
 
+    def test_paid_dispatch_control_is_forwarded_to_manual_generator(self):
+        pipeline = pipeline_store.default_pipeline()
+        control = object()
+
+        with tempfile.TemporaryDirectory() as directory:
+            summary = pipeline_runner.run_pipelines(
+                "astrolabe",
+                (pipeline,),
+                project_root=PROJECT_ROOT,
+                output_root=directory,
+                paid_dispatch_control=control,
+                generator=self.generator,
+                importer=self.importer)
+
+        self.assertEqual(len(summary.successes), 1)
+        self.assertIs(
+            self.generator.call_args.kwargs["paid_dispatch_control"],
+            control)
+
     def test_two_configurations_each_make_one_generation_call(self):
         first = configure_pipeline(
             pipeline_store.default_pipeline(),

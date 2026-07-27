@@ -523,7 +523,7 @@ def derive_compact_repair_scope(report, chunk):
         word.rank
         for word in chunk.words
         if word.context_id in replace_context_ids)
-    if not request_ranks:
+    if not request_ranks and not replace_context_ids:
         return None
     request_context_ids = set(replace_context_ids)
     request_context_ids.update(
@@ -577,16 +577,24 @@ def build_compact_repair_chunk(chunk, scope):
         raise ValueError("Repair ranks do not match the saved source chunk.")
     if {context.context_id for context in contexts} != context_ids:
         raise ValueError("Repair contexts do not match the saved source chunk.")
-    if not words:
-        raise ValueError("A compact repair request requires at least one rank.")
     return GenerationChunk(
         chunk_id=chunk.chunk_id,
         index=chunk.index,
         total=chunk.total,
-        start_rank=min(word.rank for word in words),
-        end_rank=max(word.rank for word in words),
+        start_rank=(
+            min(word.rank for word in words)
+            if words
+            else chunk.start_rank),
+        end_rank=(
+            max(word.rank for word in words)
+            if words
+            else chunk.end_rank),
         words=words,
         contexts=contexts,
+        source_context_translation_ids=(
+            tuple(scope.replace_context_ids)
+            if chunk.source_context_translation_ids is not None
+            else None),
     )
 
 
@@ -639,7 +647,13 @@ def _indexed_items(
     return indexed
 
 
-def merge_compact_repair(base_raw_text, repair_raw_text, chunk, scope):
+def merge_compact_repair(
+        base_raw_text,
+        repair_raw_text,
+        chunk,
+        scope,
+        *,
+        remembered_context_ids=()):
     """Merge only failed compact components and return canonical JSON."""
     if not isinstance(chunk, GenerationChunk):
         raise TypeError("A source generation chunk is required.")
@@ -656,9 +670,19 @@ def merge_compact_repair(base_raw_text, repair_raw_text, chunk, scope):
     term_key = process_text.SOURCE_TERM_RESULTS_KEY
     context_key = process_text.SOURCE_CONTEXT_TRANSLATIONS_KEY
     all_ranks = tuple(word.rank for word in chunk.words)
+    requested_context_ids = tuple(
+        chunk.requested_source_context_ids)
+    remembered_context_ids = set(remembered_context_ids)
+    if not remembered_context_ids <= set(requested_context_ids):
+        raise ValueError(
+            "Remembered repair contexts are outside the saved chunk.")
+    if remembered_context_ids & set(scope.replace_context_ids):
+        raise ValueError(
+            "A remembered source translation cannot be provider-repaired.")
     all_context_ids = tuple(
-        context.context_id
-        for context in chunk.contexts)
+        context_id
+        for context_id in requested_context_ids
+        if context_id not in remembered_context_ids)
     base_terms = _indexed_items(
         base,
         root_key=term_key,
@@ -683,7 +707,10 @@ def merge_compact_repair(base_raw_text, repair_raw_text, chunk, scope):
         repair,
         root_key=context_key,
         identity_key=context_id_key,
-        expected_identities=scope.request_context_ids,
+        expected_identities=(
+            scope.replace_context_ids
+            if chunk.source_context_translation_ids is not None
+            else scope.request_context_ids),
         label="repair")
 
     replace_ranks = set(scope.replace_ranks)

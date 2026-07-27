@@ -4,6 +4,7 @@ import hashlib
 import html
 import json
 from pathlib import Path
+import tempfile
 
 import genanki
 
@@ -233,7 +234,8 @@ def _lexical_note(
         card,
         *,
         guid_seed,
-        due):
+        due,
+        enhanced_payload=None):
     language = pipeline_store.get_language(pipeline.language_key)
     settings = pipeline_store.get_language_settings(
         pipeline,
@@ -253,9 +255,12 @@ def _lexical_note(
         ),
         "",
     ]
+    if card.enhanced:
+        fields.extend(_enhanced_note_fields(enhanced_payload))
     card_type = templates.get_direction_card_type(
         language.model_language_key,
-        card.direction_key)
+        card.direction_key,
+        enhanced=card.enhanced)
     return genanki.Note(
         model=card_type.model,
         fields=fields,
@@ -279,7 +284,8 @@ def _generated_note(
         card,
         *,
         guid_seed,
-        due):
+        due,
+        enhanced_payload=None):
     language = pipeline_store.get_language(pipeline.language_key)
     settings = pipeline_store.get_language_settings(
         pipeline,
@@ -304,20 +310,24 @@ def _generated_note(
             translations)
     card_type = templates.get_direction_card_type(
         language.model_language_key,
-        card.direction_key)
+        card.direction_key,
+        enhanced=card.enhanced)
+    fields = [
+        note_data[language.term_field],
+        sentences,
+        *(
+            note_data.get(
+                response_fields_by_key.get(field_key, ""),
+                "")
+            for field_key, _field_name in templates.CONTENT_FIELDS
+        ),
+        translations,
+    ]
+    if card.enhanced:
+        fields.extend(_enhanced_note_fields(enhanced_payload))
     return genanki.Note(
         model=card_type.model,
-        fields=[
-            note_data[language.term_field],
-            sentences,
-            *(
-                note_data.get(
-                    response_fields_by_key.get(field_key, ""),
-                    "")
-                for field_key, _field_name in templates.CONTENT_FIELDS
-            ),
-            translations,
-        ],
+        fields=fields,
         due=due,
         guid=genanki.guid_for(
             "autoanki",
@@ -332,23 +342,190 @@ def _generated_note(
             )))
 
 
-def _sentence_note(context, *, guid_seed, due):
+def _sentence_note(
+        context,
+        *,
+        guid_seed,
+        due,
+        enhanced_payload=None):
     def safe_text(value):
         return html.escape(html.unescape(value), quote=False)
 
     return genanki.Note(
-        model=templates.SOURCE_SENTENCE_MODEL,
+        model=(
+            templates.ENHANCED_SOURCE_SENTENCE_MODEL
+            if enhanced_payload is not None
+            else templates.SOURCE_SENTENCE_MODEL),
         fields=[
             safe_text(context["original_sentence"]),
             safe_text(context["english_translation"]),
             safe_text(context.get("nuance", "")),
+            *(
+                _enhanced_source_sentence_fields(enhanced_payload)
+                if enhanced_payload is not None
+                else ()
+            ),
         ],
         due=due,
         guid=genanki.guid_for(
             "autoanki",
             guid_seed,
-            "source_sentence",
+            (
+                "enhanced_source_sentence"
+                if enhanced_payload is not None
+                else "source_sentence"),
             context["sentence_id"]))
+
+
+def _sound_field(artifact):
+    return (
+        f"[sound:{artifact.media_filename}]"
+        if artifact is not None
+        else "")
+
+
+def _enhanced_note_fields(payload):
+    if not isinstance(payload, dict):
+        raise ValueError(
+            "Enhanced card packaging requires synthesized local audio.")
+    audio_first = bool(payload.get("audio_first"))
+    return [
+        _sound_field(payload.get("word_audio")),
+        payload.get("sentence", ""),
+        payload.get("sentence_translation", ""),
+        _sound_field(payload.get("sentence_audio")),
+        "1" if audio_first else "",
+        "" if audio_first else "1",
+        payload["presentation_key"],
+    ]
+
+
+def _enhanced_source_sentence_fields(payload):
+    if not isinstance(payload, dict):
+        raise ValueError(
+            "Enhanced source-sentence packaging requires local audio.")
+    audio_first = bool(payload.get("audio_first"))
+    return [
+        _sound_field(payload.get("sentence_audio")),
+        "1" if audio_first else "",
+        "" if audio_first else "1",
+        payload["presentation_key"],
+    ]
+
+
+def _prepare_enhanced_event_audio(
+        ordered_events,
+        *,
+        pipeline,
+        guid_seed,
+        audio_service=None):
+    import enhanced_audio
+
+    context_card = next((
+        card
+        for card in pipeline_store.get_enabled_cards(pipeline)
+        if card.direction_key == "context"
+    ), None)
+    language = pipeline_store.get_language(pipeline.language_key)
+    payloads = {}
+    requests = []
+    request_slots = []
+    for event_index, (
+            _order,
+            direction,
+            kind,
+            data,
+            card) in enumerate(ordered_events):
+        effective_card = card if card is not None else context_card
+        if effective_card is None or not effective_card.enhanced:
+            continue
+        presentation_key = enhanced_audio.deterministic_presentation_key(
+            guid_seed,
+            pipeline.language_key,
+            direction,
+            kind,
+            event_index,
+            (
+                data.get("sentence_id")
+                if isinstance(data, dict)
+                else None),
+            (
+                data.get(language.term_field)
+                if isinstance(data, dict)
+                else None))
+        audio_first = (
+            direction in {"context", "word_to_meaning"}
+            and enhanced_audio.deterministic_audio_first(
+                presentation_key))
+        payload = {
+            "presentation_key": presentation_key,
+            "audio_first": audio_first,
+            "word_audio": None,
+            "sentence_audio": None,
+            "sentence": "",
+            "sentence_translation": "",
+        }
+        payloads[event_index] = payload
+        if kind == "sentence":
+            sentence = data["original_sentence"]
+            payload["sentence"] = html.escape(
+                html.unescape(sentence),
+                quote=False)
+            payload["sentence_translation"] = html.escape(
+                html.unescape(data["english_translation"]),
+                quote=False)
+            requests.append(enhanced_audio.AudioRequest(
+                sentence,
+                pipeline.language_key,
+                "sentence"))
+            request_slots.append((event_index, "sentence_audio"))
+        elif direction == "context":
+            term = data[language.term_field]
+            sentences = data.get("Sentences", "").split("|")
+            translations = data.get(
+                process_text.SENTENCE_TRANSLATIONS_FIELD_NAME,
+                "").split("|")
+            if (
+                    not sentences
+                    or not sentences[0].strip()
+                    or len(sentences) != len(translations)):
+                raise ValueError(
+                    "Enhanced Sentence → Meaning cards require aligned "
+                    "example sentences and English translations.")
+            choice = enhanced_audio.deterministic_choice_index(
+                len(sentences),
+                presentation_key)
+            payload["sentence"] = (
+                process_text.emphasize_term_in_sentences(
+                    sentences[choice],
+                    term,
+                    pipeline.language_key))
+            payload["sentence_translation"] = (
+                process_text.sanitize_sentence_translations(
+                    translations[choice]))
+            requests.append(enhanced_audio.AudioRequest(
+                payload["sentence"],
+                pipeline.language_key,
+                "sentence"))
+            request_slots.append((event_index, "sentence_audio"))
+        else:
+            term = data[language.term_field]
+            requests.append(enhanced_audio.AudioRequest(
+                term,
+                pipeline.language_key,
+                "word"))
+            request_slots.append((event_index, "word_audio"))
+
+    if not requests:
+        return payloads, ()
+    service = audio_service or enhanced_audio.LocalTTSService()
+    artifacts = service.synthesize_many(requests)
+    for (event_index, field_name), artifact in zip(
+            request_slots,
+            artifacts,
+            strict=True):
+        payloads[event_index][field_name] = artifact
+    return payloads, artifacts
 
 
 def create_source_package(
@@ -363,7 +540,9 @@ def create_source_package(
         use_source_for_example_sentences=False,
         require_sentence_translations=True,
         separate_source_decks=False,
-        shared_source_sentence_cards=None):
+        shared_source_sentence_cards=None,
+        audio_service=None,
+        audio_media_directory=None):
     """Validate output and package selected source card directions."""
     value = _response_mapping(combined_response)
     if shared_source_sentence_cards is None:
@@ -398,7 +577,9 @@ def create_source_package(
                 require_sentence_translations),
             guid_seed=(
                 guid_seed
-                or f"source:{source_key}:{pipeline.pipeline_id}"))
+                or f"source:{source_key}:{pipeline.pipeline_id}"),
+            audio_service=audio_service,
+            audio_media_directory=audio_media_directory)
         return output_path, notes_created
     response_text = json.dumps(
         {"cards": value["cards"]},
@@ -557,14 +738,27 @@ def create_source_package(
                     card,
                 ))
 
+    ordered_events = sorted(
+        events,
+        key=lambda event: event[0])
+    enhanced_payloads, audio_artifacts = (
+        _prepare_enhanced_event_audio(
+            ordered_events,
+            pipeline=pipeline,
+            guid_seed=guid_seed,
+            audio_service=audio_service))
+
     due_by_direction = {
         direction: 0
         for direction in decks
     }
     notes_created = 0
-    for _order, direction, kind, data, card in sorted(
-            events,
-            key=lambda event: event[0]):
+    for event_index, (
+            _order,
+            direction,
+            kind,
+            data,
+            card) in enumerate(ordered_events):
         if separate_source_decks:
             due_by_direction[direction] += 1
             due = due_by_direction[direction]
@@ -575,21 +769,24 @@ def create_source_package(
             note = _sentence_note(
                 data,
                 guid_seed=guid_seed,
-                due=due)
+                due=due,
+                enhanced_payload=enhanced_payloads.get(event_index))
         elif kind == "lexical":
             note = _lexical_note(
                 data,
                 pipeline,
                 card,
                 guid_seed=guid_seed,
-                due=due)
+                due=due,
+                enhanced_payload=enhanced_payloads.get(event_index))
         else:
             note = _generated_note(
                 data,
                 pipeline,
                 card,
                 guid_seed=guid_seed,
-                due=due)
+                due=due,
+                enhanced_payload=enhanced_payloads.get(event_index))
         decks[direction].add_note(note)
         if separate_source_decks:
             notes_created += 1
@@ -597,9 +794,34 @@ def create_source_package(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     unique_decks = list(dict.fromkeys(decks.values()))
-    genanki.Package(
-        unique_decks if len(unique_decks) > 1 else unique_decks[0]
-    ).write_to_file(output_path)
+    package_target = (
+        unique_decks
+        if len(unique_decks) > 1
+        else unique_decks[0])
+    if audio_artifacts:
+        import enhanced_audio
+
+        def write_audio_package(media_directory):
+            enhanced_audio.materialize_media(
+                audio_artifacts,
+                media_directory)
+            media_files = [
+                str(media_directory / artifact.media_filename)
+                for artifact in dict.fromkeys(audio_artifacts)
+            ]
+            genanki.Package(
+                package_target,
+                media_files=media_files).write_to_file(output_path)
+
+        if audio_media_directory is None:
+            with tempfile.TemporaryDirectory(
+                    prefix=".autoanki-source-audio-",
+                    dir=output_path.parent) as directory:
+                write_audio_package(Path(directory))
+        else:
+            write_audio_package(Path(audio_media_directory))
+    else:
+        genanki.Package(package_target).write_to_file(output_path)
     return output_path, notes_created
 
 

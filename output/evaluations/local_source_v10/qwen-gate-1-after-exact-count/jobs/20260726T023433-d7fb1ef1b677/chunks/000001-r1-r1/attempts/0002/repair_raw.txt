@@ -1,8 +1,0 @@
-{
-  "repairs": {
-    "p001": {
-      "sentence": "君子之言，不可聞也。",
-      "translation": "The words of the gentleman cannot be heard."
-    }
-  }
-}

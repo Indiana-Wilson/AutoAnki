@@ -1,5 +1,8 @@
-Translate each retained {source_language} source context into complete, natural
-English for one Sentence → Meaning card per original sentence.
+Translate each {source_language} source context whose ID appears in
+"source_context_translation_ids" into complete, natural English for one
+Sentence → Meaning card per original sentence. Other retained contexts are
+lexical evidence only and must not be translated in this response. For a
+legacy batch where that field is absent, every retained context is a target.
 
 The ranked words are local association and ordering metadata only. Do not
 define, pronounce, classify, exemplify, or search for additional senses of

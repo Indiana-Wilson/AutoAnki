@@ -50,6 +50,42 @@ def _source_example_setting(request, plan, pipeline):
     return True
 
 
+def _sentence_only_source_plan(plan, pipeline, enabled):
+    """Keep sentence attribution local when no lexical card is requested."""
+    if (
+            not enabled
+            or pipeline_store.get_source_lexical_field_settings(pipeline)):
+        return plan
+    chunks = []
+    for chunk in plan.chunks:
+        anchors_by_rank = {
+            word.rank: word
+            for word in (
+                *chunk.context_anchors,
+                *chunk.words,
+            )
+        }
+        chunks.append(replace(
+            chunk,
+            words=(),
+            context_anchors=tuple(
+                anchors_by_rank[rank]
+                for rank in sorted(anchors_by_rank))))
+    return replace(
+        plan,
+        chunks=tuple(chunks))
+
+
+def _source_sentence_card_count(plan, enabled):
+    if not enabled:
+        return 0
+    return len({
+        context_id
+        for chunk in plan.chunks
+        for context_id in chunk.requested_source_context_ids
+    })
+
+
 def _request_protocol_version(config):
     return int(config.request_protocol.removeprefix("v"))
 
@@ -57,12 +93,14 @@ def _request_protocol_version(config):
 def _estimate_response_format_arguments(config, request_contract):
     response_formats = request_contract.get(
         "response_formats_by_chunk")
-    if config.request_protocol in {"v9", "v10"}:
+    if config.request_protocol == "v9":
         return {
             "response_format": request_contract["response_format"],
             "response_formats_by_chunk": None,
         }
-    if request_contract.get("use_source_for_example_sentences"):
+    if (
+            request_contract.get("use_source_for_example_sentences")
+            and response_formats):
         return {
             "response_format": None,
             "response_formats_by_chunk": response_formats,
@@ -136,10 +174,8 @@ def _normalise_translation_memory_snapshot(value, plan):
         if not isinstance(raw_hits, dict):
             raise TypeError(
                 "Translation-memory chunk hits must be an object.")
-        expected_context_ids = {
-            context.context_id
-            for context in chunks[chunk_id].contexts
-        }
+        expected_context_ids = set(
+            chunks[chunk_id].requested_source_context_ids)
         hits = {}
         for context_id, raw_hit in raw_hits.items():
             if (
@@ -344,6 +380,10 @@ class SourceGenerationBackend:
             request,
             plan,
             pipeline)
+        plan = _sentence_only_source_plan(
+            plan,
+            pipeline,
+            use_source_examples)
         include_source_context_nuance = bool(
             request.get("include_source_context_nuance", False))
         memory_enabled = bool(
@@ -452,6 +492,19 @@ class SourceGenerationBackend:
             "translation_memory_hit_count": sum(
                 len(hits)
                 for hits in translation_memory_by_chunk.values()),
+            "source_sentence_card_count": (
+                _source_sentence_card_count(
+                    plan,
+                    use_source_examples)),
+            "local_completion_chunk_count": sum(
+                1
+                for chunk in plan.chunks
+                if (
+                    not chunk.words
+                    and set(chunk.requested_source_context_ids)
+                    <= set(translation_memory_by_chunk.get(
+                        chunk.chunk_id,
+                        ())))),
             "largest_request_input_tokens": largest_input,
             "largest_request_output_tokens": largest_output,
             "largest_request_high_output_tokens": high_output,
@@ -462,9 +515,6 @@ class SourceGenerationBackend:
 
     def create_job(self, request):
         """Persist pending chunks after, but without consuming, authorization."""
-        if request.get("paid_confirmed") is not True:
-            raise PermissionError(
-                "Paid source generation requires explicit confirmation.")
         _loaded, plan = self._plan(request)
         model_runtime_snapshot = _normalise_model_runtime_snapshot(
             request.get("model_runtime_snapshot"),
@@ -477,6 +527,10 @@ class SourceGenerationBackend:
             request,
             plan,
             pipeline)
+        plan = _sentence_only_source_plan(
+            plan,
+            pipeline,
+            use_source_examples)
         include_source_context_nuance = bool(
             request.get("include_source_context_nuance", False))
         memory_enabled = bool(
@@ -522,6 +576,10 @@ class SourceGenerationBackend:
             **_estimate_response_format_arguments(
                 plan.config,
                 request_contract))
+        paid_confirmed = request.get("paid_confirmed") is True
+        if estimate.request_count and not paid_confirmed:
+            raise PermissionError(
+                "Paid source generation requires explicit confirmation.")
         expected_authorization = _estimate_authorization_fingerprint(
             plan,
             request_contract,
@@ -568,7 +626,7 @@ class SourceGenerationBackend:
                 f"{model_profile.max_context_tokens:,} total tokens. Reduce "
                 "the chunk size or context.")
         metadata = {
-            "paid_confirmed_at_creation": True,
+            "paid_confirmed_at_creation": paid_confirmed,
             "authorization_bypassed_for_empty_plan": (
                 not plan.chunks),
             "pipeline": asdict(pipeline),

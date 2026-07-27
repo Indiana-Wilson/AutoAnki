@@ -1,8 +1,0 @@
-{
-  "repairs": {
-    "p001": {
-      "sentence": "子之道，可闻而不可见。",
-      "translation": "What he says can be heard but cannot be seen."
-    }
-  }
-}

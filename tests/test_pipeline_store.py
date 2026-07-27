@@ -142,6 +142,41 @@ class PipelineStoreTests(unittest.TestCase):
                 pipeline_store.pipeline_to_mapping(french)),
             french)
 
+    def test_enhanced_choice_round_trips_and_is_effective_only_when_supported(
+            self):
+        pipeline = language_pipeline(
+            "english",
+            enabled=("context",))
+        settings = pipeline_store.get_language_settings(
+            pipeline,
+            "english")
+        settings = replace(
+            settings,
+            cards=tuple(
+                replace(
+                    card,
+                    enhanced=card.direction_key == "context")
+                for card in settings.cards))
+        modern = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,),
+            active_language_key="english")
+        historical = replace(modern, language_key="middle_english")
+
+        restored = pipeline_store.pipeline_from_mapping(
+            pipeline_store.pipeline_to_mapping(historical))
+
+        retained_context = next(
+            card
+            for card in restored.cards
+            if card.direction_key == "context")
+        self.assertTrue(retained_context.enhanced)
+        self.assertFalse(
+            pipeline_store.get_enabled_cards(restored)[0].enhanced)
+        self.assertTrue(
+            pipeline_store.get_enabled_cards(modern)[0].enhanced)
+
     def test_unselected_field_language_is_saved_without_selecting_field(self):
         pipeline = pipeline_store.default_pipeline()
         settings = pipeline_store.get_language_settings(
@@ -750,6 +785,30 @@ class PromptComponentTests(unittest.TestCase):
             "without seeing the definition",
             normalized_text)
 
+    def test_legacy_prompt_files_request_three_plain_examples(self):
+        for prompt_name in (
+                "english_vocab",
+                "french_vocab",
+                "japanese_vocab",
+                "latin_vocab",
+                "classical_chinese"):
+            with self.subTest(prompt=prompt_name):
+                text = (
+                    PROJECT_ROOT / "input" / "prompts" / prompt_name
+                ).read_text(encoding="utf-8")
+                lowered = text.casefold()
+                normalized = " ".join(lowered.split())
+
+                self.assertIn("three", lowered)
+                self.assertNotIn("four", lowered)
+                self.assertNotIn("<strong>", lowered)
+                self.assertNotIn("embolden", lowered)
+                self.assertNotIn("emphasis", lowered)
+                self.assertIn("no html", lowered)
+                self.assertIn(
+                    "reasonably likely to encounter",
+                    normalized)
+
     def test_classical_chinese_era_prompts_add_historical_guidance(self):
         ming = language_pipeline(
             "classical_chinese_ming",
@@ -942,6 +1001,14 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(
             templates.LATIN_MEANING_TO_WORD_MODEL_ID,
             2021716093)
+        all_card_types = templates.list_card_types(
+            include_enhanced=True)
+        all_ids = [
+            card_type.model.model_id
+            for card_type in all_card_types
+        ]
+        self.assertEqual(len(all_card_types), 27)
+        self.assertEqual(len(all_ids), len(set(all_ids)))
 
     def test_every_language_has_exactly_three_directions(self):
         model_language_keys = {
@@ -1066,6 +1133,55 @@ class TemplateTests(unittest.TestCase):
                 with zipfile.ZipFile(output) as archive:
                     self.assertIn("collection.anki2", archive.namelist())
 
+    def test_every_enhanced_model_can_be_packaged_with_complete_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            enhanced = tuple(
+                card_type
+                for card_type in templates.list_card_types(
+                    include_enhanced=True)
+                if card_type.enhanced)
+            for index, card_type in enumerate(enhanced):
+                deck = genanki.Deck(
+                    (1 << 30) + 100 + index,
+                    f"Enhanced test {index}")
+                fields = [
+                    "term",
+                    "one|two|three",
+                    "translation",
+                    "definition",
+                    "pronunciation",
+                    "part of speech",
+                    "register",
+                    "nuance",
+                    "one|two|three",
+                    "[sound:word.wav]",
+                    "one",
+                    "one",
+                    "[sound:sentence.wav]",
+                    "",
+                    "1",
+                    f"presentation-{index}",
+                ]
+                deck.add_note(genanki.Note(
+                    model=card_type.model,
+                    fields=fields))
+                output = Path(directory) / f"enhanced-{index}.apkg"
+                genanki.Package(deck).write_to_file(output)
+                self.assertTrue(output.is_file())
+
+        context = templates.get_direction_card_type(
+            "english",
+            "context",
+            enhanced=True).model.templates[0]
+        self.assertIn("context-fallback-term", context["qfmt"])
+        self.assertIn("!sentence.querySelector(\"strong\")", context["qfmt"])
+        meaning_to_word = templates.get_direction_card_type(
+            "english",
+            "meaning_to_word",
+            enhanced=True).model.templates[0]
+        self.assertIn("{{FrontSide}}", meaning_to_word["afmt"])
+        self.assertNotIn("{{Pronunciation}}", meaning_to_word["qfmt"])
+
     def test_meaning_fields_are_vertical_and_conditionally_rendered(self):
         card_type = templates.get_direction_card_type(
             "french",
@@ -1078,6 +1194,50 @@ class TemplateTests(unittest.TestCase):
             '<strong class="definition-label">Translation</strong>',
             answer)
         self.assertIn("{{#Nuance}}", answer)
+
+    def test_meaning_to_word_keeps_pronunciation_on_word_side(self):
+        for language_key, term_field in templates.TERM_FIELD_NAMES.items():
+            with self.subTest(language=language_key):
+                model = templates.get_direction_card_type(
+                    language_key,
+                    "meaning_to_word").model
+                question = model.templates[0]["qfmt"]
+                answer = model.templates[0]["afmt"]
+
+                self.assertNotIn("Pronunciation", question)
+                self.assertIn("{{#Pronunciation}}", answer)
+                self.assertIn("{{Pronunciation}}", answer)
+                self.assertIn('class="term-pronunciation"', answer)
+                self.assertGreater(
+                    answer.index("{{Pronunciation}}"),
+                    answer.index(f"{{{{{term_field}}}}}"))
+
+    def test_pronunciation_only_meaning_to_word_has_visible_front_guard(self):
+        pipeline = language_pipeline(
+            "english",
+            enabled=("meaning_to_word",),
+            shared_fields=(
+                pipeline_store.FieldSetting(
+                    "pronunciation",
+                    "english"),
+            ))
+
+        pipeline_store.validate_pipelines((pipeline,))
+        question = templates.get_direction_card_type(
+            "english",
+            "meaning_to_word").model.templates[0]["qfmt"]
+
+        self.assertNotIn("Pronunciation", question)
+        self.assertIn(
+            "No meaning field was configured for this card.",
+            question)
+        for field_name in (
+                "Translation",
+                "Dictionary Meaning",
+                "Part of Speech",
+                "Register",
+                "Nuance"):
+            self.assertIn(f"{{{{^{field_name}}}}}", question)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +30,8 @@ from source_generation import (
     GenerationJobStore,
     LoadedSource,
     OutputDetail,
+    PaidDispatchControl,
+    PaidDispatchPaused,
     RetryPolicy,
     SOURCE_REQUEST_MODEL,
     SourceGenerationConfig,
@@ -63,6 +66,7 @@ from source_generation.jobs import _RequestStartGate
 import pipeline_store
 import process_text
 import templates
+import source_workflow
 
 
 class CharacterTokenizer:
@@ -136,7 +140,8 @@ def make_plan(
         reasoning_effort="none",
         execution_mode="standard",
         model="gpt-5.4-mini",
-        automatic_repair=False):
+        automatic_repair=False,
+        retain_excluded_source_contexts=False):
     source = make_source()
     return plan_source_generation(
         source,
@@ -152,7 +157,9 @@ def make_plan(
             reasoning_effort=reasoning_effort,
             execution_mode=execution_mode,
             automatic_repair=automatic_repair,
-            excluded_words=tuple(excluded_words)))
+            excluded_words=tuple(excluded_words),
+            retain_excluded_source_contexts=(
+                retain_excluded_source_contexts)))
 
 
 class SourcePlanningTests(unittest.TestCase):
@@ -213,6 +220,13 @@ class SourcePlanningTests(unittest.TestCase):
                 source_key="fixture_source",
                 request_protocol="v8",
                 reasoning_effort="none")
+        with self.assertRaisesRegex(
+                ValueError,
+                "context mode other than None"):
+            SourceGenerationConfig(
+                source_key="fixture_source",
+                context_mode=ContextMode.NONE,
+                retain_excluded_source_contexts=True)
 
     def test_source_batch_instructions_are_an_editable_prompt_component(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -447,6 +461,77 @@ class SourcePlanningTests(unittest.TestCase):
             "occurrence_locator",
             legacy_chunk.request_payload()["words"][0])
 
+    def test_context_translation_ownership_crosses_lexical_chunk_boundaries(
+            self):
+        plan = make_plan(
+            chunk_size=1,
+            request_protocol="v10",
+            retain_excluded_source_contexts=True)
+
+        context_ids = [
+            chunk.contexts[0].context_id
+            for chunk in plan.chunks
+        ]
+        translation_ids = [
+            context_id
+            for chunk in plan.chunks
+            for context_id in chunk.requested_source_context_ids
+        ]
+
+        self.assertEqual(len(plan.chunks), 6)
+        self.assertEqual(len(set(context_ids)), 3)
+        self.assertEqual(len(translation_ids), 3)
+        self.assertEqual(len(set(translation_ids)), 3)
+        for context_id in set(context_ids):
+            matching = [
+                chunk
+                for chunk in plan.chunks
+                if chunk.contexts[0].context_id == context_id
+            ]
+            self.assertEqual(len(matching), 2)
+            self.assertEqual(
+                matching[0].requested_source_context_ids,
+                (context_id,))
+            self.assertEqual(
+                matching[1].requested_source_context_ids,
+                ())
+            self.assertEqual(
+                json.loads(render_chunk_input(
+                    matching[1],
+                    protocol_version=10))["contexts"][0]["context_id"],
+                context_id)
+
+        estimate = estimate_plan_cost(
+            plan,
+            OutputDetail(
+                ("translation",),
+                include_example_sentences=True),
+            use_source_for_example_sentences=True,
+            request_protocol="v10")
+        self.assertEqual(estimate.request_count, 6)
+
+    def test_excluded_context_only_chunks_translate_each_sentence_once(self):
+        plan = make_plan(
+            chunk_size=1,
+            request_protocol="v10",
+            excluded_words=("甲", "乙", "丙", "丁", "戊", "己"),
+            retain_excluded_source_contexts=True)
+
+        estimate = estimate_plan_cost(
+            plan,
+            OutputDetail((), include_example_sentences=False),
+            use_source_for_example_sentences=True,
+            request_protocol="v10")
+
+        self.assertEqual(plan.word_count, 0)
+        self.assertEqual(len(plan.chunks), 6)
+        self.assertEqual(
+            sum(
+                len(chunk.requested_source_context_ids)
+                for chunk in plan.chunks),
+            3)
+        self.assertEqual(estimate.request_count, 3)
+
     def test_overlapping_neighbor_windows_merge_into_one_context(self):
         plan = make_plan(
             context_mode=ContextMode.SENTENCE_NEIGHBORS)
@@ -542,6 +627,36 @@ class SourcePlanningTests(unittest.TestCase):
 
         self.assertEqual(plan.word_count, 0)
         self.assertFalse(plan.chunks)
+
+    def test_excluded_words_still_anchor_requested_source_sentence_cards(self):
+        plan = make_plan(
+            chunk_size=2,
+            request_protocol="v10",
+            excluded_words=("甲", "乙", "丙", "丁", "戊", "己"),
+            retain_excluded_source_contexts=True)
+
+        self.assertEqual(plan.word_count, 0)
+        self.assertEqual(len(plan.chunks), 3)
+        self.assertTrue(all(
+            not chunk.words
+            for chunk in plan.chunks))
+        self.assertEqual(
+            tuple(
+                anchor.surface
+                for chunk in plan.chunks
+                for anchor in chunk.context_anchors),
+            ("甲", "乙", "丙", "丁", "戊", "己"))
+        self.assertTrue(all(
+            chunk.contexts
+            for chunk in plan.chunks))
+        self.assertTrue(all(
+            chunk.request_payload()["words"] == []
+            for chunk in plan.chunks))
+        self.assertTrue(all(
+            "context_anchors" not in render_chunk_input(
+                chunk,
+                protocol_version=10)
+            for chunk in plan.chunks))
 
     def test_plan_identity_ignores_worker_count_but_tracks_request_shape(self):
         source = make_source()
@@ -1131,6 +1246,52 @@ class SourceResponseValidationTests(unittest.TestCase):
             self.term_field: term,
             self.meaning_field: meaning,
         }
+
+    def test_all_known_words_can_produce_a_source_sentence_without_lexical_cards(
+            self):
+        pipeline = context_classical_pipeline()
+        chunk = make_plan(
+            chunk_size=2,
+            request_protocol="v10",
+            excluded_words=("甲", "乙", "丙", "丁", "戊", "己"),
+            retain_excluded_source_contexts=True).chunks[0]
+        response_format = process_text.build_compact_source_response_format(
+            pipeline,
+            protocol_version=10,
+            chunk=chunk,
+            source_lexical_only=True,
+            include_generated_examples=False)
+        term_schema = response_format["schema"]["properties"][
+            "term_results"]
+        self.assertEqual(term_schema["minItems"], 0)
+        self.assertEqual(term_schema["maxItems"], 0)
+
+        raw = json.dumps({
+            "term_results": [],
+            "source_context_translations": [
+                {
+                    "context_id": context.context_id,
+                    "translation": "A complete source translation.",
+                }
+                for context in chunk.contexts
+            ],
+        }, ensure_ascii=False)
+        report = inspect_pipeline_response(
+            raw,
+            pipeline,
+            chunk,
+            use_compact_source_results=True,
+            require_generated_examples=False)
+
+        self.assertTrue(report["valid"], report["problems"])
+        canonical = report["canonical_response"]
+        self.assertEqual(canonical["cards"], [])
+        self.assertEqual(
+            canonical["source_contexts"][0]["ranked_terms"],
+            [
+                {"rank": 1, "term": "甲"},
+                {"rank": 2, "term": "乙"},
+            ])
 
     def test_missing_requested_term_is_invalid(self):
         raw = json.dumps({
@@ -2250,6 +2411,133 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertEqual(estimate["candidate_count"], 4)
         self.assertEqual(estimate["excluded_candidate_count"], 2)
 
+    def test_all_known_words_still_plan_source_sentence_translation_requests(
+            self):
+        self.backend.exclusion_resolver = lambda _spec, _loaded: (
+            "甲", "乙", "丙", "丁", "戊", "己")
+        request = {
+            **self.request,
+            "pipeline": context_classical_pipeline(),
+            "use_source_for_example_sentences": True,
+        }
+
+        estimate = self.backend.estimate(request)
+
+        self.assertEqual(estimate["candidate_count"], 0)
+        self.assertEqual(estimate["excluded_candidate_count"], 6)
+        self.assertEqual(estimate["request_count"], 3)
+        job = self.backend.create_job({
+            **request,
+            "paid_confirmed": True,
+            "estimate": estimate,
+        })
+        saved_chunks = [
+            self.backend.jobs.load_chunk(job.job_id, chunk_id)
+            for chunk_id in self.backend.jobs.chunk_ids(job.job_id)
+        ]
+        self.assertTrue(all(
+            not chunk.words
+            for chunk in saved_chunks))
+        self.assertEqual(
+            tuple(
+                anchor.surface
+                for chunk in saved_chunks
+                for anchor in chunk.context_anchors),
+            ("甲", "乙", "丙", "丁", "戊", "己"))
+
+    def test_sentence_only_source_request_sends_contexts_without_lexical_shells(
+            self):
+        request = {
+            **self.request,
+            "chunk_size": 1,
+            "pipeline": context_classical_pipeline(),
+            "use_source_for_example_sentences": True,
+            "exclude_anki": False,
+            "anki_exclusion": None,
+        }
+
+        estimate = self.backend.estimate(request)
+        job = self.backend.create_job({
+            **request,
+            "paid_confirmed": True,
+            "estimate": estimate,
+        })
+        chunks = [
+            self.backend.jobs.load_chunk(job.job_id, chunk_id)
+            for chunk_id in self.backend.jobs.chunk_ids(job.job_id)
+        ]
+
+        self.assertEqual(estimate["candidate_count"], 0)
+        self.assertEqual(estimate["source_sentence_card_count"], 3)
+        self.assertEqual(estimate["request_count"], 3)
+        self.assertTrue(
+            estimate["assumptions"]["schema_cache_shared"])
+        self.assertTrue(all(not chunk.words for chunk in chunks))
+        self.assertEqual(
+            [anchor.rank for chunk in chunks for anchor in chunk.context_anchors],
+            [1, 2, 3, 4, 5, 6])
+        self.assertTrue(all(
+            json.loads(render_chunk_input(
+                chunk,
+                protocol_version=10))["words"] == []
+            for chunk in chunks))
+
+    def test_fully_remembered_sentence_only_job_completes_without_provider(
+            self):
+        request = {
+            **self.request,
+            "chunk_size": 1,
+            "pipeline": context_classical_pipeline(),
+            "use_source_for_example_sentences": True,
+            "exclude_anki": False,
+            "anki_exclusion": None,
+            "automatic_repair": True,
+            "reasoning_effort": "none",
+        }
+        _loaded, initial_plan = self.backend._plan(request)
+        for context in {
+                context.context_id: context
+                for chunk in initial_plan.chunks
+                for context in chunk.contexts
+        }.values():
+            self.backend.translation_memory.commit(
+                "classical_chinese",
+                context.text,
+                f"Remembered translation for {context.context_id}.",
+                provenance={
+                    "provenance_id": f"fixture-{context.context_id}",
+                    "origin": "provider",
+                    "fully_validated": True,
+                    "manual_acceptance": False,
+                })
+
+        estimate = self.backend.estimate(request)
+        job = self.backend.create_job({
+            **request,
+            "paid_confirmed": False,
+            "estimate": estimate,
+        })
+
+        class NoProviderResponses:
+            def create(self, **_kwargs):
+                raise AssertionError("No provider request was expected.")
+
+        snapshot = source_workflow.SourceWorkflowController(
+            backend=self.backend)._run_job(
+                job.job_id,
+                context_classical_pipeline(),
+                SimpleNamespace(responses=NoProviderResponses()))
+        combined = json.loads(
+            (snapshot.path / "combined.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(estimate["request_count"], 0)
+        self.assertEqual(estimate["source_sentence_card_count"], 3)
+        self.assertEqual(snapshot.overall_status, "completed")
+        self.assertEqual(len(combined["source_contexts"]), 3)
+        self.assertEqual(
+            [context["word_ranks"] for context in combined["source_contexts"]],
+            [[1, 2], [3, 4], [5, 6]])
+
     def test_preview_returns_ordered_retained_sentence_metadata(self):
         page = self.backend.preview({
             "source_key": "fixture_source",
@@ -2576,8 +2864,8 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertTrue(
             source_request_uses_occurrence_locators(contract))
         self.assertIn(
-            "Translate every retained context required by the response "
-            "schema exactly once",
+            'Translate every context listed in '
+            '"source_context_translation_ids" exactly once',
             prompt_text)
         self.assertNotIn('"occurrence_span"', contract["composed_prompt"])
         self.assertNotIn('"occurrence_locator"', contract["composed_prompt"])
@@ -2827,6 +3115,59 @@ class SourceJobTests(unittest.TestCase):
             sleeper=lambda _seconds: None,
             random_source=lambda: 0,
             **kwargs)
+
+    def test_emergency_pause_keeps_undispatched_chunk_pending(self):
+        control = PaidDispatchControl(paused=True)
+        paid_calls = []
+
+        def request(chunk):
+            return control.dispatch(
+                lambda: paid_calls.append(chunk.chunk_id))
+
+        chunk_id = self.store.chunk_ids(self.job.job_id)[0]
+        snapshot = self.runner(
+            request,
+            concurrency=1).run((chunk_id,))
+
+        self.assertEqual(paid_calls, [])
+        status = self.store.chunk_status(
+            self.job.job_id,
+            chunk_id)
+        self.assertEqual(status["status"], "pending")
+        self.assertEqual(status["worker"], "paused")
+        self.assertIsNone(status["completed_at"])
+        self.assertEqual(
+            status["last_error"]["type"],
+            "PaidDispatchPaused")
+        self.assertEqual(snapshot.overall_status, "ready")
+
+    def test_emergency_pause_does_not_wait_for_an_inflight_call(self):
+        control = PaidDispatchControl()
+        entered = threading.Event()
+        release = threading.Event()
+
+        def operation():
+            entered.set()
+            self.assertTrue(release.wait(timeout=2))
+
+        worker = threading.Thread(
+            target=lambda: control.dispatch(operation),
+            daemon=True)
+        worker.start()
+        self.assertTrue(entered.wait(timeout=2))
+
+        state = control.pause()
+
+        self.assertTrue(state["paused"])
+        self.assertEqual(state["active_dispatches"], 1)
+        with self.assertRaises(PaidDispatchPaused):
+            control.dispatch(lambda: None)
+        release.set()
+        worker.join(timeout=2)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(
+            control.status()["active_dispatches"],
+            0)
 
     def test_successful_concurrent_run_persists_each_and_combines_in_order(self):
         barrier = threading.Barrier(3)

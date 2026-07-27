@@ -1191,6 +1191,8 @@ def render_chunk_input(
             or protocol_version > SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION):
         raise ValueError("Unsupported source request payload protocol.")
     payload = chunk.request_payload()
+    explicit_translation_ids = payload.get(
+        "source_context_translation_ids")
     if protocol_version in {9, 10}:
         contexts_by_id = {
             context.get("context_id"): context.get("text")
@@ -1236,11 +1238,17 @@ def render_chunk_input(
             "words": compact_words,
             "contexts": payload.get("contexts", []),
         }
+        if explicit_translation_ids is not None:
+            payload["source_context_translation_ids"] = list(
+                explicit_translation_ids)
         if source_context_translation_memory:
             if protocol_version != 10:
                 raise ValueError(
                     "Translation-memory payloads require protocol v10.")
-            expected_ids = set(contexts_by_id)
+            expected_ids = set(
+                explicit_translation_ids
+                if explicit_translation_ids is not None
+                else contexts_by_id)
             memory = {}
             for context_id, hit in (
                     source_context_translation_memory.items()):

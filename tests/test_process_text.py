@@ -18,6 +18,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 import gui
 import pipeline_store
 import process_text
+import source_generation
 import templates
 
 
@@ -183,6 +184,45 @@ class FetchResponseTests(unittest.TestCase):
             self.assertEqual(
                 log_path.read_text(encoding="utf-8"),
                 "\n<break>\n" + result)
+
+    def test_paid_dispatch_pause_blocks_manual_call_until_resumed(self):
+        result = '{"cards": []}'
+        client = MagicMock()
+        response = client.responses.create.return_value
+        response.status = "completed"
+        response.output = []
+        response.output_text = result
+        control = source_generation.PaidDispatchControl(paused=True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            response_path = Path(directory) / "response.json"
+            log_path = Path(directory) / "response.log"
+            with self.assertRaises(source_generation.PaidDispatchPaused):
+                process_text.fetch_response(
+                    "astrolabe",
+                    client=client,
+                    paid_dispatch_control=control,
+                    prompt_text="Define: ",
+                    response_path=response_path,
+                    response_log_path=log_path,
+                    response_format={"type": "json_schema"})
+
+            client.responses.create.assert_not_called()
+            self.assertFalse(response_path.exists())
+            self.assertFalse(log_path.exists())
+
+            control.resume()
+            returned = process_text.fetch_response(
+                "astrolabe",
+                client=client,
+                paid_dispatch_control=control,
+                prompt_text="Define: ",
+                response_path=response_path,
+                response_log_path=log_path,
+                response_format={"type": "json_schema"})
+
+        self.assertEqual(returned, result)
+        client.responses.create.assert_called_once()
 
     def test_default_request_uses_the_composed_current_prompt_and_schema(self):
         client = MagicMock()
@@ -1594,6 +1634,25 @@ class GuiLogicTests(unittest.TestCase):
         self.assertEqual(outcome, "manual_filter_complete")
         self.assertEqual(value[0].filtered_text, "new")
 
+    def test_manual_pipeline_receives_shared_paid_dispatch_control(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.result_queue = gui.queue.Queue()
+        app.pipeline_executor = MagicMock(return_value="summary")
+        app.paid_dispatch_control = object()
+
+        app._generate_in_background("astrolabe", ("pipeline",))
+
+        app.pipeline_executor.assert_called_once()
+        call_arguments = app.pipeline_executor.call_args
+        self.assertEqual(
+            call_arguments.args,
+            ("astrolabe", ("pipeline",)))
+        self.assertIs(
+            call_arguments.kwargs["paid_dispatch_control"],
+            app.paid_dispatch_control)
+        outcome, value = app.result_queue.get_nowait()
+        self.assertEqual((outcome, value), ("run_complete", "summary"))
+
     def test_zero_remaining_manual_lines_never_start_a_pipeline(self):
         app = object.__new__(gui.AutoAnkiApp)
         app.result_queue = gui.queue.Queue()
@@ -1905,6 +1964,53 @@ class GuiLogicTests(unittest.TestCase):
         showinfo.assert_called_once()
         app._dispatch_source_action.assert_not_called()
 
+    def test_all_known_words_can_still_dispatch_source_sentence_requests(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.root = MagicMock()
+        app.source_paid_authorized = MagicMock(
+            get=MagicMock(return_value=True))
+        app._source_request = MagicMock(return_value={"source_key": "x"})
+        app.source_estimate_result = {
+            "candidate_count": 0,
+            "request_count": 2,
+        }
+        app._dispatch_source_action = MagicMock()
+        app.source_generate_callback = MagicMock()
+
+        with patch.object(gui.messagebox, "showinfo") as showinfo:
+            app._start_source_generation()
+
+        showinfo.assert_not_called()
+        request = app._dispatch_source_action.call_args.args[2]
+        self.assertTrue(request["paid_confirmed"])
+        self.assertIs(
+            request["estimate"],
+            app.source_estimate_result)
+
+    def test_fully_remembered_source_sentences_need_no_paid_authorization(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.root = MagicMock()
+        app.source_paid_authorized = MagicMock(
+            get=MagicMock(return_value=False))
+        app._source_request = MagicMock(return_value={"source_key": "x"})
+        app.source_estimate_result = {
+            "candidate_count": 0,
+            "request_count": 0,
+            "source_sentence_card_count": 3,
+        }
+        app._dispatch_source_action = MagicMock()
+        app.source_generate_callback = MagicMock()
+
+        with patch.object(gui.messagebox, "showwarning") as showwarning:
+            app._start_source_generation()
+
+        showwarning.assert_not_called()
+        request = app._dispatch_source_action.call_args.args[2]
+        self.assertFalse(request["paid_confirmed"])
+        self.assertIs(
+            request["estimate"],
+            app.source_estimate_result)
+
     def test_failed_source_retry_requires_manual_paid_authorization(self):
         app = object.__new__(gui.AutoAnkiApp)
         app.root = MagicMock()
@@ -2002,7 +2108,10 @@ class GuiLogicTests(unittest.TestCase):
         editor.last_active_language_key = "english"
         editor.get_active_language = MagicMock(
             return_value=pipeline_store.get_language("french"))
+        editor._ensure_language_tab_built = MagicMock(
+            return_value=True)
         editor._update_visibility = MagicMock()
+        editor.bind_target_deck_mousewheel = MagicMock()
         editor.app = MagicMock()
         editor.app.generation_language.get.return_value = "English"
 
@@ -2011,9 +2120,52 @@ class GuiLogicTests(unittest.TestCase):
         self.assertEqual(
             editor.app.generation_language.get(),
             "English")
+        editor._ensure_language_tab_built.assert_called_once_with(
+            "french")
         editor._update_visibility.assert_called_once_with(
             "french")
+        editor.app.pipeline_scroll_frame.bind_mousewheel_tree \
+            .assert_called_once_with()
+        editor.bind_target_deck_mousewheel.assert_called_once_with()
         editor.app.schedule_pipeline_save.assert_not_called()
+
+    def test_lazy_card_setup_save_preserves_unbuilt_language_settings(self):
+        editor = object.__new__(gui.PipelineEditor)
+        editor.config = pipeline_store.default_pipeline()
+        editor.built_language_keys = {"english"}
+        editor.app = MagicMock()
+        editor.app.get_card_setup_generation_language.return_value = (
+            pipeline_store.get_language("english"))
+        edited_english = replace(
+            pipeline_store.get_language_settings(
+                editor.config,
+                "english"),
+            target_deck="Edited English Deck")
+        editor._settings_from_built_language = MagicMock(
+            return_value=edited_english)
+        original_unbuilt = {
+            language.key: pipeline_store.get_language_settings(
+                editor.config,
+                language.key)
+            for language in pipeline_store.list_settings_languages()
+            if language.key != "english"
+        }
+
+        saved = editor.to_config()
+
+        editor._settings_from_built_language.assert_called_once()
+        self.assertEqual(
+            pipeline_store.get_language_settings(
+                saved,
+                "english").target_deck,
+            "Edited English Deck")
+        for language_key, original in original_unbuilt.items():
+            with self.subTest(language_key=language_key):
+                self.assertEqual(
+                    pipeline_store.get_language_settings(
+                        saved,
+                        language_key),
+                    original)
 
     def test_translation_language_menu_excludes_source_only(self):
         editor = object.__new__(gui.PipelineEditor)
@@ -2051,6 +2203,9 @@ class GuiLogicTests(unittest.TestCase):
 
     def test_visibility_uses_scrollable_layout_for_large_controls(self):
         editor = object.__new__(gui.PipelineEditor)
+        editor.app = MagicMock()
+        editor.app.get_card_setup_generation_language.return_value = (
+            pipeline_store.get_language("english"))
         editor._refresh_layout_geometry = MagicMock()
         editor.separate_target_deck_variables = {
             "english": MagicMock(get=MagicMock(return_value=True))}
@@ -2062,6 +2217,11 @@ class GuiLogicTests(unittest.TestCase):
             "english": {
                 direction.key: MagicMock(
                     get=MagicMock(return_value=True))
+                for direction in pipeline_store.list_directions()
+            }}
+        editor.direction_enhanced_checks = {
+            "english": {
+                direction.key: MagicMock()
                 for direction in pipeline_store.list_directions()
             }}
         editor.direction_target_deck_boxes = {

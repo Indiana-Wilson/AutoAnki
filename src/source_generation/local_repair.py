@@ -422,7 +422,8 @@ def repair_compact_response(
         use_occurrence_sense_indices=False,
         source_lexical_only=False,
         include_generated_examples=True,
-        include_source_context_nuance=False):
+        include_source_context_nuance=False,
+        remembered_source_context_ids=()):
     """Return a conservative plain-text compact-response candidate.
 
     Invalid JSON and malformed required containers are left for the validator;
@@ -433,6 +434,13 @@ def repair_compact_response(
     if not isinstance(use_occurrence_sense_indices, bool):
         raise TypeError(
             "Occurrence-sense repair mode must be true or false.")
+    remembered_source_context_ids = set(
+        remembered_source_context_ids)
+    if any(
+            not isinstance(context_id, str) or not context_id
+            for context_id in remembered_source_context_ids):
+        raise ValueError(
+            "Remembered source-context IDs must be non-empty strings.")
     original_sha256 = _sha256(raw_text)
     try:
         parsed = json.loads(raw_text)
@@ -474,9 +482,23 @@ def repair_compact_response(
         for word in chunk.words
     }
     expected_ranks = tuple(word.rank for word in chunk.words)
+    explicit_context_ids = getattr(
+        chunk,
+        "source_context_translation_ids",
+        None)
+    expected_context_ids = (
+        tuple(
+            context.context_id
+            for context in chunk.contexts)
+        if explicit_context_ids is None
+        else tuple(explicit_context_ids))
+    if not remembered_source_context_ids <= set(expected_context_ids):
+        raise ValueError(
+            "Remembered source contexts are outside the request targets.")
     expected_context_ids = tuple(
-        context.context_id
-        for context in chunk.contexts)
+        context_id
+        for context_id in expected_context_ids
+        if context_id not in remembered_source_context_ids)
     term_results = _normalise_identity_array(
         parsed.get(term_results_key),
         identity_key=rank_key,
