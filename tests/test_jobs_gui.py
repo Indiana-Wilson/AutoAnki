@@ -13,6 +13,17 @@ import gui
 
 
 class SourceJobsGuiTests(unittest.TestCase):
+    def test_enhanced_audio_labels_name_production_voices(self):
+        self.assertEqual(
+            gui.enhanced_audio_backend_label("japanese"),
+            "MeloTTS · JP")
+        self.assertEqual(
+            gui.enhanced_audio_backend_label("classical_chinese"),
+            "Kokoro 82M · zm_010")
+        self.assertEqual(
+            gui.enhanced_audio_backend_label("english"),
+            "Fun-CosyVoice3 0.5B")
+
     def test_jobs_and_inspection_readers_are_tripled(self):
         # The whole Jobs page now owns an outer scrollbar, so both readers can
         # expose three times the former ten-line working area.
@@ -53,6 +64,12 @@ class SourceJobsGuiTests(unittest.TestCase):
                 "chunk_label": "1/1",
             },
             {
+                "job_id": "job-a::finalize_audio",
+                "parent_job_id": "job-a",
+                "chunk_label": "Audio",
+                "is_finalization_stage": True,
+            },
+            {
                 "job_id": "job-a::finalize",
                 "parent_job_id": "job-a",
                 "chunk_label": "Deck",
@@ -71,7 +88,11 @@ class SourceJobsGuiTests(unittest.TestCase):
             ("job-a", "job-b"))
         self.assertEqual(
             tuple(row["job_id"] for row in grouped[0][1]),
-            ("job-a::chunk-1", "job-a::finalize"))
+            (
+                "job-a::chunk-1",
+                "job-a::finalize_audio",
+                "job-a::finalize",
+            ))
         self.assertEqual(
             tuple(row["job_id"] for row in grouped[1][1]),
             ("job-b::chunk-1", "job-b::finalize"))

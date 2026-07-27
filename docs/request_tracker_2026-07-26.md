@@ -70,6 +70,10 @@ have both been verified.
 - [x] Preserve ordinary cards and existing saved jobs when Enhanced cards are
   disabled.
 
+The Style-Bert and three-language CosyVoice selections above record the
+initial implementation. They were superseded by the evaluated production
+voice selection below on 2026-07-27.
+
 ## Final verification
 
 - [x] Full automated regression suite (623 tests passed).
@@ -79,3 +83,26 @@ have both been verified.
 - [x] Same-deck and split-deck ordering/package inspection.
 - [x] Enhanced-card APKG media/template inspection and local synthesis smoke
   tests for every supported language family.
+
+## Follow-up: visible finalization and voice comparison
+
+- [x] Split the final Deck operation into visible Cards, Audio, Package, and
+  Import stages while retaining the Deck summary/retry row.
+- [x] Persist and display requested enhanced-card audio slots, ready slots,
+  unique files, cache hits, and files requiring local synthesis.
+- [x] Report progress after planning and after each bounded synthesis batch.
+- [x] Document the installed Style-Bert style inventory and CosyVoice's
+  reference-voice model.
+- [x] Add a reproducible installed-runtime voice-sample generator and produce
+  the dated comparison set under `output/tts_voice_samples_2026-07-27/`.
+
+## Follow-up: evaluated production voices — 2026-07-27
+
+- [x] Route Japanese enhanced audio to MeloTTS speaker `JP`.
+- [x] Route Chinese and Classical Chinese enhanced audio to Kokoro 82M voice
+  `zm_010`.
+- [x] Keep English and French on Fun-CosyVoice3 0.5B.
+- [x] Add isolated, revision-pinned, CUDA-only installers and workers for
+  MeloTTS Japanese and Kokoro Chinese, with no CPU fallback.
+- [x] Pass installed-runtime synthesis for both selected voices and the full
+  regression suite (632 tests passed).

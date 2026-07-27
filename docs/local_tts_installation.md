@@ -8,9 +8,11 @@ default shared directory is:
 ├── artifacts/                  # content-addressed generated audio
 ├── models/                     # immutable Hugging Face snapshots
 ├── runtimes/
-│   ├── style_bert_vits2_jp_extra/
-│   └── fun_cosyvoice3_0_5b/
-├── sources/                    # pinned CosyVoice checkout and submodules
+│   ├── fun_cosyvoice3_0_5b/    # production English and French
+│   ├── melotts_jp/             # production Japanese
+│   ├── kokoro_82m_zh/          # production Chinese
+│   └── style_bert_vits2_jp_extra/ # optional legacy comparison
+├── sources/                    # pinned CosyVoice and MeloTTS checkouts
 └── staging/                    # host-controlled temporary output
 ```
 
@@ -23,21 +25,33 @@ cache.
 The plan command performs no installation or model download:
 
 ```bash
-python3 scripts/install_local_tts.py --backend all --dry-run
+python3 scripts/install_local_tts.py --backend production --dry-run
 ```
 
-Style-Bert-VITS2 supports the installer's Python 3.10–3.12 path. The upstream
-CosyVoice instructions specify Python 3.10, so that backend deliberately
-requires a Python 3.10 interpreter:
+`production` selects CosyVoice, MeloTTS, and Kokoro. `all` additionally
+installs the optional Style-Bert comparison runtime, which has a substantial
+separate disk cost.
+
+The active production routes use CosyVoice on Python 3.10, MeloTTS on Python
+3.10, and Kokoro on Python 3.10–3.12. Style-Bert-VITS2 remains available as
+an optional comparison backend on Python 3.10–3.12:
 
 ```bash
 python3 scripts/install_local_tts.py \
-  --backend style \
-  --style-python /path/to/python3.11
-
-python3 scripts/install_local_tts.py \
   --backend cosy \
   --cosy-python /path/to/python3.10
+
+python3 scripts/install_local_tts.py \
+  --backend melo \
+  --melo-python /path/to/python3.10
+
+python3 scripts/install_local_tts.py \
+  --backend kokoro \
+  --kokoro-python /path/to/python3.11
+
+python3 scripts/install_local_tts.py \
+  --backend style \
+  --style-python /path/to/python3.11
 ```
 
 On a machine without system Python 3.10, a uv-managed interpreter can remain
@@ -48,17 +62,18 @@ path:
 ~/.local/share/autoanki/tts/python/cpython-3.10-linux-x86_64-gnu/bin/python3.10
 ```
 
-Pass that path with both `--style-python` and `--cosy-python`. Keeping uv's
-binary, Python installation, and cache below the shared TTS root makes the
-runtime discoverable to other repositories without changing the system Python
-or AutoAnki's virtual environment.
+Pass that path with `--cosy-python`, `--melo-python`, and `--kokoro-python`
+when installing the production set. Keeping uv's binary, Python installation,
+and cache below the shared TTS root makes the runtime discoverable to other
+repositories without changing the system Python or AutoAnki's virtual
+environment.
 
 The installer:
 
 1. creates a venv directly under the shared runtime directory;
 2. installs a CUDA PyTorch wheel there, without touching AutoAnki's `.venv`;
 3. verifies that PyTorch can allocate a tensor on the NVIDIA GPU;
-4. installs a pinned backend revision;
+4. installs exact synthesis dependency versions and a pinned backend revision;
 5. downloads an immutable model snapshot and installed voice/reference asset;
 6. writes an installation manifest in the `testing` state;
 7. loads the model once and synthesizes a small GPU-only batch; and
@@ -66,6 +81,10 @@ The installer:
 
 There is no CPU fallback. A missing CUDA runtime, driver mismatch, model
 load problem, or empty output fails installation.
+The manifest records the complete installed-environment fingerprint. MeloTTS
+also records and rechecks a content hash of its imported source package, so an
+edited checkout is refused instead of generating different audio under an old
+cache identity.
 The short WAV files are retained under
 `diagnostics/installation-smoke/<backend>-<timestamp>` for a human
 intelligibility and neutrality check; merely detecting a non-empty waveform
@@ -77,10 +96,11 @@ model:
 
 ```bash
 python3 scripts/install_local_tts.py \
-  --backend all \
+  --backend production \
   --defer-smoke \
-  --style-python /path/to/python3.10 \
-  --cosy-python /path/to/python3.10
+  --cosy-python /path/to/python3.10 \
+  --melo-python /path/to/python3.10 \
+  --kokoro-python /path/to/python3.10
 ```
 
 Prepared manifests remain in the non-ready `testing` state. Once VRAM is
@@ -88,16 +108,17 @@ available, promote them only by passing real CUDA audio smoke tests:
 
 ```bash
 python3 scripts/install_local_tts.py \
-  --backend all \
+  --backend production \
   --verify-existing
 ```
 
-If only repository worker code changes, refresh the two small worker files and
-their composite cache identities without reinstalling models or environments:
+If only repository worker code changes, refresh the selected small worker
+files and their composite cache identities without reinstalling models or
+environments:
 
 ```bash
 python3 scripts/install_local_tts.py \
-  --backend all \
+  --backend production \
   --refresh-workers
 ```
 
@@ -112,7 +133,7 @@ old runtime to a timestamped sibling before creating its replacement:
 
 ```bash
 python3 scripts/install_local_tts.py \
-  --backend style \
+  --backend melo \
   --force
 ```
 
@@ -182,13 +203,35 @@ onto the same GPU at once. AutoAnki separately holds
 `locks/orchestration.lock` through shared-cache publication; the distinct lock
 names avoid a parent/child self-deadlock.
 
+## Voice inventory and listening samples
+
+The Japanese MeloTTS model has one installed speaker: `JP`. The Chinese
+Kokoro model contains the explicitly selected `zm_010` voice file. Production
+routing does not silently substitute another speaker.
+
+CosyVoice is a zero-shot voice-cloning model rather than a finite catalogue
+of built-in speakers. AutoAnki's `neutral-english` and `neutral-french`
+identities use the same revision-pinned official reference voice.
+
+The selected voices and candidate demos are retained in
+`output/evaluations/tts_voice_evaluation_2026-07-27/`. The older helper below
+recreates the pre-selection Style-Bert/CosyVoice comparison only:
+
+```bash
+python3 scripts/generate_tts_voice_samples.py
+```
+
+That script does not represent the current Japanese or Chinese routes and
+does not change production voice configuration.
+
 ## Backends and installed voices
 
-- Japanese uses Style-Bert-VITS2 JP-Extra with the official
-  `jvnv-F1-jp` model and its `Neutral` style.
-- English, French, and Chinese use
+- Japanese uses `myshell-ai/MeloTTS-Japanese` with speaker `JP`.
+- Chinese, including Classical Chinese variants, uses
+  `hexgrad/Kokoro-82M-v1.1-zh` with voice `zm_010`.
+- English and French use
   `FunAudioLLM/Fun-CosyVoice3-0.5B-2512` with the official CosyVoice
-  zero-shot reference asset. The three stable AutoAnki voice identities share
+  zero-shot reference asset. The two stable AutoAnki voice identities share
   that revisioned reference.
 
 The CosyVoice environment records two deliberate compatibility overrides.
@@ -201,11 +244,12 @@ back from `CUDAExecutionProvider`. Reference WAV decoding uses SoundFile
 instead of TorchCodec, so no optional FFmpeg/NPP installation or CPU model
 fallback is hidden in synthesis.
 
-Classical Chinese is routed to the Chinese voice and is therefore pronounced
-as modern Mandarin; the worker does not claim a reconstructed historical
-pronunciation.
+Classical Chinese is routed to Kokoro's Chinese voice and is therefore
+pronounced as modern Mandarin; the worker does not claim a reconstructed
+historical pronunciation.
 
-The Style-Bert-VITS2 source is AGPL-3.0 and its installed `jvnv` voice assets
-are CC-BY-SA-4.0. CosyVoice and its model are Apache-2.0. The installer writes
-the source URLs and license identifiers to `THIRD_PARTY_NOTICES.md` in the
-shared TTS root.
+MeloTTS and its Japanese model are MIT licensed. Kokoro and its selected
+Chinese model are Apache-2.0, as are CosyVoice and its model. The optional
+Style-Bert source is AGPL-3.0 and its `jvnv` assets are CC-BY-SA-4.0. The
+installer writes source URLs and license identifiers to
+`THIRD_PARTY_NOTICES.md` in the shared TTS root.

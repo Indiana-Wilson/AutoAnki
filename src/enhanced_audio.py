@@ -1,6 +1,6 @@
 """Local, GPU-only text-to-speech orchestration for enhanced Anki cards.
 
-This module deliberately does not import either supported TTS runtime.  Each
+This module deliberately does not import any supported TTS runtime.  Each
 runtime lives in an isolated environment and is addressed through a small
 one-shot JSON subprocess protocol.  That keeps their large and occasionally
 conflicting dependency trees out of AutoAnki's Python environment.
@@ -42,14 +42,20 @@ SYNTHESIS_TIMEOUT_SECONDS_PER_ITEM = 30.0
 
 STYLE_BERT_BACKEND = "style_bert_vits2_jp_extra"
 COSYVOICE_BACKEND = "fun_cosyvoice3_0_5b"
+MELOTTS_BACKEND = "melotts_jp"
+KOKORO_BACKEND = "kokoro_82m_zh"
 
 STYLE_BERT_MODEL_ID = "Style-Bert-VITS2 JP-Extra"
 COSYVOICE_MODEL_ID = "Fun-CosyVoice3-0.5B"
+MELOTTS_MODEL_ID = "myshell-ai/MeloTTS-Japanese"
+KOKORO_MODEL_ID = "hexgrad/Kokoro-82M-v1.1-zh"
 
 TTS_HOME_ENVIRONMENT_VARIABLE = "AUTOANKI_TTS_HOME"
 STYLE_BERT_WORKER_ENVIRONMENT_VARIABLE = (
     "AUTOANKI_STYLE_BERT_VITS2_WORKER")
 COSYVOICE_WORKER_ENVIRONMENT_VARIABLE = "AUTOANKI_COSYVOICE3_WORKER"
+MELOTTS_WORKER_ENVIRONMENT_VARIABLE = "AUTOANKI_MELOTTS_JP_WORKER"
+KOKORO_WORKER_ENVIRONMENT_VARIABLE = "AUTOANKI_KOKORO_82M_ZH_WORKER"
 
 _SUPPORTED_ROLES = frozenset({"word", "sentence"})
 _BLOCK_TAGS = frozenset({
@@ -201,14 +207,14 @@ _ROUTES = {
         default_voice="neutral-french"),
     "chinese": TTSRoute(
         language="chinese",
-        backend=COSYVOICE_BACKEND,
-        model_id=COSYVOICE_MODEL_ID,
-        default_voice="neutral-mandarin"),
+        backend=KOKORO_BACKEND,
+        model_id=KOKORO_MODEL_ID,
+        default_voice="zm_010"),
     "japanese": TTSRoute(
         language="japanese",
-        backend=STYLE_BERT_BACKEND,
-        model_id=STYLE_BERT_MODEL_ID,
-        default_voice="neutral-japanese"),
+        backend=MELOTTS_BACKEND,
+        model_id=MELOTTS_MODEL_ID,
+        default_voice="JP"),
 }
 
 _EXACT_LANGUAGE_ALIASES = {
@@ -593,6 +599,14 @@ class AudioSynthesisPlan:
     def synthesis_count(self) -> int:
         return self.unique_count - self.cache_hit_count
 
+    @property
+    def ready_request_count(self) -> int:
+        """Count requested card slots already satisfied by the cache."""
+        cached_keys = set(self.cached_artifacts)
+        return sum(
+            request.cache_key in cached_keys
+            for request in self.requests)
+
 
 @dataclass(frozen=True)
 class WorkerCommand:
@@ -636,14 +650,22 @@ def default_worker_commands(
     paths = paths or TTSPaths.shared()
     style_runtime = paths.runtimes / STYLE_BERT_BACKEND
     cosy_runtime = paths.runtimes / COSYVOICE_BACKEND
+    melo_runtime = paths.runtimes / MELOTTS_BACKEND
+    kokoro_runtime = paths.runtimes / KOKORO_BACKEND
     if os.name == "nt":
         style_python = style_runtime / "Scripts" / "python.exe"
         cosy_python = cosy_runtime / "Scripts" / "python.exe"
+        melo_python = melo_runtime / "Scripts" / "python.exe"
+        kokoro_python = kokoro_runtime / "Scripts" / "python.exe"
     else:
         style_python = style_runtime / "bin" / "python"
         cosy_python = cosy_runtime / "bin" / "python"
+        melo_python = melo_runtime / "bin" / "python"
+        kokoro_python = kokoro_runtime / "bin" / "python"
     style_entry = style_runtime / "autoanki_worker.py"
     cosy_entry = cosy_runtime / "autoanki_worker.py"
+    melo_entry = melo_runtime / "autoanki_worker.py"
+    kokoro_entry = kokoro_runtime / "autoanki_worker.py"
     return {
         STYLE_BERT_BACKEND: (
             _command_from_environment(
@@ -657,6 +679,18 @@ def default_worker_commands(
             or WorkerCommand(
                 (str(cosy_python), str(cosy_entry)),
                 required_paths=(cosy_python, cosy_entry))),
+        MELOTTS_BACKEND: (
+            _command_from_environment(
+                MELOTTS_WORKER_ENVIRONMENT_VARIABLE)
+            or WorkerCommand(
+                (str(melo_python), str(melo_entry)),
+                required_paths=(melo_python, melo_entry))),
+        KOKORO_BACKEND: (
+            _command_from_environment(
+                KOKORO_WORKER_ENVIRONMENT_VARIABLE)
+            or WorkerCommand(
+                (str(kokoro_python), str(kokoro_entry)),
+                required_paths=(kokoro_python, kokoro_entry))),
     }
 
 
@@ -1345,7 +1379,9 @@ class LocalTTSService:
 
     def synthesize_many(
             self,
-            requests: Iterable[AudioRequest]) -> tuple[AudioArtifact, ...]:
+            requests: Iterable[AudioRequest],
+            *,
+            progress_callback=None) -> tuple[AudioArtifact, ...]:
         """Synthesize requests in order, reusing each distinct request once."""
         requests = tuple(requests)
         if not requests:
@@ -1353,7 +1389,9 @@ class LocalTTSService:
         with self._synthesis_lock:
             with _shared_orchestration_lease(self.paths):
                 plan = self._plan(requests)
-                return self._execute_plan(plan)
+                return self._execute_plan(
+                    plan,
+                    progress_callback=progress_callback)
 
     def synthesize(self, request: AudioRequest) -> AudioArtifact:
         return self.synthesize_many((request,))[0]
@@ -1394,8 +1432,19 @@ class LocalTTSService:
 
     def _execute_plan(
             self,
-            plan: AudioSynthesisPlan) -> tuple[AudioArtifact, ...]:
+            plan: AudioSynthesisPlan,
+            *,
+            progress_callback=None) -> tuple[AudioArtifact, ...]:
         by_key: dict[str, AudioArtifact] = dict(plan.cached_artifacts)
+        if progress_callback is not None:
+            progress_callback({
+                "phase": "planned",
+                "requested_card_count": plan.requested_count,
+                "ready_card_count": plan.ready_request_count,
+                "unique_audio_count": plan.unique_count,
+                "ready_unique_audio_count": plan.cache_hit_count,
+                "synthesis_audio_count": plan.synthesis_count,
+            })
         missing_by_backend: dict[str, list[PreparedAudioRequest]] = {}
         for request in plan.requests:
             if request.cache_key != _canonical_digest(request.identity()):
@@ -1426,19 +1475,44 @@ class LocalTTSService:
                         self._publish_many(batch),
                         strict=True):
                     by_key[request.cache_key] = artifact
+                if progress_callback is not None:
+                    ready_keys = set(by_key)
+                    progress_callback({
+                        "phase": "synthesizing",
+                        "requested_card_count": plan.requested_count,
+                        "ready_card_count": sum(
+                            request.cache_key in ready_keys
+                            for request in plan.requests),
+                        "unique_audio_count": plan.unique_count,
+                        "ready_unique_audio_count": len(ready_keys),
+                        "synthesis_audio_count": plan.synthesis_count,
+                    })
+        if progress_callback is not None:
+            progress_callback({
+                "phase": "complete",
+                "requested_card_count": plan.requested_count,
+                "ready_card_count": plan.requested_count,
+                "unique_audio_count": plan.unique_count,
+                "ready_unique_audio_count": plan.unique_count,
+                "synthesis_audio_count": plan.synthesis_count,
+            })
         return tuple(
             by_key[request.cache_key]
             for request in plan.requests)
 
     def execute_plan(
             self,
-            plan: AudioSynthesisPlan) -> tuple[AudioArtifact, ...]:
+            plan: AudioSynthesisPlan,
+            *,
+            progress_callback=None) -> tuple[AudioArtifact, ...]:
         """Execute a previously prepared plan, preserving request order."""
         if not isinstance(plan, AudioSynthesisPlan):
             raise TypeError("Expected an AudioSynthesisPlan.")
         with self._synthesis_lock:
             with _shared_orchestration_lease(self.paths):
-                return self._execute_plan(plan)
+                return self._execute_plan(
+                    plan,
+                    progress_callback=progress_callback)
 
 
 def require_tts_ready(
@@ -1514,10 +1588,14 @@ __all__ = [
     "COSYVOICE_BACKEND",
     "COSYVOICE_MODEL_ID",
     "JSONSubprocessWorker",
+    "KOKORO_BACKEND",
+    "KOKORO_MODEL_ID",
     "LocalTTSError",
     "LocalTTSService",
     "MAX_SYNTHESIS_BATCH_ITEMS",
     "MEDIA_MANIFEST_SCHEMA_VERSION",
+    "MELOTTS_BACKEND",
+    "MELOTTS_MODEL_ID",
     "OutputFormat",
     "PreparedAudioRequest",
     "STYLE_BERT_BACKEND",

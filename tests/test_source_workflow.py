@@ -157,10 +157,11 @@ class UnavailableAudioService:
 
     def backend_status(self, language):
         self.status_languages.append(language)
+        route = enhanced_audio.resolve_tts_route(language)
         return SimpleNamespace(
             ready=False,
-            backend=enhanced_audio.COSYVOICE_BACKEND,
-            model_id=enhanced_audio.COSYVOICE_MODEL_ID,
+            backend=route.backend,
+            model_id=route.model_id,
             device_name=None,
             gpu_available=False,
             runtime_available=False,
@@ -617,6 +618,40 @@ class SourceWorkflowTests(unittest.TestCase):
                 for row in rows
                 if row["chunk_label"] == "Deck"),
             "completed")
+        stage_rows = [
+            row
+            for row in rows
+            if row.get("is_finalization_stage")]
+        self.assertEqual(
+            tuple(row["chunk_label"] for row in stage_rows),
+            ("Cards", "Audio", "Package", "Import"))
+        self.assertTrue(all(
+            row["status"] == "completed"
+            for row in stage_rows))
+
+        controller._update_workflow(
+            result["job_id"],
+            audio_progress={
+                "phase": "complete",
+                "requested_card_count": 100,
+                "ready_card_count": 100,
+                "unique_audio_count": 92,
+                "ready_unique_audio_count": 92,
+                "synthesis_audio_count": 40,
+            })
+        audio_row = next(
+            row
+            for row in controller.job_rows()["jobs"]
+            if row["chunk_label"] == "Audio")
+        self.assertIn(
+            "100 of 100 enhanced cards have audio",
+            audio_row["detail"])
+        self.assertIn(
+            "92 of 92 unique files are ready",
+            audio_row["detail"])
+        self.assertEqual(
+            audio_row["audio_progress"]["synthesis_audio_count"],
+            40)
 
     def test_invalid_output_waits_for_explicit_retry_and_reuses_successes(self):
         self.install_plan(one_word_plan())

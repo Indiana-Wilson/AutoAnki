@@ -70,6 +70,18 @@ SOURCE_MODEL = SOURCE_REQUEST_MODEL
 SOURCE_WORKFLOW_SCHEMA_VERSION = 1
 SOURCE_WORKFLOW_FILE_NAME = "workflow.json"
 _FINALIZE_ROW_ID = "finalize"
+_FINALIZATION_STAGE_ROW_IDS = {
+    "cards": "finalize_cards",
+    "audio": "finalize_audio",
+    "package": "finalize_package",
+    "import": "finalize_import",
+}
+
+
+def _is_finalization_child(child_id):
+    return (
+        child_id == _FINALIZE_ROW_ID
+        or child_id in _FINALIZATION_STAGE_ROW_IDS.values())
 _ECONOMY_TERMINAL_STATUSES = frozenset({
     "completed",
     "failed",
@@ -2366,6 +2378,9 @@ class SourceWorkflowController:
             workflow = self._workflow(job_id)
             if workflow["state"] in {
                     "imported",
+                    "processing_cards",
+                    "audio_planning",
+                    "audio_synthesis",
                     "packaging",
                     "packaged",
                     "importing",
@@ -2459,6 +2474,7 @@ class SourceWorkflowController:
         package_path = self._job_path(job_id) / "source_deck.apkg"
         attempts = int(workflow.get("finalize_attempts", 0)) + 1
         failed_stage = "packaging"
+        finalization_stage = "cards"
         try:
             accepted_content_problem_count = (
                 self._accepted_content_problem_count(job_id))
@@ -2469,11 +2485,48 @@ class SourceWorkflowController:
             if (
                     not package_path.is_file()
                     or workflow.get("notes_created") is None):
+                enhanced_enabled = any(
+                    card.enhanced
+                    for card in pipeline_store.get_enabled_cards(
+                        pipeline))
+                if not enhanced_enabled:
+                    finalization_stage = "package"
                 self._update_workflow(
                     job_id,
-                    state="packaging",
+                    state=(
+                        "processing_cards"
+                        if enhanced_enabled
+                        else "packaging"),
                     finalize_attempts=attempts,
+                    audio_progress=None,
+                    failed_finalization_stage=None,
                     last_error=None)
+
+                def record_audio_progress(progress):
+                    nonlocal finalization_stage
+                    if not isinstance(progress, dict):
+                        raise TypeError(
+                            "Audio progress must be a mapping.")
+                    phase = progress.get("phase")
+                    finalization_stage = (
+                        "package"
+                        if phase == "complete"
+                        else "audio")
+                    state = (
+                        "audio_planning"
+                        if phase == "planned"
+                        else (
+                            "packaging"
+                            if phase == "complete"
+                            else "audio_synthesis"))
+                    self._update_workflow(
+                        job_id,
+                        state=state,
+                        audio_progress={
+                            **progress,
+                            "updated_at": _utc_now(),
+                        })
+
                 _path, notes_created = self.package_creator(
                     {
                         "cards": combined["cards"],
@@ -2509,11 +2562,11 @@ class SourceWorkflowController:
                                 "shared_source_sentence_cards",
                                 False)),
                     **(
-                        {"audio_service": self._audio_service()}
-                        if any(
-                            card.enhanced
-                            for card in pipeline_store.get_enabled_cards(
-                                pipeline))
+                        {
+                            "audio_service": self._audio_service(),
+                            "audio_progress_callback": record_audio_progress,
+                        }
+                        if enhanced_enabled
                         else {}
                     ),
                     allow_accepted_content_problems=(
@@ -2526,8 +2579,10 @@ class SourceWorkflowController:
                     accepted_content_problem_count=(
                         accepted_content_problem_count),
                     failed_stage=None,
+                    failed_finalization_stage=None,
                     last_error=None)
             failed_stage = "importing"
+            finalization_stage = "import"
             self._update_workflow(
                 job_id,
                 state="importing",
@@ -2541,6 +2596,7 @@ class SourceWorkflowController:
                 state="failed",
                 finalize_attempts=attempts,
                 failed_stage=failed_stage,
+                failed_finalization_stage=finalization_stage,
                 package_path=(
                     str(package_path)
                     if package_path.is_file()
@@ -2567,10 +2623,138 @@ class SourceWorkflowController:
             import_result=imported,
             imported_at=_utc_now(),
             failed_stage=None,
+            failed_finalization_stage=None,
             last_error=None,
             message=(
                 f'Created and imported “{deck_name}” in place. '
                 "Its cards were not moved and the deck was not deleted."))
+
+    @staticmethod
+    def _stage_status(*, current_state, stage_states, completed_states):
+        if current_state in completed_states:
+            return "completed"
+        if current_state in stage_states:
+            return "running"
+        if current_state == "failed":
+            return "failed"
+        return "pending"
+
+    def _finalization_stage_rows(self, snapshot):
+        workflow = self._workflow(snapshot.job_id)
+        state = workflow["state"]
+        audio = workflow.get("audio_progress")
+        audio = audio if isinstance(audio, dict) else {}
+        try:
+            enhanced = any(
+                card.enhanced
+                for card in pipeline_store.get_enabled_cards(
+                    self._pipeline_for_job(snapshot.job_id)))
+        except (KeyError, TypeError, ValueError):
+            # Older retained jobs may predate persisted pipeline metadata.
+            # Their finalization rows should remain inspectable even though
+            # no pre-synthesis audio count can be recovered.
+            enhanced = False
+        ready_cards = int(audio.get("ready_card_count", 0) or 0)
+        requested_cards = int(audio.get("requested_card_count", 0) or 0)
+        ready_unique = int(audio.get("ready_unique_audio_count", 0) or 0)
+        unique_total = int(audio.get("unique_audio_count", 0) or 0)
+        synthesis_total = int(audio.get("synthesis_audio_count", 0) or 0)
+        stages = (
+            (
+                "cards",
+                "Cards",
+                "process/validate",
+                {"processing_cards"},
+                {
+                    "audio_planning",
+                    "audio_synthesis",
+                    "packaging",
+                    "packaged",
+                    "importing",
+                    "imported",
+                },
+                "Validate generated card data and determine final card order.",
+            ),
+            (
+                "audio",
+                "Audio",
+                "local TTS",
+                {"audio_planning", "audio_synthesis"},
+                {"packaging", "packaged", "importing", "imported"},
+                (
+                    (
+                        f"{ready_cards:,} of {requested_cards:,} enhanced "
+                        f"cards have audio; {ready_unique:,} of "
+                        f"{unique_total:,} unique files are ready; "
+                        f"{synthesis_total:,} required local synthesis."
+                    )
+                    if requested_cards
+                    else (
+                        "No Enhanced cards require audio."
+                        if not enhanced
+                        else "Waiting to count Enhanced cards and cache hits.")
+                ),
+            ),
+            (
+                "package",
+                "Package",
+                "Anki package",
+                {"packaging"},
+                {"packaged", "importing", "imported"},
+                "Write notes, templates, ordering, and media into the APKG.",
+            ),
+            (
+                "import",
+                "Import",
+                "AnkiConnect",
+                {"importing"},
+                {"imported"},
+                "Import the completed APKG into Anki.",
+            ),
+        )
+        rows = []
+        for key, label, worker, active, completed, detail in stages:
+            status = self._stage_status(
+                current_state=state,
+                stage_states=active,
+                completed_states=completed)
+            failed_stage = workflow.get("failed_stage")
+            if state == "failed":
+                precise_failed_stage = workflow.get(
+                    "failed_finalization_stage")
+                failed_here = (
+                    key == precise_failed_stage
+                    if precise_failed_stage
+                    else (
+                        (key == "cards" and failed_stage == "validation")
+                        or (
+                            key in {"cards", "audio", "package"}
+                            and failed_stage == "packaging")
+                        or (
+                            key == "import"
+                            and failed_stage == "importing")))
+                status = "failed" if failed_here else "pending"
+                if failed_here:
+                    detail = (
+                        (workflow.get("last_error") or {}).get(
+                            "message",
+                            detail))
+            rows.append({
+                "job_id": (
+                    f"{snapshot.job_id}::"
+                    f"{_FINALIZATION_STAGE_ROW_IDS[key]}"),
+                "parent_job_id": snapshot.job_id,
+                "source_name": snapshot.source_title,
+                "chunk_label": label,
+                "worker": worker,
+                "status": status,
+                "attempts": workflow.get("finalize_attempts", 0),
+                "detail": detail,
+                "is_finalization_stage": True,
+                "audio_progress": audio if key == "audio" else None,
+                "updated_at": workflow.get("updated_at", ""),
+            })
+        return rows
 
     def _finalization_is_active(self, job_id):
         with self.backend.jobs.finalization_lease(
@@ -2626,7 +2810,13 @@ class SourceWorkflowController:
                 "not run. Retry this row to package and import without "
                 "repeating OpenAI.")
         elif (
-                state in {"packaging", "packaged", "importing"}
+                state in {
+                    "processing_cards",
+                    "audio_planning",
+                    "audio_synthesis",
+                    "packaging",
+                    "packaged",
+                    "importing"}
                 and not self._is_active(snapshot.job_id)):
             # A process may have stopped after writing this state. Stable note
             # GUIDs make an explicitly authorized re-import recoverable.
@@ -2634,9 +2824,17 @@ class SourceWorkflowController:
             detail = (
                 "The previous run stopped during deck finalization. Inspect "
                 "it, then retry this row to recover without repeating OpenAI.")
-        elif state in {"packaging", "packaged", "importing"}:
+        elif state in {
+                "processing_cards",
+                "audio_planning",
+                "audio_synthesis",
+                "packaging",
+                "packaged",
+                "importing"}:
             status = "running"
-            detail = f"Deck {state} is in progress."
+            detail = (
+                "Finalization is in progress; expand this job to see its "
+                "card, audio, package, and import stages.")
         else:
             status = "pending"
             detail = "Waiting for every OpenAI chunk to validate."
@@ -2731,6 +2929,13 @@ class SourceWorkflowController:
                     row["worker"] = (
                         f"OpenAI Batch · {batch_status}")
                 rows.append(row)
+            for stage_row in self._finalization_stage_rows(snapshot):
+                stage_row["job_number"] = job_number
+                stage_row["job_label"] = (
+                    f"{snapshot.source_title} · {snapshot.job_id}")
+                stage_row["execution_mode"] = execution_mode
+                stage_row["usage"] = usage
+                rows.append(stage_row)
             finalize_row = self._finalize_row(snapshot)
             finalize_row["job_number"] = job_number
             finalize_row["job_label"] = (
@@ -2890,7 +3095,7 @@ class SourceWorkflowController:
         job_id, child_id = self.backend.split_row_id(row_id)
         request_contract, contract_origin = (
             self._request_contract_for_job(job_id))
-        if child_id != _FINALIZE_ROW_ID:
+        if not _is_finalization_child(child_id):
             inspection = self.backend.inspect(request)
             inspection["request_contract"] = request_contract
             inspection["request_contract_origin"] = contract_origin
@@ -2988,7 +3193,7 @@ class SourceWorkflowController:
                 "Manual-validation request must be an object.")
         row_id = request.get("job_id")
         job_id, chunk_id = self.backend.split_row_id(row_id)
-        if chunk_id == _FINALIZE_ROW_ID:
+        if _is_finalization_child(chunk_id):
             raise ValueError(
                 "Choose an invalid OpenAI chunk, not the deck row.")
         raw_problem_ids = request.get("problem_ids", ())
@@ -3813,7 +4018,7 @@ class SourceWorkflowController:
         finalize_jobs = set()
         for row_id in request.get("job_ids", ()):
             job_id, child_id = self.backend.split_row_id(row_id)
-            if child_id == _FINALIZE_ROW_ID:
+            if _is_finalization_child(child_id):
                 finalize_jobs.add(job_id)
             else:
                 regular_rows.append(row_id)

@@ -12,6 +12,15 @@ The current protocol identity is:
 {"protocol":"autoanki-local-tts","version":1}
 ```
 
+Production route identities are:
+
+| Requested language | Backend | Model | Voice |
+| --- | --- | --- | --- |
+| Japanese | `melotts_jp` | `myshell-ai/MeloTTS-Japanese` | `JP` |
+| Chinese and Classical Chinese | `kokoro_82m_zh` | `hexgrad/Kokoro-82M-v1.1-zh` | `zm_010` |
+| English | `fun_cosyvoice3_0_5b` | `Fun-CosyVoice3-0.5B` | `neutral-english` |
+| French | `fun_cosyvoice3_0_5b` | `Fun-CosyVoice3-0.5B` | `neutral-french` |
+
 Every request and response also carries the same `backend` and `operation`.
 Workers must exit nonzero on a process-level failure. A handled error exits
 zero and returns:
@@ -217,12 +226,18 @@ The default shared root is `~/.local/share/autoanki/tts` (or the applicable
 
 The default isolated worker locations are:
 
-- `runtimes/style_bert_vits2_jp_extra/bin/python` with
-  `runtimes/style_bert_vits2_jp_extra/autoanki_worker.py`
 - `runtimes/fun_cosyvoice3_0_5b/bin/python` with
   `runtimes/fun_cosyvoice3_0_5b/autoanki_worker.py`
+- `runtimes/melotts_jp/bin/python` with
+  `runtimes/melotts_jp/autoanki_worker.py`
+- `runtimes/kokoro_82m_zh/bin/python` with
+  `runtimes/kokoro_82m_zh/autoanki_worker.py`
+- optional comparison runtime:
+  `runtimes/style_bert_vits2_jp_extra/bin/python` with
+  `runtimes/style_bert_vits2_jp_extra/autoanki_worker.py`
 
 On Windows, `Scripts/python.exe` is used. The commands can be overridden with
-`AUTOANKI_STYLE_BERT_VITS2_WORKER` and `AUTOANKI_COSYVOICE3_WORKER`.
-An override is parsed as an argument vector and is never executed through a
-shell.
+`AUTOANKI_COSYVOICE3_WORKER`, `AUTOANKI_MELOTTS_JP_WORKER`,
+`AUTOANKI_KOKORO_82M_ZH_WORKER`, and the optional
+`AUTOANKI_STYLE_BERT_VITS2_WORKER`. An override is parsed as an argument
+vector and is never executed through a shell.

@@ -418,7 +418,8 @@ def _prepare_enhanced_event_audio(
         *,
         pipeline,
         guid_seed,
-        audio_service=None):
+        audio_service=None,
+        audio_progress_callback=None):
     import enhanced_audio
 
     context_card = next((
@@ -519,7 +520,12 @@ def _prepare_enhanced_event_audio(
     if not requests:
         return payloads, ()
     service = audio_service or enhanced_audio.LocalTTSService()
-    artifacts = service.synthesize_many(requests)
+    synthesis_arguments = {}
+    if audio_progress_callback is not None:
+        synthesis_arguments["progress_callback"] = audio_progress_callback
+    artifacts = service.synthesize_many(
+        requests,
+        **synthesis_arguments)
     for (event_index, field_name), artifact in zip(
             request_slots,
             artifacts,
@@ -542,7 +548,8 @@ def create_source_package(
         separate_source_decks=False,
         shared_source_sentence_cards=None,
         audio_service=None,
-        audio_media_directory=None):
+        audio_media_directory=None,
+        audio_progress_callback=None):
     """Validate output and package selected source card directions."""
     value = _response_mapping(combined_response)
     if shared_source_sentence_cards is None:
@@ -579,7 +586,8 @@ def create_source_package(
                 guid_seed
                 or f"source:{source_key}:{pipeline.pipeline_id}"),
             audio_service=audio_service,
-            audio_media_directory=audio_media_directory)
+            audio_media_directory=audio_media_directory,
+            audio_progress_callback=audio_progress_callback)
         return output_path, notes_created
     response_text = json.dumps(
         {"cards": value["cards"]},
@@ -746,7 +754,8 @@ def create_source_package(
             ordered_events,
             pipeline=pipeline,
             guid_seed=guid_seed,
-            audio_service=audio_service))
+            audio_service=audio_service,
+            audio_progress_callback=audio_progress_callback))
 
     due_by_direction = {
         direction: 0

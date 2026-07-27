@@ -93,17 +93,22 @@ class EnhancedAudioTests(unittest.TestCase):
 
     def test_routes_requested_languages_and_rejects_unsupported_archaic_ones(
             self):
-        self.assertEqual(
-            enhanced_audio.resolve_tts_route("ja-JP").backend,
-            enhanced_audio.STYLE_BERT_BACKEND)
+        japanese = enhanced_audio.resolve_tts_route("ja-JP")
+        self.assertEqual(japanese.backend, enhanced_audio.MELOTTS_BACKEND)
+        self.assertEqual(japanese.model_id, enhanced_audio.MELOTTS_MODEL_ID)
+        self.assertEqual(japanese.default_voice, "JP")
         for language in (
-                "English",
-                "French",
                 "Chinese",
                 "Traditional Chinese",
                 "zh-Hant",
                 "Classical Chinese (Wang Bi recension)",
                 "classical_chinese_warring_states"):
+            with self.subTest(language=language):
+                route = enhanced_audio.resolve_tts_route(language)
+                self.assertEqual(route.backend, enhanced_audio.KOKORO_BACKEND)
+                self.assertEqual(route.model_id, enhanced_audio.KOKORO_MODEL_ID)
+                self.assertEqual(route.default_voice, "zm_010")
+        for language in ("English", "French"):
             with self.subTest(language=language):
                 self.assertEqual(
                     enhanced_audio.resolve_tts_route(language).backend,
@@ -117,6 +122,53 @@ class EnhancedAudioTests(unittest.TestCase):
                         enhanced_audio.UnsupportedTTSLanguageError,
                         "archaic language"):
                     enhanced_audio.resolve_tts_route(language)
+
+    def test_plan_uses_exact_selected_japanese_and_chinese_voices(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            service = enhanced_audio.LocalTTSService(
+                paths=enhanced_audio.TTSPaths.shared(
+                    Path(temporary_directory) / "tts"),
+                worker=FakeWorker())
+
+            plan = service.plan((
+                enhanced_audio.AudioRequest("猫", "Japanese", "word"),
+                enhanced_audio.AudioRequest(
+                    "道可道", "Classical Chinese", "sentence"),
+            ))
+
+        self.assertEqual(
+            [
+                (request.backend, request.model_id, request.voice_id)
+                for request in plan.requests
+            ],
+            [
+                (
+                    enhanced_audio.MELOTTS_BACKEND,
+                    enhanced_audio.MELOTTS_MODEL_ID,
+                    "JP",
+                ),
+                (
+                    enhanced_audio.KOKORO_BACKEND,
+                    enhanced_audio.KOKORO_MODEL_ID,
+                    "zm_010",
+                ),
+            ])
+
+    def test_default_worker_commands_include_selected_isolated_runtimes(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            paths = enhanced_audio.TTSPaths.shared(
+                Path(temporary_directory) / "tts")
+            commands = enhanced_audio.default_worker_commands(paths)
+
+        for backend in (
+                enhanced_audio.MELOTTS_BACKEND,
+                enhanced_audio.KOKORO_BACKEND):
+            with self.subTest(backend=backend):
+                command = commands[backend]
+                self.assertIn(str(paths.runtimes / backend), command.argv[0])
+                self.assertEqual(
+                    command.argv[1],
+                    str(paths.runtimes / backend / "autoanki_worker.py"))
 
     def test_shared_paths_are_not_inside_the_repository(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -163,10 +215,21 @@ class EnhancedAudioTests(unittest.TestCase):
             self.assertEqual(plan.requested_count, 2)
             self.assertEqual(plan.unique_count, 1)
             self.assertEqual(plan.cache_hit_count, 0)
+            self.assertEqual(plan.ready_request_count, 0)
             self.assertEqual(plan.synthesis_count, 1)
-            first, duplicate = service.execute_plan(plan)
+            progress = []
+            first, duplicate = service.execute_plan(
+                plan,
+                progress_callback=progress.append)
 
             self.assertEqual(first, duplicate)
+            self.assertEqual(
+                tuple(item["phase"] for item in progress),
+                ("planned", "synthesizing", "complete"))
+            self.assertEqual(progress[0]["requested_card_count"], 2)
+            self.assertEqual(progress[0]["ready_card_count"], 0)
+            self.assertEqual(progress[-1]["ready_card_count"], 2)
+            self.assertEqual(progress[-1]["unique_audio_count"], 1)
             self.assertEqual(len(worker.synthesis_calls), 1)
             self.assertEqual(worker.synthesis_calls[0].text, "日本語")
             self.assertEqual(first.path.read_bytes(), worker.payload)
@@ -178,6 +241,7 @@ class EnhancedAudioTests(unittest.TestCase):
                 worker=second_worker)
             cached_plan = second_service.plan((request,))
             self.assertEqual(cached_plan.cache_hit_count, 1)
+            self.assertEqual(cached_plan.ready_request_count, 1)
             self.assertEqual(cached_plan.synthesis_count, 0)
             cached = second_service.execute_plan(cached_plan)[0]
             self.assertEqual(cached.sha256, first.sha256)

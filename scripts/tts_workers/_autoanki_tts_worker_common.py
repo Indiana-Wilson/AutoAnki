@@ -26,8 +26,12 @@ INSTALLATION_SCHEMA_VERSION = 1
 
 STYLE_BACKEND = "style_bert_vits2_jp_extra"
 COSY_BACKEND = "fun_cosyvoice3_0_5b"
+MELO_BACKEND = "melotts_jp"
+KOKORO_BACKEND = "kokoro_82m_zh"
 STYLE_MODEL_ID = "Style-Bert-VITS2 JP-Extra"
 COSY_MODEL_ID = "Fun-CosyVoice3-0.5B"
+MELO_MODEL_ID = "myshell-ai/MeloTTS-Japanese"
+KOKORO_MODEL_ID = "hexgrad/Kokoro-82M-v1.1-zh"
 
 
 class RequestError(RuntimeError):

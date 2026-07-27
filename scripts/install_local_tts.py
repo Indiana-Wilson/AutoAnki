@@ -29,18 +29,62 @@ import venv
 
 STYLE_BACKEND = "style_bert_vits2_jp_extra"
 COSY_BACKEND = "fun_cosyvoice3_0_5b"
+MELO_BACKEND = "melotts_jp"
+KOKORO_BACKEND = "kokoro_82m_zh"
 STYLE_MODEL_ID = "Style-Bert-VITS2 JP-Extra"
 COSY_MODEL_ID = "Fun-CosyVoice3-0.5B"
+MELO_MODEL_ID = "myshell-ai/MeloTTS-Japanese"
+KOKORO_MODEL_ID = "hexgrad/Kokoro-82M-v1.1-zh"
 
 # Pinned upstream identities make installations and audio cache identities
 # reproducible. Update only after a GPU synthesis regression test.
 STYLE_SOURCE_REVISION = "66de777e06392c0f313600be03c43ef96658b244"
 COSY_SOURCE_REVISION = "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc"
+MELO_SOURCE_REVISION = "209145371cff8fc3bd60d7be902ea69cbdb7965a"
 STYLE_VOICE_REPOSITORY = "litagin/style_bert_vits2_jvnv"
 STYLE_VOICE_REVISION = "205830ca1d49e666ddfbf2a755f0108e9cade4dd"
 COSY_MODEL_REPOSITORY = "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
 COSY_MODEL_REVISION = "29e01c4e8d000f4bcd70751be16fa94bf3d85a18"
 STYLE_BERT_REPOSITORY = "ku-nlp/deberta-v2-large-japanese-char-wwm"
+MELO_MODEL_REPOSITORY = "myshell-ai/MeloTTS-Japanese"
+MELO_MODEL_REVISION = "367f8795464b531b4e97c1515bddfc1243e60891"
+MELO_TOKENIZER_REPOSITORY = "tohoku-nlp/bert-base-japanese-v3"
+MELO_TOKENIZER_REVISION = "65243d6e5629b969c77309f217bd7b1a79d43c7e"
+KOKORO_MODEL_REPOSITORY = "hexgrad/Kokoro-82M-v1.1-zh"
+KOKORO_MODEL_REVISION = "01e7505bd6a7a2ac4975463114c3a7650a9f7218"
+KOKORO_PACKAGE_VERSION = "0.9.4"
+MISAKI_PACKAGE_VERSION = "0.9.4"
+MELO_INFERENCE_REQUIREMENTS = (
+    "numpy==1.26.4",
+    "cached_path==1.8.10",
+    "transformers==4.27.4",
+    "num2words==0.5.12",
+    "unidic-lite==1.0.8",
+    "mecab-python3==1.0.9",
+    "pykakasi==2.2.1",
+    "fugashi==1.3.0",
+    "librosa==0.9.1",
+    "soundfile==0.14.0",
+    "scipy==1.15.3",
+    "tqdm==4.69.1",
+)
+KOKORO_INFERENCE_REQUIREMENTS = (
+    f"kokoro=={KOKORO_PACKAGE_VERSION}",
+    f"misaki[zh]=={MISAKI_PACKAGE_VERSION}",
+    "numpy==2.2.6",
+    "huggingface-hub==1.25.1",
+    "transformers==5.14.1",
+    "spacy==3.8.14",
+    "spacy-curated-transformers==0.3.1",
+    "cn2an==0.5.24",
+    "jieba==0.42.1",
+    "ordered-set==4.1.0",
+    "pypinyin==0.55.0",
+    "pypinyin-dict==0.9.0",
+    "espeakng-loader==0.2.4",
+    "num2words==0.5.14",
+    "phonemizer-fork==3.3.2",
+)
 # The CosyVoice revision pins Whisper 20231117, whose ``triton<3`` metadata
 # forces pip to replace modern CUDA PyTorch.  CosyVoice uses only Whisper's
 # stable tokenizer and log-mel APIs.  This newer immutable release supports
@@ -69,6 +113,13 @@ COSY_MODEL_FILES = (
     "speech_tokenizer_v3.onnx",
     "CosyVoice-BlankEN/*",
 )
+MELO_MODEL_FILES = ("config.json", "checkpoint.pth")
+MELO_TOKENIZER_FILES = ("tokenizer_config.json", "vocab.txt")
+KOKORO_MODEL_FILES = (
+    "config.json",
+    "kokoro-v1_1-zh.pth",
+    "voices/zm_010.pt",
+)
 COSY_PROMPT_TEXT = (
     "You are a helpful assistant.<|endofprompt|>"
     "希望你以后能够做的比我还好呦。"
@@ -79,6 +130,30 @@ _WORKERS = _HERE / "tts_workers"
 _COMMON_WORKER = _WORKERS / "_autoanki_tts_worker_common.py"
 _STYLE_WORKER = _WORKERS / "style_bert_vits2_worker.py"
 _COSY_WORKER = _WORKERS / "fun_cosyvoice3_worker.py"
+_MELO_WORKER = _WORKERS / "melotts_jp_worker.py"
+_KOKORO_WORKER = _WORKERS / "kokoro_82m_zh_worker.py"
+
+_BACKEND_MODEL_IDS = {
+    STYLE_BACKEND: STYLE_MODEL_ID,
+    COSY_BACKEND: COSY_MODEL_ID,
+    MELO_BACKEND: MELO_MODEL_ID,
+    KOKORO_BACKEND: KOKORO_MODEL_ID,
+}
+_BACKEND_WORKERS = {
+    STYLE_BACKEND: _STYLE_WORKER,
+    COSY_BACKEND: _COSY_WORKER,
+    MELO_BACKEND: _MELO_WORKER,
+    KOKORO_BACKEND: _KOKORO_WORKER,
+}
+_BACKEND_SMOKE_SAMPLES = {
+    STYLE_BACKEND: (("japanese", "こんにちは", "neutral-japanese"),),
+    COSY_BACKEND: (
+        ("english", "Hello.", "neutral-english"),
+        ("french", "Bonjour.", "neutral-french"),
+    ),
+    MELO_BACKEND: (("japanese", "こんにちは", "JP"),),
+    KOKORO_BACKEND: (("chinese", "你好。", "zm_010"),),
+}
 
 
 class InstallationError(RuntimeError):
@@ -142,7 +217,7 @@ def _resolve_python(value: str | None, backend: str) -> Path:
     candidates = []
     if value:
         candidates.append(value)
-    if backend == COSY_BACKEND:
+    if backend in {COSY_BACKEND, MELO_BACKEND}:
         candidates.extend(("python3.10",))
     else:
         candidates.extend(("python3.11", "python3.10", sys.executable))
@@ -153,9 +228,9 @@ def _resolve_python(value: str | None, backend: str) -> Path:
             continue
         executable = Path(resolved).resolve()
         version = _python_version(executable)
-        if backend == COSY_BACKEND and version[:2] != (3, 10):
+        if backend in {COSY_BACKEND, MELO_BACKEND} and version[:2] != (3, 10):
             continue
-        if backend == STYLE_BACKEND and not (
+        if backend in {STYLE_BACKEND, KOKORO_BACKEND} and not (
                 (3, 10) <= version[:2] <= (3, 12)):
             continue
         return executable
@@ -163,6 +238,14 @@ def _resolve_python(value: str | None, backend: str) -> Path:
         raise InstallationError(
             "CosyVoice's supported installer path requires Python 3.10. "
             "Install Python 3.10, then pass --cosy-python /path/to/python3.10.")
+    if backend == MELO_BACKEND:
+        raise InstallationError(
+            "MeloTTS's verified installer path requires Python 3.10. "
+            "Install Python 3.10, then pass --melo-python /path/to/python3.10.")
+    if backend == KOKORO_BACKEND:
+        raise InstallationError(
+            "Kokoro requires Python 3.10 through 3.12. Pass "
+            "--kokoro-python /path/to/a/compatible/python.")
     raise InstallationError(
         "Style-Bert-VITS2 requires Python 3.10 through 3.12. "
         "Pass --style-python /path/to/a/compatible/python.")
@@ -193,6 +276,46 @@ def _relative(root: Path, path: Path) -> str:
     except ValueError as error:
         raise InstallationError(
             f"Installation path escaped the shared root: {path}") from error
+
+
+def _source_tree_fingerprint(directory: Path) -> str:
+    """Hash stable source files while ignoring generated bytecode caches."""
+    if not directory.is_dir():
+        raise InstallationError(
+            f"Pinned source package is missing: {directory}")
+    digest = hashlib.sha256()
+    entry_count = 0
+    for path in sorted(
+            directory.rglob("*"),
+            key=lambda candidate: candidate.relative_to(directory).as_posix()):
+        relative = path.relative_to(directory)
+        if (
+                "__pycache__" in relative.parts
+                or path.suffix in {".pyc", ".pyo"}):
+            continue
+        if path.is_symlink():
+            kind = b"L"
+            content_digest = hashlib.sha256(
+                os.readlink(path).encode("utf-8")).digest()
+        elif path.is_file():
+            kind = b"F"
+            file_digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                while block := stream.read(1024 * 1024):
+                    file_digest.update(block)
+            content_digest = file_digest.digest()
+        else:
+            continue
+        name = relative.as_posix().encode("utf-8")
+        digest.update(kind)
+        digest.update(len(name).to_bytes(8, "big"))
+        digest.update(name)
+        digest.update(content_digest)
+        entry_count += 1
+    if not entry_count:
+        raise InstallationError(
+            f"Pinned source package contains no files: {directory}")
+    return digest.hexdigest()
 
 
 def _write_json_atomic(path: Path, value: Mapping) -> None:
@@ -418,6 +541,38 @@ def _ensure_cosy_source(root: Path, *, force: bool) -> Path:
         # Retain an incomplete clone for diagnosis; it is not treated as the
         # immutable source directory.
         raise
+    return destination
+
+
+def _ensure_melo_source(root: Path, *, force: bool) -> Path:
+    """Retain the exact MeloTTS source used by the Japanese-only worker."""
+    destination = root / "sources" / "MeloTTS" / MELO_SOURCE_REVISION
+    if destination.is_dir():
+        completed = _run(
+            ("git", "-C", destination, "rev-parse", "HEAD"),
+            capture=True)
+        if completed.stdout.strip() == MELO_SOURCE_REVISION:
+            return destination
+        if not force:
+            raise InstallationError(
+                f"Existing MeloTTS source has the wrong revision: "
+                f"{destination}")
+        backup = destination.with_name(
+            f"{destination.name}.backup-"
+            f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}")
+        destination.replace(backup)
+    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.cloning")
+    if temporary.exists():
+        raise InstallationError(
+            f"An earlier clone is incomplete: {temporary}")
+    _run((
+        "git", "clone", "--filter=blob:none", "--no-checkout",
+        "https://github.com/myshell-ai/MeloTTS.git", temporary))
+    _run((
+        "git", "-C", temporary, "checkout", "--detach",
+        MELO_SOURCE_REVISION))
+    temporary.replace(destination)
     return destination
 
 
@@ -800,6 +955,237 @@ def _install_cosy(
         raise
 
 
+def _install_melo(
+        root: Path,
+        python: Path,
+        *,
+        force: bool,
+        defer_smoke: bool,
+        torch_version: str,
+        torch_index_url: str) -> Path:
+    source = _ensure_melo_source(root, force=force)
+    runtime, backup = _create_runtime(
+        root, MELO_BACKEND, python, force=force)
+    environment = _environment(root)
+    runtime_python = _runtime_python(runtime)
+    try:
+        _pip(
+            runtime_python, "install", "--upgrade", "pip", "setuptools",
+            "wheel", environment=environment)
+        _install_cuda_torch(
+            runtime_python,
+            version=torch_version,
+            index_url=torch_index_url,
+            environment=environment)
+        # Install only the Japanese inference dependencies. Upstream's setup
+        # hook downloads full UniDic and its cleaner eagerly imports every
+        # language frontend; the worker instead uses UniDic-lite and a pinned,
+        # Japanese-only cleaner/tokenizer path.
+        _pip(
+            runtime_python,
+            "install",
+            *MELO_INFERENCE_REQUIREMENTS,
+            environment=environment)
+        _assert_exact_cuda_torch(
+            runtime_python,
+            expected_version=torch_version,
+            environment=environment)
+
+        model_root = root / "models" / MELO_BACKEND / MELO_MODEL_REVISION
+        _download_snapshot(
+            runtime_python,
+            repository=MELO_MODEL_REPOSITORY,
+            revision=MELO_MODEL_REVISION,
+            destination=model_root,
+            allow_patterns=MELO_MODEL_FILES,
+            environment=environment)
+        tokenizer_root = (
+            root / "models" / "huggingface"
+            / "tohoku-nlp--bert-base-japanese-v3"
+            / MELO_TOKENIZER_REVISION)
+        _download_snapshot(
+            runtime_python,
+            repository=MELO_TOKENIZER_REPOSITORY,
+            revision=MELO_TOKENIZER_REVISION,
+            destination=tokenizer_root,
+            allow_patterns=MELO_TOKENIZER_FILES,
+            environment=environment)
+        _copy_worker(runtime, _MELO_WORKER)
+        source_tree_revision = _source_tree_fingerprint(source / "melo")
+        environment_revision = _environment_fingerprint(
+            runtime_python, environment)
+        worker_revision = _worker_fingerprint(runtime)
+        manifest = _base_manifest(
+            backend=MELO_BACKEND,
+            model_id=MELO_MODEL_ID,
+            model_revision=_model_revision(
+                model_revision=MELO_MODEL_REVISION,
+                source_revision=(
+                    f"{MELO_SOURCE_REVISION}-{source_tree_revision}"),
+                environment_revision=environment_revision,
+                worker_revision=worker_revision,
+                extra_revision=MELO_TOKENIZER_REVISION),
+            torch_version=torch_version,
+            torch_index_url=torch_index_url)
+        manifest.update({
+            "paths": {
+                "source": _relative(root, source),
+                "model_config": _relative(
+                    root, model_root / MELO_MODEL_FILES[0]),
+                "model_checkpoint": _relative(
+                    root, model_root / MELO_MODEL_FILES[1]),
+                "tokenizer": _relative(root, tokenizer_root),
+            },
+            "voice": {
+                "id": "JP",
+                "speaker_id": 0,
+                "language": "japanese",
+            },
+            "source": {
+                "repository": "https://github.com/myshell-ai/MeloTTS.git",
+                "revision": MELO_SOURCE_REVISION,
+                "tree_sha256": source_tree_revision,
+                "license": "MIT",
+            },
+            "model_source": {
+                "repository": MELO_MODEL_REPOSITORY,
+                "revision": MELO_MODEL_REVISION,
+                "license": "MIT",
+            },
+            "frontend": {
+                "repository": MELO_TOKENIZER_REPOSITORY,
+                "revision": MELO_TOKENIZER_REVISION,
+            },
+        })
+        manifest["runtime"].update({
+            "environment_sha256": environment_revision,
+            "worker_sha256": worker_revision,
+            "japanese_only_lazy_frontend": True,
+            "full_unidic_downloaded": False,
+        })
+        _write_json_atomic(runtime / "installation.json", manifest)
+        if defer_smoke:
+            print(
+                "MeloTTS Japanese prepared in the testing state; run "
+                "--verify-existing when sufficient VRAM is available.")
+            return runtime
+        smoke_directory = _smoke_test(
+            root, runtime, MELO_BACKEND, MELO_MODEL_ID)
+        manifest["state"] = "ready"
+        manifest["verified_at"] = datetime.now(timezone.utc).isoformat()
+        manifest["smoke_audio_directory"] = _relative(
+            root, smoke_directory)
+        _write_json_atomic(runtime / "installation.json", manifest)
+        return runtime
+    except BaseException:
+        _restore_runtime_after_failure(runtime, backup)
+        raise
+
+
+def _install_kokoro(
+        root: Path,
+        python: Path,
+        *,
+        force: bool,
+        defer_smoke: bool,
+        torch_version: str,
+        torch_index_url: str) -> Path:
+    runtime, backup = _create_runtime(
+        root, KOKORO_BACKEND, python, force=force)
+    environment = _environment(root)
+    runtime_python = _runtime_python(runtime)
+    try:
+        _pip(
+            runtime_python, "install", "--upgrade", "pip", "setuptools",
+            "wheel", environment=environment)
+        _install_cuda_torch(
+            runtime_python,
+            version=torch_version,
+            index_url=torch_index_url,
+            environment=environment)
+        _pip(
+            runtime_python,
+            "install",
+            *KOKORO_INFERENCE_REQUIREMENTS,
+            environment=environment)
+        _assert_exact_cuda_torch(
+            runtime_python,
+            expected_version=torch_version,
+            environment=environment)
+
+        model_root = (
+            root / "models" / KOKORO_BACKEND / KOKORO_MODEL_REVISION)
+        _download_snapshot(
+            runtime_python,
+            repository=KOKORO_MODEL_REPOSITORY,
+            revision=KOKORO_MODEL_REVISION,
+            destination=model_root,
+            allow_patterns=KOKORO_MODEL_FILES,
+            environment=environment)
+        _copy_worker(runtime, _KOKORO_WORKER)
+        environment_revision = _environment_fingerprint(
+            runtime_python, environment)
+        worker_revision = _worker_fingerprint(runtime)
+        manifest = _base_manifest(
+            backend=KOKORO_BACKEND,
+            model_id=KOKORO_MODEL_ID,
+            model_revision=_model_revision(
+                model_revision=KOKORO_MODEL_REVISION,
+                source_revision=f"kokoro-{KOKORO_PACKAGE_VERSION}",
+                environment_revision=environment_revision,
+                worker_revision=worker_revision,
+                extra_revision=f"misaki-{MISAKI_PACKAGE_VERSION}"),
+            torch_version=torch_version,
+            torch_index_url=torch_index_url)
+        manifest.update({
+            "paths": {
+                "model_config": _relative(
+                    root, model_root / KOKORO_MODEL_FILES[0]),
+                "model_checkpoint": _relative(
+                    root, model_root / KOKORO_MODEL_FILES[1]),
+                "voice": _relative(
+                    root, model_root / KOKORO_MODEL_FILES[2]),
+            },
+            "voice": {
+                "id": "zm_010",
+                "language": "chinese",
+            },
+            "source": {
+                "repository": "https://github.com/hexgrad/kokoro.git",
+                "revision": KOKORO_PACKAGE_VERSION,
+                "license": "Apache-2.0",
+            },
+            "model_source": {
+                "repository": KOKORO_MODEL_REPOSITORY,
+                "revision": KOKORO_MODEL_REVISION,
+                "license": "Apache-2.0",
+            },
+        })
+        manifest["runtime"].update({
+            "environment_sha256": environment_revision,
+            "worker_sha256": worker_revision,
+            "kokoro": KOKORO_PACKAGE_VERSION,
+            "misaki": MISAKI_PACKAGE_VERSION,
+        })
+        _write_json_atomic(runtime / "installation.json", manifest)
+        if defer_smoke:
+            print(
+                "Kokoro Chinese prepared in the testing state; run "
+                "--verify-existing when sufficient VRAM is available.")
+            return runtime
+        smoke_directory = _smoke_test(
+            root, runtime, KOKORO_BACKEND, KOKORO_MODEL_ID)
+        manifest["state"] = "ready"
+        manifest["verified_at"] = datetime.now(timezone.utc).isoformat()
+        manifest["smoke_audio_directory"] = _relative(
+            root, smoke_directory)
+        _write_json_atomic(runtime / "installation.json", manifest)
+        return runtime
+    except BaseException:
+        _restore_runtime_after_failure(runtime, backup)
+        raise
+
+
 def _worker_request(
         root: Path,
         runtime: Path,
@@ -869,14 +1255,11 @@ def _smoke_test(
             "The installed worker did not report a ready CUDA runtime.")
     revision = status["model"]["revision"]
     voices = status["voices"]
-    if backend == STYLE_BACKEND:
-        samples = (("japanese", "こんにちは", "neutral-japanese"),)
-    else:
-        samples = (
-            ("english", "Hello.", "neutral-english"),
-            ("french", "Bonjour.", "neutral-french"),
-            ("chinese", "你好。", "neutral-mandarin"),
-        )
+    try:
+        samples = _BACKEND_SMOKE_SAMPLES[backend]
+    except KeyError as error:
+        raise InstallationError(
+            f"No smoke-test workload is configured for {backend}.") from error
     staging = root / "staging"
     staging.mkdir(mode=0o700, parents=True, exist_ok=True)
     output_paths = [
@@ -973,6 +1356,12 @@ def _write_notices(root: Path) -> None:
 - FunAudioLLM CosyVoice source and Fun-CosyVoice3 model: Apache-2.0,
   https://github.com/FunAudioLLM/CosyVoice and
   https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+- MeloTTS source and Japanese model: MIT,
+  https://github.com/myshell-ai/MeloTTS and
+  https://huggingface.co/myshell-ai/MeloTTS-Japanese
+- Kokoro source and Kokoro-82M-v1.1-zh model: Apache-2.0,
+  https://github.com/hexgrad/kokoro and
+  https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh
 
 Review the upstream terms before distributing a runtime or generated audio.
 """
@@ -993,8 +1382,10 @@ def _verify_existing(root: Path, backend: str) -> Path:
             or manifest.get("state") not in {"testing", "ready"}):
         raise InstallationError(
             f"Runtime has no compatible testing/ready manifest: {runtime}")
-    expected_model_id = (
-        STYLE_MODEL_ID if backend == STYLE_BACKEND else COSY_MODEL_ID)
+    try:
+        expected_model_id = _BACKEND_MODEL_IDS[backend]
+    except KeyError as error:
+        raise InstallationError(f"Unknown TTS backend: {backend}") from error
     if manifest.get("model", {}).get("id") != expected_model_id:
         raise InstallationError(
             f"Runtime manifest names the wrong model: {runtime}")
@@ -1029,6 +1420,33 @@ def _refresh_existing_worker(root: Path, backend: str) -> Path:
         raise InstallationError(
             f"Runtime manifest is missing model/runtime metadata: {runtime}")
 
+    source_tree_revision = None
+    if backend == MELO_BACKEND:
+        paths = manifest.get("paths")
+        source_metadata = manifest.get("source")
+        if not isinstance(paths, dict) or not isinstance(source_metadata, dict):
+            raise InstallationError(
+                f"MeloTTS runtime has no pinned source metadata: {runtime}")
+        source_value = paths.get("source")
+        if (
+                not isinstance(source_value, str)
+                or not source_value
+                or Path(source_value).is_absolute()
+                or ".." in Path(source_value).parts):
+            raise InstallationError(
+                f"MeloTTS runtime has an unsafe source path: {runtime}")
+        source = (root / source_value).resolve()
+        try:
+            source.relative_to(root.resolve())
+        except ValueError as error:
+            raise InstallationError(
+                f"MeloTTS source escaped the shared root: {source}") from error
+        if source_metadata.get("revision") != MELO_SOURCE_REVISION:
+            raise InstallationError(
+                f"MeloTTS runtime has the wrong source revision: {runtime}")
+        source_tree_revision = _source_tree_fingerprint(source / "melo")
+        source_metadata["tree_sha256"] = source_tree_revision
+
     torch_version = runtime_value.get("torch_requested")
     if not isinstance(torch_version, str) or not torch_version:
         raise InstallationError(
@@ -1040,18 +1458,16 @@ def _refresh_existing_worker(root: Path, backend: str) -> Path:
         environment=environment)
     environment_revision = _environment_fingerprint(
         _runtime_python(runtime), environment)
-    worker_source = (
-        _STYLE_WORKER if backend == STYLE_BACKEND else _COSY_WORKER)
-    _copy_worker(runtime, worker_source)
-    worker_revision = _worker_fingerprint(runtime)
     revision = model.get("revision")
     if not isinstance(revision, str):
         raise InstallationError(
             f"Runtime manifest has no model revision: {runtime}")
     components = revision.split(";")
-    for name, value in (
-            ("environment", environment_revision),
-            ("worker", worker_revision)):
+    required_components = ["environment", "worker"]
+    if source_tree_revision is not None:
+        required_components.append("runtime")
+    component_indices = {}
+    for name in required_components:
         matches = [
             index
             for index, component in enumerate(components)
@@ -1061,7 +1477,25 @@ def _refresh_existing_worker(root: Path, backend: str) -> Path:
             raise InstallationError(
                 f"Runtime model revision has no unique {name} component: "
                 f"{runtime}")
-        components[matches[0]] = f"{name}:{value}"
+        component_indices[name] = matches[0]
+
+    try:
+        worker_source = _BACKEND_WORKERS[backend]
+    except KeyError as error:
+        raise InstallationError(f"Unknown TTS backend: {backend}") from error
+    _copy_worker(runtime, worker_source)
+    worker_revision = _worker_fingerprint(runtime)
+    revision_updates = [
+        ("environment", environment_revision),
+        ("worker", worker_revision),
+    ]
+    if source_tree_revision is not None:
+        revision_updates.append((
+            "runtime",
+            f"{MELO_SOURCE_REVISION}-{source_tree_revision}",
+        ))
+    for name, value in revision_updates:
+        components[component_indices[name]] = f"{name}:{value}"
     model["revision"] = ";".join(components)
     runtime_value["environment_sha256"] = environment_revision
     runtime_value["worker_sha256"] = worker_revision
@@ -1085,6 +1519,10 @@ def _plan(args, root: Path, backends: list[str]) -> dict:
             "version": args.torch_version,
             "index_url": args.torch_index_url,
         },
+        "inference_requirements": {
+            "melo": list(MELO_INFERENCE_REQUIREMENTS),
+            "kokoro": list(KOKORO_INFERENCE_REQUIREMENTS),
+        },
         "pinned_revisions": {
             "style_source": STYLE_SOURCE_REVISION,
             "style_voice": STYLE_VOICE_REVISION,
@@ -1092,13 +1530,22 @@ def _plan(args, root: Path, backends: list[str]) -> dict:
             "cosy_model": COSY_MODEL_REVISION,
             "cosy_openai_whisper": COSY_WHISPER_VERSION,
             "cosy_onnxruntime_gpu": COSY_ONNXRUNTIME_VERSION,
+            "melo_source": MELO_SOURCE_REVISION,
+            "melo_model": MELO_MODEL_REVISION,
+            "melo_tokenizer": MELO_TOKENIZER_REVISION,
+            "kokoro_model": KOKORO_MODEL_REVISION,
+            "kokoro_package": KOKORO_PACKAGE_VERSION,
+            "misaki_package": MISAKI_PACKAGE_VERSION,
         },
     }
     interpreters = {}
     for backend in backends:
-        supplied = (
-            args.style_python if backend == STYLE_BACKEND
-            else args.cosy_python)
+        supplied = {
+            STYLE_BACKEND: args.style_python,
+            COSY_BACKEND: args.cosy_python,
+            MELO_BACKEND: args.melo_python,
+            KOKORO_BACKEND: args.kokoro_python,
+        }[backend]
         try:
             interpreters[backend] = str(_resolve_python(
                 supplied or args.python, backend))
@@ -1115,9 +1562,18 @@ def _parse_arguments(argv: list[str] | None = None):
     parser.add_argument(
         "--backend",
         action="append",
-        choices=("style", "cosy", "all"),
+        choices=(
+            "style",
+            "cosy",
+            "melo",
+            "kokoro",
+            "production",
+            "all",
+        ),
         required=True,
-        help="Backend to install; repeat the option or use all.")
+        help=(
+            "Backend to install; repeat the option, use production for the "
+            "three active routes, or all to include optional Style-Bert."))
     parser.add_argument(
         "--root",
         type=Path,
@@ -1125,13 +1581,19 @@ def _parse_arguments(argv: list[str] | None = None):
         help="Shared TTS root (default: %(default)s).")
     parser.add_argument(
         "--python",
-        help="Fallback Python interpreter for either backend.")
+        help="Fallback Python interpreter for each selected backend.")
     parser.add_argument(
         "--style-python",
         help="Python 3.10-3.12 interpreter for Style-Bert-VITS2.")
     parser.add_argument(
         "--cosy-python",
         help="Python 3.10 interpreter for CosyVoice.")
+    parser.add_argument(
+        "--melo-python",
+        help="Python 3.10 interpreter for MeloTTS Japanese.")
+    parser.add_argument(
+        "--kokoro-python",
+        help="Python 3.10-3.12 interpreter for Kokoro Chinese.")
     parser.add_argument(
         "--torch-version",
         default=DEFAULT_TORCH_VERSION,
@@ -1177,8 +1639,12 @@ def main(argv: list[str] | None = None) -> int:
     backends = []
     if "all" in selected or "style" in selected:
         backends.append(STYLE_BACKEND)
-    if "all" in selected or "cosy" in selected:
+    if "all" in selected or "production" in selected or "cosy" in selected:
         backends.append(COSY_BACKEND)
+    if "all" in selected or "production" in selected or "melo" in selected:
+        backends.append(MELO_BACKEND)
+    if "all" in selected or "production" in selected or "kokoro" in selected:
+        backends.append(KOKORO_BACKEND)
     root = args.root.expanduser().resolve()
     if root == Path("/") or root == Path.home().resolve():
         raise InstallationError(
@@ -1235,8 +1701,24 @@ def main(argv: list[str] | None = None) -> int:
                 defer_smoke=args.defer_smoke,
                 torch_version=args.torch_version,
                 torch_index_url=args.torch_index_url)
-        else:
+        elif backend == COSY_BACKEND:
             runtime = _install_cosy(
+                root,
+                python,
+                force=args.force,
+                defer_smoke=args.defer_smoke,
+                torch_version=args.torch_version,
+                torch_index_url=args.torch_index_url)
+        elif backend == MELO_BACKEND:
+            runtime = _install_melo(
+                root,
+                python,
+                force=args.force,
+                defer_smoke=args.defer_smoke,
+                torch_version=args.torch_version,
+                torch_index_url=args.torch_index_url)
+        else:
+            runtime = _install_kokoro(
                 root,
                 python,
                 force=args.force,

@@ -151,11 +151,13 @@ direction can still translate and package its deduplicated source sentences;
 otherwise AutoAnki sends nothing and creates no package or deck.
 
 Card setup can opt supported directions into Enhanced audio without changing
-ordinary saved cards. Japanese uses the installed Style-Bert-VITS2 JP-Extra
-Neutral voice; English, French, and Chinese use Fun-CosyVoice3 0.5B. Audio is
-generated locally on CUDA, cached outside the repository, and packaged as Anki
-media. See `docs/local_tts_installation.md` for the isolated shared-runtime
-installer, supported-language limits, licenses, and GPU-only smoke tests.
+ordinary saved cards. Japanese uses MeloTTS `JP`; Chinese, including Classical
+Chinese variants, uses Kokoro 82M `zm_010`; and English and French use
+Fun-CosyVoice3 0.5B. Classical Chinese audio is modern Mandarin, not a
+reconstructed historical pronunciation. Audio is generated locally on CUDA,
+cached outside the repository, and packaged as Anki media. See
+`docs/local_tts_installation.md` for the isolated shared-runtime installer,
+supported-language limits, licenses, and GPU-only smoke tests.
 
 An estimate can reuse a matching read-only Anki result briefly, but confirmed
 generation forces a fresh, ready-collection read immediately before its

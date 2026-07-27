@@ -17,9 +17,10 @@ From Source contains five pages:
    file without generating cards.
 4. **Codex Retrieve** gives an explicitly authorized Codex CLI process a
    source-retrieval description, then prepares the retrieved files.
-5. **Jobs & Failures** shows each saved request, its attempts, and the final
-   package/import step. Each deck-generation job is an expandable group, with
-   its request chunks in order and its Deck packaging/import row last.
+5. **Jobs & Failures** shows each saved request, its attempts, and four
+   explicit finalization stages: Cards, Audio, Package, and Import. Each
+   deck-generation job is an expandable group, with its request chunks in
+   order, those four stages next, and its Deck summary/retry row last.
    **Inspect selected stage** separates the exact request from the retained
    response in two tabs; it inspects one chunk, not the whole job. **Emergency
    pause** immediately closes the shared paid-dispatch gate for queued/unsent
@@ -491,6 +492,11 @@ available for inspection; when that job is resumed, the orphaned chunk is
 returned to pending. Completed chunks remain completed. A package/import
 failure leaves the validated combined JSON and any completed `.apkg` in the
 job directory, so retrying the **Deck** row does not repeat provider work.
+Enhanced-card audio planning also records durable progress in `workflow.json`.
+The Audio row reports requested card-audio slots, how many are already
+satisfied, unique audio files, and how many unique files require local
+synthesis. Cache hits therefore count as ready before a model is loaded, and
+the row advances after each bounded synthesis batch.
 The paid-dispatch pause never cancels a request already in flight, but it
 prevents every worker that has not yet crossed the shared gate from sending.
 Resume reports connecting, success, timeout, no-connection, or attention

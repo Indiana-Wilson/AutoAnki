@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -16,6 +17,8 @@ WORKERS = REPOSITORY / "scripts" / "tts_workers"
 sys.path.insert(0, str(WORKERS))
 
 import _autoanki_tts_worker_common as worker_common
+import kokoro_82m_zh_worker
+import melotts_jp_worker
 
 INSTALLER_SPEC = importlib.util.spec_from_file_location(
     "autoanki_local_tts_installer",
@@ -26,6 +29,114 @@ INSTALLER_SPEC.loader.exec_module(installer)
 
 
 class LocalTTSWorkerTests(unittest.TestCase):
+    def test_melo_source_fingerprint_matches_installer_and_detects_edits(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "melo"
+            (source / "text").mkdir(parents=True)
+            (source / "api.py").write_text(
+                "SOURCE = 'pinned'\n",
+                encoding="utf-8")
+            (source / "text" / "symbols.txt").write_text(
+                "a\nb\n",
+                encoding="utf-8")
+            initial = installer._source_tree_fingerprint(source)
+            self.assertEqual(
+                initial,
+                melotts_jp_worker._source_tree_fingerprint(source))
+
+            bytecode = source / "__pycache__"
+            bytecode.mkdir()
+            (bytecode / "api.cpython-310.pyc").write_bytes(b"generated")
+            self.assertEqual(
+                installer._source_tree_fingerprint(source),
+                initial)
+
+            (source / "api.py").write_text(
+                "SOURCE = 'modified'\n",
+                encoding="utf-8")
+            self.assertNotEqual(
+                installer._source_tree_fingerprint(source),
+                initial)
+
+    def test_melo_accepts_upstream_hparams_speaker_map(self):
+        class HParamsLike:
+            def __getitem__(self, key):
+                if key != "JP":
+                    raise KeyError(key)
+                return 0
+
+        model = mock.Mock()
+        model.hps.data.spk2id = HParamsLike()
+        self.assertEqual(melotts_jp_worker._speaker_id(model), 0)
+
+    def test_kokoro_uses_selected_local_voice_and_joins_all_chunks(self):
+        class FakeTensor:
+            def __init__(self, values):
+                self.values = list(values)
+
+            def numel(self):
+                return len(self.values)
+
+            def detach(self):
+                return self
+
+            def cpu(self):
+                return self
+
+            def reshape(self, *_shape):
+                return self
+
+        fake_torch = SimpleNamespace(
+            Tensor=FakeTensor,
+            float32=object(),
+            zeros=lambda count, dtype: FakeTensor([0.0] * count),
+            cat=lambda tensors: FakeTensor(
+                value
+                for tensor in tensors
+                for value in tensor.values),
+            cuda=SimpleNamespace(synchronize=lambda: None),
+        )
+        pipeline = mock.Mock(return_value=[
+            SimpleNamespace(audio=FakeTensor([0.1, 0.2, 0.3])),
+            SimpleNamespace(audio=FakeTensor([0.4, 0.5])),
+        ])
+        voice_path = Path("/installed/voices/zm_010.pt")
+        data = {
+            "text": "第一句。第二句。",
+            "speed": 1.0,
+            "seed": 0,
+            "sample_rate_hz": 24000,
+            "output_path": Path("/staging/output.wav"),
+        }
+        with (
+                mock.patch.object(
+                    kokoro_82m_zh_worker,
+                    "installed_path",
+                    return_value=voice_path),
+                mock.patch.object(
+                    kokoro_82m_zh_worker,
+                    "seed_synthesis"),
+                mock.patch.object(
+                    kokoro_82m_zh_worker,
+                    "write_tensor_wav") as write_wav,
+                mock.patch.dict(sys.modules, {"torch": fake_torch})):
+            result = kokoro_82m_zh_worker._synthesize_item(
+                pipeline,
+                {},
+                data)
+
+        pipeline.assert_called_once_with(
+            data["text"],
+            voice=str(voice_path),
+            speed=1.0)
+        audio, source_rate, target_rate, output_path = (
+            write_wav.call_args.args)
+        self.assertEqual(audio.numel(), 3 + 1920 + 2)
+        self.assertEqual(source_rate, 24000)
+        self.assertEqual(target_rate, 24000)
+        self.assertEqual(output_path, data["output_path"])
+        self.assertEqual(result["artifact"]["path"], str(data["output_path"]))
+
     def test_backend_stdout_is_redirected_away_from_protocol(self):
         request = {
             "protocol": worker_common.PROTOCOL,
@@ -191,6 +302,75 @@ class LocalTTSWorkerTests(unittest.TestCase):
             f"worker:{'f' * 64}",
             refreshed["model"]["revision"])
 
+    def test_melo_worker_refresh_records_verified_source_tree_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "sources" / "MeloTTS" / "revision"
+            package = source / "melo"
+            package.mkdir(parents=True)
+            (package / "api.py").write_text(
+                "PINNED = True\n",
+                encoding="utf-8")
+            tree_revision = installer._source_tree_fingerprint(package)
+            runtime = root / "runtimes" / worker_common.MELO_BACKEND
+            runtime.mkdir(parents=True)
+            manifest_path = runtime / "installation.json"
+            manifest_path.write_text(json.dumps({
+                "schema_version": 1,
+                "backend": worker_common.MELO_BACKEND,
+                "state": "ready",
+                "paths": {
+                    "source": str(source.relative_to(root)),
+                },
+                "source": {
+                    "revision": installer.MELO_SOURCE_REVISION,
+                },
+                "model": {
+                    "id": worker_common.MELO_MODEL_ID,
+                    "revision": (
+                        "model:model-revision;"
+                        "runtime:old-source;"
+                        "environment:old-environment;"
+                        "worker:old-worker"),
+                },
+                "runtime": {
+                    "torch_requested": "2.11.0",
+                    "environment_sha256": "old-environment",
+                    "worker_sha256": "old-worker",
+                },
+            }), encoding="utf-8")
+            with (
+                    mock.patch.object(
+                        installer,
+                        "_assert_exact_cuda_torch"),
+                    mock.patch.object(
+                        installer,
+                        "_environment_fingerprint",
+                        return_value="e" * 64),
+                    mock.patch.object(
+                        installer,
+                        "_copy_worker"),
+                    mock.patch.object(
+                        installer,
+                        "_worker_fingerprint",
+                        return_value="f" * 64)):
+                installer._refresh_existing_worker(
+                    root,
+                    worker_common.MELO_BACKEND)
+            refreshed = json.loads(
+                manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            refreshed["source"]["tree_sha256"],
+            tree_revision)
+        self.assertIn(
+            (
+                f"runtime:{installer.MELO_SOURCE_REVISION}-"
+                f"{tree_revision}"
+            ),
+            refreshed["model"]["revision"].split(";"))
+        self.assertEqual(refreshed["state"], "testing")
+
     def test_status_is_machine_readable_without_installation(self):
         cases = (
             (
@@ -202,6 +382,16 @@ class LocalTTSWorkerTests(unittest.TestCase):
                 "fun_cosyvoice3_worker.py",
                 worker_common.COSY_BACKEND,
                 worker_common.COSY_MODEL_ID,
+            ),
+            (
+                "melotts_jp_worker.py",
+                worker_common.MELO_BACKEND,
+                worker_common.MELO_MODEL_ID,
+            ),
+            (
+                "kokoro_82m_zh_worker.py",
+                worker_common.KOKORO_BACKEND,
+                worker_common.KOKORO_MODEL_ID,
             ),
         )
         for filename, backend, model_id in cases:
@@ -234,6 +424,64 @@ class LocalTTSWorkerTests(unittest.TestCase):
                 self.assertTrue(response["ok"])
                 self.assertFalse(response["runtime"]["available"])
                 self.assertEqual(response["model"]["id"], model_id)
+
+    def test_installer_maps_selected_backends_to_exact_workers_and_voices(self):
+        self.assertEqual(
+            installer._BACKEND_MODEL_IDS[worker_common.MELO_BACKEND],
+            worker_common.MELO_MODEL_ID)
+        self.assertEqual(
+            installer._BACKEND_MODEL_IDS[worker_common.KOKORO_BACKEND],
+            worker_common.KOKORO_MODEL_ID)
+        self.assertEqual(
+            installer._BACKEND_WORKERS[worker_common.MELO_BACKEND].name,
+            "melotts_jp_worker.py")
+        self.assertEqual(
+            installer._BACKEND_WORKERS[worker_common.KOKORO_BACKEND].name,
+            "kokoro_82m_zh_worker.py")
+        self.assertEqual(
+            installer._BACKEND_SMOKE_SAMPLES[worker_common.MELO_BACKEND],
+            (("japanese", "こんにちは", "JP"),))
+        self.assertEqual(
+            installer._BACKEND_SMOKE_SAMPLES[worker_common.KOKORO_BACKEND],
+            (("chinese", "你好。", "zm_010"),))
+        self.assertEqual(
+            tuple(
+                language
+                for language, _text, _voice
+                in installer._BACKEND_SMOKE_SAMPLES[
+                    worker_common.COSY_BACKEND]),
+            ("english", "french"))
+        for requirements in (
+                installer.MELO_INFERENCE_REQUIREMENTS,
+                installer.KOKORO_INFERENCE_REQUIREMENTS):
+            self.assertTrue(all(
+                "==" in requirement
+                for requirement in requirements))
+
+    def test_installer_production_selection_excludes_optional_style_backend(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            stdout = io.StringIO()
+            with (
+                    mock.patch.object(
+                        installer,
+                        "_resolve_python",
+                        return_value=Path(sys.executable)),
+                    redirect_stdout(stdout)):
+                result = installer.main([
+                    "--backend",
+                    "production",
+                    "--root",
+                    temporary,
+                    "--dry-run",
+                ])
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            json.loads(stdout.getvalue())["backends"],
+            [
+                worker_common.COSY_BACKEND,
+                worker_common.MELO_BACKEND,
+                worker_common.KOKORO_BACKEND,
+            ])
 
     def test_batch_identity_does_not_require_global_model(self):
         request = {

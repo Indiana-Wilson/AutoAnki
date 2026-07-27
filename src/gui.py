@@ -105,6 +105,19 @@ SOURCE_MODEL_KEYS_BY_LABEL = {
     for key, label in SOURCE_MODEL_OPTIONS
 }
 
+ENHANCED_AUDIO_BACKEND_LABELS = {
+    "japanese": "MeloTTS · JP",
+    "english": "Fun-CosyVoice3 0.5B",
+    "classical_chinese": "Kokoro 82M · zm_010",
+    "french": "Fun-CosyVoice3 0.5B",
+    "latin": "No supported local voice",
+}
+
+
+def enhanced_audio_backend_label(language_key):
+    """Return the exact production model and voice shown in card setup."""
+    return ENHANCED_AUDIO_BACKEND_LABELS[language_key]
+
 SOURCE_JOB_HEADINGS = {
     "job": "Job",
     "source": "Source",
@@ -200,7 +213,13 @@ def group_source_job_rows(jobs):
                 _source_job_value(row, "chunk", "")))
             target = (
                 finalization
-                if row_id.endswith("::finalize") or chunk == "Deck"
+                if (
+                    bool(_source_job_value(
+                        row,
+                        "is_finalization_stage",
+                        False))
+                    or row_id.endswith("::finalize")
+                    or chunk == "Deck")
                 else regular)
             target.append(row)
         result.append((parent_id, tuple((*regular, *finalization))))
@@ -2620,13 +2639,7 @@ class PipelineEditor:
                     pady=(5, 6))
             enhanced = tk.BooleanVar(value=card.enhanced)
             enhanced_variables[direction.key] = enhanced
-            backend_label = {
-                "japanese": "Style-Bert-VITS2 JP-Extra · Neutral",
-                "english": "Fun-CosyVoice3 0.5B",
-                "classical_chinese": "Fun-CosyVoice3 0.5B",
-                "french": "Fun-CosyVoice3 0.5B",
-                "latin": "No supported local voice",
-            }[language.key]
+            backend_label = enhanced_audio_backend_label(language.key)
             enhanced_check = ttk.Checkbutton(
                 card_panel,
                 text=f"Enhanced · local audio · {backend_label}",
@@ -2804,14 +2817,7 @@ class PipelineEditor:
                     if not enhanced_supported
                     else (
                         "Enhanced · local audio · "
-                        + {
-                            "japanese": (
-                                "Style-Bert-VITS2 JP-Extra · Neutral"),
-                            "english": "Fun-CosyVoice3 0.5B",
-                            "classical_chinese": "Fun-CosyVoice3 0.5B",
-                            "french": "Fun-CosyVoice3 0.5B",
-                            "latin": "No supported local voice",
-                        }[language_key]
+                        + enhanced_audio_backend_label(language_key)
                     )),
                 state=(
                     tk.DISABLED

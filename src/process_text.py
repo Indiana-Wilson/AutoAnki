@@ -2117,6 +2117,7 @@ def process_json_text(
         enforce_sentence_count=True,
         require_sentence_translations=True,
         audio_service=None,
+        audio_progress_callback=None,
         audio_media_directory=None,
         **_legacy_arguments):
     if deck is None:
@@ -2200,7 +2201,13 @@ def process_json_text(
                     pipeline.language_key,
                     "sentence"))
         service = audio_service or enhanced_audio.LocalTTSService()
-        all_audio_artifacts = service.synthesize_many(requests)
+        synthesis_arguments = {}
+        if audio_progress_callback is not None:
+            synthesis_arguments["progress_callback"] = (
+                audio_progress_callback)
+        all_audio_artifacts = service.synthesize_many(
+            requests,
+            **synthesis_arguments)
         audio_artifacts_by_slot = dict(zip(
             slots,
             all_audio_artifacts,
