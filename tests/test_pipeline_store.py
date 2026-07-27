@@ -1182,6 +1182,41 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("{{FrontSide}}", meaning_to_word["afmt"])
         self.assertNotIn("{{Pronunciation}}", meaning_to_word["qfmt"])
 
+    def test_enhanced_answers_always_show_prompt_text_and_audio(self):
+        context = templates.get_direction_card_type(
+            "english",
+            "context",
+            enhanced=True).model.templates[0]["afmt"]
+        word_to_meaning = templates.get_direction_card_type(
+            "english",
+            "word_to_meaning",
+            enhanced=True).model.templates[0]["afmt"]
+        meaning_to_word = templates.get_direction_card_type(
+            "english",
+            "meaning_to_word",
+            enhanced=True).model.templates[0]["afmt"]
+        source_sentence = (
+            templates.ENHANCED_SOURCE_SENTENCE_MODEL
+            .templates[0]["afmt"])
+
+        self.assertIn("{{Enhanced Sentence}}", context)
+        self.assertIn("{{Sentence Audio}}", context)
+        self.assertNotIn("{{#Audio First}}", context)
+        self.assertNotIn("{{#Written First}}", context)
+
+        self.assertIn("{{Word}}", word_to_meaning)
+        self.assertIn("{{Word Audio}}", word_to_meaning)
+        self.assertNotIn("{{#Audio First}}", word_to_meaning)
+        self.assertNotIn("{{#Written First}}", word_to_meaning)
+
+        self.assertIn("{{Word}}", meaning_to_word)
+        self.assertIn("{{Word Audio}}", meaning_to_word)
+
+        self.assertIn("{{Original Sentence}}", source_sentence)
+        self.assertIn("{{Sentence Audio}}", source_sentence)
+        self.assertNotIn("{{#Audio First}}", source_sentence)
+        self.assertNotIn("{{#Written First}}", source_sentence)
+
     def test_meaning_fields_are_vertical_and_conditionally_rendered(self):
         card_type = templates.get_direction_card_type(
             "french",

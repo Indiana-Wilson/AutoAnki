@@ -283,12 +283,8 @@ def _enhanced_context_question(term_field):
 
 def _enhanced_context_answer(term_field):
     return f"""<div>
-{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
 {_enhanced_sentence_block(term_field, "back")}
-{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
-{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
 {_enhanced_audio_block(SENTENCE_AUDIO_FIELD_NAME)}
-{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}
 <hr>
 {{{{#{ENHANCED_SENTENCE_TRANSLATION_FIELD_NAME}}}}}
 <div class="sentence-translation">
@@ -325,12 +321,8 @@ def _enhanced_answer(language_key, direction_key):
         return _enhanced_context_answer(term_field)
     if direction_key == "word_to_meaning":
         return f"""<div>
-{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
 <div class="term">{{{{{term_field}}}}}</div>
-{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
-{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
 {_enhanced_audio_block(WORD_AUDIO_FIELD_NAME)}
-{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}
 <hr>
 {_definition_stack()}
 </div>"""
@@ -561,12 +553,8 @@ def _create_enhanced_source_sentence_model():
 <div class="sentence">{{{{{SOURCE_ORIGINAL_SENTENCE_FIELD_NAME}}}}}</div>
 {{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}""",
             "afmt": f"""<div>
-{{{{#{AUDIO_FIRST_FIELD_NAME}}}}}
 <div class="sentence">{{{{{SOURCE_ORIGINAL_SENTENCE_FIELD_NAME}}}}}</div>
-{{{{/{AUDIO_FIRST_FIELD_NAME}}}}}
-{{{{#{WRITTEN_FIRST_FIELD_NAME}}}}}
 {_enhanced_audio_block(SENTENCE_AUDIO_FIELD_NAME)}
-{{{{/{WRITTEN_FIRST_FIELD_NAME}}}}}
 <hr>
 <div class="sentence-translation">
   {{{{{SOURCE_ENGLISH_TRANSLATION_FIELD_NAME}}}}}
