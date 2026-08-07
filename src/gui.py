@@ -814,6 +814,7 @@ class ManualInputFilterResult:
     filtered_text: str
     excluded_count: int
     remaining_count: int
+    added_character_count: int = 0
 
 
 BUILT_IN_SOURCE_OPTIONS = (
@@ -941,9 +942,11 @@ def normalise_manual_input_filter_response(value, candidate_count):
             "Manual-input filter results require filtered_text.")
     excluded_count = value.get("excluded_count")
     remaining_count = value.get("remaining_count")
+    added_character_count = value.get("added_character_count", 0)
     for name, number in (
             ("excluded_count", excluded_count),
-            ("remaining_count", remaining_count)):
+            ("remaining_count", remaining_count),
+            ("added_character_count", added_character_count)):
         if (
                 isinstance(number, bool)
                 or not isinstance(number, int)
@@ -958,13 +961,16 @@ def normalise_manual_input_filter_response(value, candidate_count):
         raise ValueError(
             "Manual-input filter remaining_count does not match "
             "filtered_text.")
-    if excluded_count + remaining_count != candidate_count:
+    if (
+            excluded_count + remaining_count
+            != candidate_count + added_character_count):
         raise ValueError(
             "Manual-input filter counts do not match the requested lines.")
     return ManualInputFilterResult(
         filtered_text="\n".join(filtered_candidates),
         excluded_count=excluded_count,
-        remaining_count=remaining_count)
+        remaining_count=remaining_count,
+        added_character_count=added_character_count)
 
 
 def parse_source_chunk_size(value, *, maximum=10000):
@@ -2119,6 +2125,7 @@ class PipelineEditor:
         self.share_field_settings_variables = {}
         self.learned_filter_enabled_variables = {}
         self.learned_filter_summary_variables = {}
+        self.make_items_for_characters_variables = {}
         self.direction_enabled_variables = {}
         self.direction_enhanced_variables = {}
         self.direction_enhanced_checks = {}
@@ -2502,6 +2509,36 @@ class PipelineEditor:
                 column=2,
                 sticky="e",
                 padx=(12, 0))
+        if language.key in {"classical_chinese", "japanese"}:
+            make_character_items = tk.BooleanVar(
+                value=settings.make_items_for_characters)
+            self.make_items_for_characters_variables[
+                language.key] = make_character_items
+            ttk.Checkbutton(
+                learned_controls,
+                text="Make items for characters in multi-character words",
+                variable=make_character_items,
+                command=self.app.schedule_pipeline_save,
+                style="Panel.TCheckbutton").grid(
+                    row=1,
+                    column=0,
+                    columnspan=3,
+                    sticky="w",
+                    pady=(8, 0))
+            if language.key == "japanese":
+                ttk.Label(
+                    learned_controls,
+                    text=(
+                        "Note: Japanese-specific logic is yet to be "
+                        "decided."),
+                    style="Muted.TLabel").grid(
+                        row=2,
+                        column=0,
+                        columnspan=3,
+                        sticky="w",
+                        padx=(24, 0),
+                        pady=(3, 0))
+            self._trace(make_character_items)
         self._trace(same_deck)
         self._trace(share_fields)
         self._trace(target_deck)
@@ -2976,6 +3013,11 @@ class PipelineEditor:
             share_field_settings=(
                 self.share_field_settings_variables[
                     language.key].get()),
+            make_items_for_characters=(
+                self.make_items_for_characters_variables[
+                    language.key].get()
+                if language.key in self.make_items_for_characters_variables
+                else False),
             shared_fields=shared_fields,
             shared_field_languages=shared_field_languages)
 
@@ -3305,6 +3347,10 @@ class AutoAnkiApp:
         })
         if hasattr(self, "prompt_selector_value"):
             preferences["prompt_key"] = self.prompt_selector_value.get()
+        if hasattr(self, "input_text"):
+            preferences["manual_input_draft"] = self.input_text.get(
+                "1.0",
+                "end-1c")
 
         if self._from_source_tab_built:
             option = self.source_options_by_label.get(
@@ -4464,13 +4510,15 @@ class AutoAnkiApp:
             yscrollcommand=input_scrollbar.set)
         self.input_text.grid(row=0, column=0, sticky="nsew")
         input_scrollbar.grid(row=0, column=1, sticky="ns")
+        self._restore_manual_input_draft()
         self.input_text.bind(
-            "<KeyRelease>",
-            self._update_input_count)
+            "<<Modified>>",
+            self._manual_input_changed)
         self.input_text.bind(
             "<FocusOut>",
             self._clear_text_selection,
             add="+")
+        self._update_input_count()
         self.input_text.focus_set()
 
         controls = ttk.Frame(
@@ -8090,19 +8138,32 @@ class AutoAnkiApp:
             source.to_exclusion_mapping()
             for source in settings.sources)
 
-    def _manual_input_filter_request(self, text):
+    def _manual_input_filter_request(
+            self,
+            text,
+            *,
+            make_items_for_characters=False):
         candidates = tuple(
             line.strip()
             for line in text.splitlines()
             if line.strip())
         if not candidates:
             raise ValueError("Enter at least one nonblank line.")
-        return {
+        language = self.get_generation_language()
+        request = {
             "text": text,
             "candidates": candidates,
             "anki_exclusions": self._selected_anki_exclusions(
-                self.get_generation_language().key),
+                language.key),
         }
+        if make_items_for_characters:
+            request.update({
+                "language_key": language.model_language_key,
+                "make_items_for_characters": True,
+                "exclude_anki": self._language_filter(
+                    language.key).enabled,
+            })
+        return request
 
     def _source_request(self):
         option = self._selected_source_option()
@@ -11217,6 +11278,19 @@ class AutoAnkiApp:
         self.input_count.set(
             f"{line_count} lines · {len(value)} characters")
 
+    def _restore_manual_input_draft(self):
+        draft = self.gui_preferences.get("manual_input_draft", "")
+        if draft:
+            self.input_text.insert("1.0", draft)
+        self.input_text.edit_modified(False)
+
+    def _manual_input_changed(self, _event=None):
+        if not self.input_text.edit_modified():
+            return
+        self.input_text.edit_modified(False)
+        self._update_input_count()
+        self._schedule_preferences_save()
+
     def _set_status(self, message, colour=None):
         self.status.set(message)
         if colour is not None and hasattr(self, "status_dot"):
@@ -11309,20 +11383,35 @@ class AutoAnkiApp:
                 "Add at least one pipeline before generating cards.")
             return
 
-        if self._language_filter(
-                self.get_generation_language().key).enabled:
+        generation_language = self.get_generation_language()
+        learned_filter_enabled = self._language_filter(
+            generation_language.key).enabled
+        active_settings = (
+            pipeline_store.get_language_settings(
+                pipelines[0],
+                generation_language.key)
+            if isinstance(pipelines[0], pipeline_store.PipelineConfig)
+            else None)
+        make_character_items = bool(
+            active_settings is not None
+            and active_settings.make_items_for_characters
+            and generation_language.model_language_key
+            == "classical_chinese")
+        if learned_filter_enabled or make_character_items:
             if self.manual_input_filter_callback is None:
                 messagebox.showerror(
-                    "Learned-word filter unavailable",
+                    "Vocabulary preflight unavailable",
                     (
-                        "This build has not connected the manual-input "
-                        "learned-word filter. Disable it or reconnect the "
-                        "filter backend."
+                        "This build has not connected the manual vocabulary "
+                        "preflight. Disable the learned-word and character-"
+                        "item options or reconnect the backend."
                     ),
                     parent=self.root)
                 return
             try:
-                filter_request = self._manual_input_filter_request(words)
+                filter_request = self._manual_input_filter_request(
+                    words,
+                    make_items_for_characters=make_character_items)
             except ValueError as error:
                 messagebox.showerror(
                     "Learned-word filter is incomplete",
@@ -11331,7 +11420,7 @@ class AutoAnkiApp:
                 return
             self._set_generation_busy(True)
             self._set_status(
-                "Checking exact input lines against Anki before generation…",
+                "Preparing vocabulary items before generation…",
                 self.WARNING)
             worker = threading.Thread(
                 target=self._filter_manual_input_in_background,
@@ -11533,9 +11622,17 @@ class AutoAnkiApp:
                 result.filtered_text,
                 pipelines,
                 status_message=(
-                    f"Omitted {result.excluded_count:,} learned lines; "
-                    f"starting {len(pipelines)} generation pipelines for "
-                    f"{result.remaining_count:,} remaining lines…"
+                    f"Prepared {result.remaining_count:,} vocabulary items"
+                    + (
+                        f" ({result.added_character_count:,} character "
+                        "items added)"
+                        if result.added_character_count
+                        else "")
+                    + (
+                        f"; omitted {result.excluded_count:,} learned lines"
+                        if result.excluded_count
+                        else "")
+                    + f"; starting {len(pipelines)} generation pipelines…"
                 ))
             return
 

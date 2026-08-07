@@ -27,6 +27,7 @@ class GuiPreferenceStoreTests(unittest.TestCase):
             path = Path(directory) / "gui.json"
             preferences = gui_preferences.default_preferences()
             preferences.update({
+                "manual_input_draft": "猫\n犬\nA note with context.",
                 "source_key": "custom-source",
                 "source_language_overrides": {
                     "custom-source": "classical_chinese_warring_states",
@@ -44,6 +45,9 @@ class GuiPreferenceStoreTests(unittest.TestCase):
             loaded = gui_preferences.load_preferences(path)
 
             self.assertEqual(saved, loaded)
+            self.assertEqual(
+                loaded["manual_input_draft"],
+                "猫\n犬\nA note with context.")
             self.assertEqual(loaded["source_key"], "custom-source")
             self.assertTrue(loaded["source_include_context_nuance"])
             self.assertFalse(loaded["source_file_use_gpu"])

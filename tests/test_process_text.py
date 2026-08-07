@@ -16,6 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import gui
+import gui_preferences
 import pipeline_store
 import process_text
 import source_generation
@@ -1308,6 +1309,58 @@ class GenerateDeckTests(unittest.TestCase):
 
 
 class GuiLogicTests(unittest.TestCase):
+    def test_gui_preferences_collect_the_exact_manual_input_draft(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.gui_preferences = gui_preferences.default_preferences()
+        app.input_text = MagicMock()
+        app.input_text.get.return_value = "  猫  \n\nA note without a newline"
+        app._from_source_tab_built = False
+        app.notebook = MagicMock()
+        app.generate_notebook = MagicMock()
+        app.generate_tab = object()
+        app.pipeline_tab = object()
+        app.advanced_tab = object()
+        app.help_tab = object()
+        app.manual_generate_tab = object()
+        app.from_source_tab = object()
+        app._selected_tab_key = MagicMock(
+            side_effect=("generate", "manual"))
+
+        preferences = app._collect_gui_preferences()
+
+        self.assertEqual(
+            preferences["manual_input_draft"],
+            "  猫  \n\nA note without a newline")
+        app.input_text.get.assert_called_once_with("1.0", "end-1c")
+
+    def test_manual_input_draft_is_restored_without_marking_it_edited(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.gui_preferences = {
+            "manual_input_draft": "猫\n犬",
+        }
+        app.input_text = MagicMock()
+
+        app._restore_manual_input_draft()
+
+        app.input_text.insert.assert_called_once_with("1.0", "猫\n犬")
+        app.input_text.edit_modified.assert_called_once_with(False)
+
+    def test_manual_input_edits_update_count_and_schedule_an_autosave(self):
+        app = object.__new__(gui.AutoAnkiApp)
+        app.input_text = MagicMock()
+        app.input_text.edit_modified.return_value = True
+        app._update_input_count = MagicMock()
+        app._schedule_preferences_save = MagicMock()
+
+        app._manual_input_changed()
+
+        app.input_text.edit_modified.assert_has_calls([
+            call(),
+            call(False),
+        ])
+        app._update_input_count.assert_called_once_with()
+        app._schedule_preferences_save.assert_called_once_with()
+
     def test_source_chunk_size_accepts_positive_integers_only(self):
         self.assertEqual(gui.parse_source_chunk_size("500"), 500)
         self.assertEqual(gui.parse_source_chunk_size(" 50 "), 50)

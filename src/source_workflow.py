@@ -66,6 +66,23 @@ from source_generation.model_catalog import (
 import source_preparation
 
 
+def _is_han_character(character):
+    """Return whether one code point is a CJK unified ideograph."""
+    codepoint = ord(character)
+    return (
+        0x3400 <= codepoint <= 0x4DBF
+        or 0x4E00 <= codepoint <= 0x9FFF
+        or 0xF900 <= codepoint <= 0xFAFF
+        or 0x20000 <= codepoint <= 0x2FA1F)
+
+
+def _han_characters(value):
+    return tuple(
+        character
+        for character in unicodedata.normalize("NFC", str(value))
+        if _is_han_character(character))
+
+
 SOURCE_MODEL = SOURCE_REQUEST_MODEL
 SOURCE_WORKFLOW_SCHEMA_VERSION = 1
 SOURCE_WORKFLOW_FILE_NAME = "workflow.json"
@@ -781,7 +798,7 @@ class SourceWorkflowController:
         raise ValueError("Unknown Anki option request.")
 
     def filter_manual_input(self, request):
-        """Remove exact learned line-items before any manual paid request."""
+        """Prepare ordered manual vocabulary before any paid request."""
         if not isinstance(request, dict):
             raise TypeError("Manual vocabulary filter request must be an object.")
         text = request.get(
@@ -789,8 +806,26 @@ class SourceWorkflowController:
             request.get("input_text", ""))
         if not isinstance(text, str):
             raise TypeError("Manual input must be text.")
+        make_character_items = request.get(
+            "make_items_for_characters",
+            False)
+        if not isinstance(make_character_items, bool):
+            raise TypeError(
+                "Make-items-for-characters must be true or false.")
+        language_key = str(request.get("language_key", "")).strip()
+        if (
+                make_character_items
+                and language_key != "classical_chinese"):
+            raise ValueError(
+                "Character-item generation is currently implemented only "
+                "for Chinese.")
         specifications = self._anki_exclusions_from_request(request)
-        if not specifications:
+        exclude_anki = request.get(
+            "exclude_anki",
+            bool(specifications))
+        if not isinstance(exclude_anki, bool):
+            raise TypeError("Exclude-Anki must be true or false.")
+        if exclude_anki and not specifications:
             raise ValueError(
                 "Choose an Anki deck, note type, and field for filtering.")
         learned = {
@@ -801,19 +836,41 @@ class SourceWorkflowController:
                 None,
                 force_refresh=True)
         }
+        covered_characters = {
+            character
+            for term in learned
+            for character in _han_characters(term)
+        }
         retained_lines = []
         excluded_count = 0
         remaining_count = 0
+        added_character_count = 0
         for line in text.splitlines():
             candidate = line.strip()
             if not candidate:
                 retained_lines.append(line)
                 continue
-            if unicodedata.normalize("NFC", candidate) in learned:
+            normalized_candidate = unicodedata.normalize("NFC", candidate)
+            if exclude_anki and normalized_candidate in learned:
                 excluded_count += 1
                 continue
             retained_lines.append(line)
             remaining_count += 1
+            candidate_characters = _han_characters(normalized_candidate)
+            if make_character_items and len(candidate_characters) > 1:
+                new_characters = []
+                seen_in_candidate = set()
+                for character in candidate_characters:
+                    if (
+                            character in seen_in_candidate
+                            or character in covered_characters):
+                        continue
+                    seen_in_candidate.add(character)
+                    new_characters.append(character)
+                retained_lines.extend(new_characters)
+                added_character_count += len(new_characters)
+                remaining_count += len(new_characters)
+            covered_characters.update(candidate_characters)
         filtered_text = "\n".join(retained_lines).strip()
         if not filtered_text:
             remaining_count = 0
@@ -821,8 +878,11 @@ class SourceWorkflowController:
             "filtered_text": filtered_text,
             "excluded_count": excluded_count,
             "remaining_count": remaining_count,
+            "added_character_count": added_character_count,
             "original_count": (
-                excluded_count + remaining_count),
+                excluded_count
+                + remaining_count
+                - added_character_count),
         }
 
     def _job_path(self, job_id):

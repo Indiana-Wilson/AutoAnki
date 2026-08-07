@@ -14,7 +14,7 @@ import runtime_paths
 import templates
 
 
-PIPELINE_CONFIG_VERSION = 8
+PIPELINE_CONFIG_VERSION = 9
 PIPELINE_CONFIG_FILE_NAME = "pipelines.json"
 ANKI_DECK_CACHE_FILE_NAME = "anki_decks.json"
 DEFAULT_PIPELINE_ID = "default-english-vocabulary"
@@ -158,6 +158,7 @@ class LanguageSettings:
     target_deck: str
     separate_target_decks: bool = False
     share_field_settings: bool = True
+    make_items_for_characters: bool = False
     shared_fields: tuple[FieldSetting, ...] = ()
     shared_field_languages: tuple[FieldSetting, ...] = ()
 
@@ -172,6 +173,7 @@ class PipelineConfig:
     generated_deck_name: str
     separate_target_decks: bool = False
     share_field_settings: bool = True
+    make_items_for_characters: bool = False
     shared_fields: tuple[FieldSetting, ...] = ()
     shared_field_languages: tuple[FieldSetting, ...] = ()
     language_settings: tuple[LanguageSettings, ...] = ()
@@ -316,6 +318,7 @@ def default_pipeline():
         generated_deck_name=templates.DECK_NAME,
         separate_target_decks=settings.separate_target_decks,
         share_field_settings=settings.share_field_settings,
+        make_items_for_characters=settings.make_items_for_characters,
         shared_fields=settings.shared_fields,
         shared_field_languages=settings.shared_field_languages)
 
@@ -332,6 +335,7 @@ def get_language_settings(pipeline, language_key):
             target_deck=pipeline.target_deck,
             separate_target_decks=pipeline.separate_target_decks,
             share_field_settings=pipeline.share_field_settings,
+            make_items_for_characters=pipeline.make_items_for_characters,
             shared_fields=pipeline.shared_fields,
             shared_field_languages=pipeline.shared_field_languages)
     for settings in pipeline.language_settings:
@@ -362,6 +366,7 @@ def replace_active_language_settings(
         target_deck=settings.target_deck,
         separate_target_decks=settings.separate_target_decks,
         share_field_settings=settings.share_field_settings,
+        make_items_for_characters=settings.make_items_for_characters,
         shared_fields=settings.shared_fields,
         shared_field_languages=settings.shared_field_languages,
         language_settings=tuple(all_settings))
@@ -547,6 +552,9 @@ def _validate_language_settings(
     if not isinstance(settings.share_field_settings, bool):
         raise ValueError(
             "Shared field settings must be true or false.")
+    if not isinstance(settings.make_items_for_characters, bool):
+        raise ValueError(
+            "Make-items-for-characters must be true or false.")
     shared_fields = _validate_fields(
         settings.shared_fields,
         source_language_key,
@@ -702,6 +710,7 @@ def create_pipeline(existing_pipelines=()):
         generated_deck_name=f"AutoAnki Generated - {pipeline_id[:8]}",
         separate_target_decks=defaults.separate_target_decks,
         share_field_settings=defaults.share_field_settings,
+        make_items_for_characters=defaults.make_items_for_characters,
         shared_fields=defaults.shared_fields,
         shared_field_languages=defaults.shared_field_languages)
 
@@ -926,7 +935,9 @@ def _legacy_language_settings(item, language_key, fallback_deck):
         shared_fields=shared_fields,
         shared_field_languages=complete_field_languages(
             language_key,
-            shared_fields))
+            shared_fields),
+        make_items_for_characters=bool(
+            item.get("make_items_for_characters", False)))
 
 
 def _migrate_legacy_item(item):
@@ -952,6 +963,7 @@ def _migrate_legacy_item(item):
         generated_deck_name=item["generated_deck_name"],
         separate_target_decks=active.separate_target_decks,
         share_field_settings=active.share_field_settings,
+        make_items_for_characters=active.make_items_for_characters,
         shared_fields=active.shared_fields,
         shared_field_languages=active.shared_field_languages,
         language_settings=tuple(retained))
@@ -1001,6 +1013,9 @@ def _language_settings_from_data(data):
         share_field_settings=data.get(
             "share_field_settings",
             True),
+        make_items_for_characters=data.get(
+            "make_items_for_characters",
+            False),
         shared_fields=shared_fields,
         shared_field_languages=complete_field_languages(
             language_key,
@@ -1038,6 +1053,9 @@ def pipeline_from_mapping(data):
             share_field_settings=data.get(
                 "share_field_settings",
                 True),
+            make_items_for_characters=data.get(
+                "make_items_for_characters",
+                False),
             shared_fields=tuple(
                 _field_setting_from_data(field)
                 for field in data.get("shared_fields", ())),
@@ -1080,7 +1098,7 @@ def load_pipelines(path=None):
             pipelines = tuple(
                 _migrate_legacy_item(item)
                 for item in data["pipelines"])
-        elif version in (6, 7, PIPELINE_CONFIG_VERSION):
+        elif version in (6, 7, 8, PIPELINE_CONFIG_VERSION):
             pipelines = tuple(
                 pipeline_from_mapping(item)
                 for item in data["pipelines"])

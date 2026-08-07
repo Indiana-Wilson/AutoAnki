@@ -1381,6 +1381,61 @@ class SourceWorkflowTests(unittest.TestCase):
         self.assertEqual(result["excluded_count"], 2)
         self.assertEqual(resolver.call_count, 2)
 
+    def test_chinese_manual_preflight_adds_only_uncovered_characters(self):
+        controller = self.controller()
+
+        result = controller.filter_manual_input({
+            "text": "中国\n中国人\n好好",
+            "language_key": "classical_chinese",
+            "make_items_for_characters": True,
+            "exclude_anki": False,
+        })
+
+        self.assertEqual(
+            result["filtered_text"],
+            "中国\n中\n国\n中国人\n人\n好好\n好")
+        self.assertEqual(result["excluded_count"], 0)
+        self.assertEqual(result["remaining_count"], 7)
+        self.assertEqual(result["added_character_count"], 4)
+        self.assertEqual(result["original_count"], 3)
+
+    def test_chinese_character_coverage_includes_selected_anki_decks(self):
+        controller = self.controller()
+        with patch.object(
+                controller,
+                "_resolve_anki_exclusion",
+                return_value=frozenset({"国民"})):
+            result = controller.filter_manual_input({
+                "text": "中国\n人民\n国民",
+                "language_key": "classical_chinese",
+                "make_items_for_characters": True,
+                "exclude_anki": True,
+                "anki_exclusion": {
+                    "deck": "Known",
+                    "model": "Vocabulary",
+                    "field": "Word",
+                },
+            })
+
+        self.assertEqual(
+            result["filtered_text"],
+            "中国\n中\n人民\n人")
+        self.assertEqual(result["excluded_count"], 1)
+        self.assertEqual(result["remaining_count"], 4)
+        self.assertEqual(result["added_character_count"], 2)
+        self.assertEqual(result["original_count"], 3)
+
+    def test_character_item_preflight_is_not_yet_enabled_for_japanese(self):
+        controller = self.controller()
+
+        with self.assertRaisesRegex(ValueError, "only for Chinese"):
+            controller.filter_manual_input({
+                "text": "日本語",
+                "language_key": "japanese",
+                "make_items_for_characters": True,
+                "exclude_anki": False,
+            })
+
     def test_source_generation_forces_a_fresh_anki_read_before_job_creation(
             self):
         self.install_plan(empty_plan())

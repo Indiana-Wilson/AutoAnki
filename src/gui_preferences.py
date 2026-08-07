@@ -17,6 +17,7 @@ CONFIG_VERSION = 1
 CONFIG_FILE_NAME = "gui_preferences.json"
 
 DEFAULTS = {
+    "manual_input_draft": "",
     "source_key": "",
     "source_language_overrides": {},
     "source_chunk_size": "30",

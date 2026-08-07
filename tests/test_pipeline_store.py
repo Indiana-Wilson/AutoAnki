@@ -142,6 +142,40 @@ class PipelineStoreTests(unittest.TestCase):
                 pipeline_store.pipeline_to_mapping(french)),
             french)
 
+    def test_character_item_choice_round_trips_per_language(self):
+        pipeline = pipeline_store.default_pipeline()
+        chinese = replace(
+            pipeline_store.get_language_settings(
+                pipeline,
+                "classical_chinese"),
+            make_items_for_characters=True)
+        japanese = replace(
+            pipeline_store.get_language_settings(
+                pipeline,
+                "japanese"),
+            make_items_for_characters=True)
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            chinese,
+            (chinese, japanese),
+            active_language_key="classical_chinese")
+
+        restored = pipeline_store.pipeline_from_mapping(
+            pipeline_store.pipeline_to_mapping(pipeline))
+
+        self.assertTrue(
+            pipeline_store.get_language_settings(
+                restored,
+                "classical_chinese").make_items_for_characters)
+        self.assertTrue(
+            pipeline_store.get_language_settings(
+                restored,
+                "japanese").make_items_for_characters)
+        self.assertFalse(
+            pipeline_store.get_language_settings(
+                restored,
+                "english").make_items_for_characters)
+
     def test_enhanced_choice_round_trips_and_is_effective_only_when_supported(
             self):
         pipeline = language_pipeline(
