@@ -2767,6 +2767,75 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertEqual(contract["tools"], [])
         self.assertEqual(contract["max_tool_calls"], 0)
 
+    def test_modern_english_source_contract_does_not_request_translations(self):
+        pipeline = pipeline_store.default_pipeline()
+        settings = pipeline_store.get_language_settings(pipeline, "english")
+        settings = replace(
+            settings,
+            include_sentence_translations=False,
+            cards=tuple(
+                replace(
+                    card,
+                    enabled=card.direction_key in {
+                        "context",
+                        "word_to_meaning",
+                    })
+                for card in settings.cards))
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,),
+            active_language_key="english")
+
+        contract = build_source_request_contract(
+            pipeline,
+            use_source_for_example_sentences=True)
+        prompt = contract["composed_prompt"]
+        item_schema = contract["response_format"]["schema"]["properties"][
+            "cards"]["items"]
+
+        self.assertFalse(
+            source_request_requires_sentence_translations(contract))
+        self.assertNotIn(
+            "Sentence Translations (English)",
+            json.dumps(item_schema))
+        self.assertIn(
+            "all generated examples are already Modern English",
+            prompt)
+        self.assertNotIn(
+            "repeat it as plain text",
+            prompt)
+
+    def test_modern_english_source_contract_requests_term_free_paraphrases(
+            self):
+        pipeline = pipeline_store.default_pipeline()
+        settings = pipeline_store.get_language_settings(pipeline, "english")
+        settings = replace(
+            settings,
+            cards=tuple(
+                replace(
+                    card,
+                    enabled=card.direction_key in {
+                        "context",
+                        "word_to_meaning",
+                    })
+                for card in settings.cards))
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,),
+            active_language_key="english")
+
+        contract = build_source_request_contract(
+            pipeline,
+            use_source_for_example_sentences=True)
+
+        self.assertTrue(
+            source_request_requires_sentence_translations(contract))
+        self.assertIn(
+            "do not use the word or expression being defined",
+            " ".join(contract["composed_prompt"].split()))
+
     def test_normalizer_keeps_legacy_none_reasoning_contracts_usable(self):
         contract = build_source_request_contract(
             simple_classical_pipeline())

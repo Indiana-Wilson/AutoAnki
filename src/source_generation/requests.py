@@ -253,6 +253,26 @@ def load_source_sentence_batch_instructions(project_root=None):
     return text
 
 
+def load_english_sentence_translation_instructions(project_root=None):
+    """Load the Modern English paraphrase constraint."""
+    component_key = "directions/sentence_translations_english"
+    component = pipeline_store.prompt_component_map(
+        project_root).get(component_key)
+    if component is None:
+        raise prompt_builder.PromptComponentError(
+            f'Required prompt component "{component_key}" was not found.')
+    try:
+        text = component.path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise prompt_builder.PromptComponentError(
+            f'Could not read prompt component "{component_key}": '
+            f"{error}") from error
+    if not text:
+        raise prompt_builder.PromptComponentError(
+            f'Prompt component "{component_key}" cannot be empty.')
+    return text
+
+
 def _source_batch_prompt(
         project_root=None,
         *,
@@ -313,6 +333,7 @@ def _source_batch_prompt(
 def load_source_context_example_instructions(
         project_root=None,
         *,
+        include_sentence_translations=True,
         use_context_translation_map=False,
         split_source_context_cards=False,
         use_occurrence_locators=False,
@@ -331,6 +352,9 @@ def load_source_context_example_instructions(
         "source/context_sentences_only"
         if not include_lexical_fields
         else (
+            "source/context_examples_without_translations"
+            if not include_sentence_translations
+            else (
             "source/context_examples_v10_memory"
             if (
                 use_compact_source_results
@@ -351,7 +375,7 @@ def load_source_context_example_instructions(
                         else (
                             "source/context_examples_v5"
                             if use_context_translation_map
-                            else "source/context_examples")))))))
+                            else "source/context_examples"))))))))
     component = pipeline_store.prompt_component_map(
         project_root).get(component_key)
     if component is None:
@@ -375,7 +399,7 @@ def build_source_prompt(
         *,
         allow_web_search=False,
         use_source_for_example_sentences=False,
-        require_sentence_translations=True,
+        require_sentence_translations=None,
         sentence_collections_as_arrays=None,
         split_source_context_cards=None,
         use_occurrence_locators=None,
@@ -385,6 +409,9 @@ def build_source_prompt(
         translation_memory_enabled=False,
         include_source_context_nuance=False):
     """Compose Card Setup's minimum prompt plus source-batch instructions."""
+    if require_sentence_translations is None:
+        require_sentence_translations = (
+            pipeline_store.requires_sentence_translations(pipeline))
     if (
             use_compact_source_results
             and compact_source_protocol not in {9, 10}):
@@ -448,6 +475,8 @@ def build_source_prompt(
             prompt
             + load_source_context_example_instructions(
                 project_root,
+                include_sentence_translations=(
+                    require_sentence_translations),
                 use_context_translation_map=(
                     sentence_collections_as_arrays
                     and require_sentence_translations),
@@ -472,6 +501,12 @@ def build_source_prompt(
                 "a learner could not understand without cultural or "
                 "historical knowledge; otherwise return an empty string. "
                 "Do not repeat the translation or give a word definition.\n")
+        if (
+                require_sentence_translations
+                and pipeline.language_key == "english"):
+            prompt += (
+                load_english_sentence_translation_instructions(project_root)
+                + "\n")
     return (
         prompt
         + _source_batch_prompt(
@@ -930,13 +965,16 @@ def build_source_request_contract(
         chunks=(),
         allow_web_search=False,
         use_source_for_example_sentences=False,
-        require_sentence_translations=True,
+        require_sentence_translations=None,
         protocol_version=SOURCE_REQUEST_CONTRACT_SCHEMA_VERSION,
         reasoning_effort="low",
         model=SOURCE_REQUEST_MODEL,
         translation_memory_enabled=False,
         include_source_context_nuance=False):
     """Freeze every mutable input used to construct an OpenAI source call."""
+    if require_sentence_translations is None:
+        require_sentence_translations = (
+            pipeline_store.requires_sentence_translations(pipeline))
     # Imported lazily so source planning remains usable without importing the
     # OpenAI-facing module until a paid job is explicitly created.
     import process_text

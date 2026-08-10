@@ -2129,6 +2129,8 @@ class PipelineEditor:
         self.direction_enabled_variables = {}
         self.direction_enhanced_variables = {}
         self.direction_enhanced_checks = {}
+        self.sentence_translation_variables = {}
+        self.sentence_translation_checks = {}
         self.card_output_variables = self.direction_enabled_variables
         self.direction_target_deck_variables = {}
         self.direction_target_deck_boxes = {}
@@ -2591,6 +2593,9 @@ class PipelineEditor:
         enabled_variables = {}
         enhanced_variables = {}
         enhanced_checks = {}
+        include_sentence_translations = tk.BooleanVar(
+            value=settings.include_sentence_translations)
+        sentence_translation_check = None
         deck_variables = {}
         deck_boxes = {}
         field_enabled_by_direction = {}
@@ -2669,7 +2674,7 @@ class PipelineEditor:
                 text=direction.description,
                 style="CardDescription.TLabel",
                 wraplength=850).grid(
-                    row=2,
+                    row=(3 if direction.key == "context" else 2),
                     column=0,
                     columnspan=3,
                     sticky="w",
@@ -2695,6 +2700,20 @@ class PipelineEditor:
                 sticky="w",
                 pady=(5, 0))
             enhanced_checks[direction.key] = enhanced_check
+            if direction.key == "context":
+                sentence_translation_check = ttk.Checkbutton(
+                    card_panel,
+                    text="Include sentence translations",
+                    variable=include_sentence_translations,
+                    command=lambda key=language.key: (
+                        self._card_controls_changed(key)),
+                    style="CardOption.TCheckbutton")
+                sentence_translation_check.grid(
+                    row=2,
+                    column=0,
+                    columnspan=3,
+                    sticky="w",
+                    pady=(5, 0))
             (
                 field_grid,
                 field_enabled,
@@ -2706,7 +2725,7 @@ class PipelineEditor:
                 card.fields,
                 card.field_languages)
             field_grid.grid(
-                row=3,
+                row=(4 if direction.key == "context" else 3),
                 column=0,
                 columnspan=3,
                 sticky="ew")
@@ -2727,6 +2746,11 @@ class PipelineEditor:
             language.key] = enhanced_variables
         self.direction_enhanced_checks[
             language.key] = enhanced_checks
+        self.sentence_translation_variables[
+            language.key] = include_sentence_translations
+        self.sentence_translation_checks[
+            language.key] = sentence_translation_check
+        self._trace(include_sentence_translations)
         self.direction_target_deck_variables[
             language.key] = deck_variables
         self.direction_target_deck_boxes[
@@ -2872,6 +2896,15 @@ class PipelineEditor:
                 container.grid_remove()
             else:
                 container.grid()
+        sentence_translation_checks = getattr(
+            self, "sentence_translation_checks", {})
+        if language_key in sentence_translation_checks:
+            sentence_translation_checks[language_key].configure(
+                state=(
+                    tk.NORMAL
+                    if self.direction_enabled_variables[
+                        language_key]["context"].get()
+                    else tk.DISABLED))
         self._update_field_box_states(language_key)
         self._refresh_layout_geometry(language_key)
 
@@ -3018,6 +3051,8 @@ class PipelineEditor:
                     language.key].get()
                 if language.key in self.make_items_for_characters_variables
                 else False),
+            include_sentence_translations=(
+                self.sentence_translation_variables[language.key].get()),
             shared_fields=shared_fields,
             shared_field_languages=shared_field_languages)
 

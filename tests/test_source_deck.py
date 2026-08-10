@@ -211,9 +211,9 @@ class SourceDeckTests(unittest.TestCase):
                         "Arts <strong>flourish</strong> in peace.|"
                         "Trade can <strong>flourish</strong>."),
                     "Sentence Translations (English)": (
-                        "Plants flourish here.|"
-                        "Arts flourish in peace.|"
-                        "Trade can flourish."),
+                        "Plants thrive here.|"
+                        "Arts prosper in peace.|"
+                        "Trade can thrive."),
                     "Dictionary Meaning (English)": (
                         "To grow or develop successfully."),
                     "Pronunciation (English)": "IPA: /ˈflʌrɪʃ/",
@@ -225,9 +225,9 @@ class SourceDeckTests(unittest.TestCase):
                         "They <strong>fulfil</strong> the need.|"
                         "We <strong>fulfil</strong> our duties."),
                     "Sentence Translations (English)": (
-                        "They fulfil the promise.|"
-                        "They fulfil the need.|"
-                        "We fulfil our duties."),
+                        "They carry out the promise.|"
+                        "They meet the need.|"
+                        "We perform our duties."),
                     "Dictionary Meaning (English)": (
                         "To carry out or bring to completion."),
                     "Pronunciation (English)": "IPA: /fʊlˈfɪl/",
@@ -269,8 +269,8 @@ class SourceDeckTests(unittest.TestCase):
                     "The gardens <strong>flourish</strong> after rain. "
                     "Art and trade <strong>flourish</strong> here too."),
                 "Sentence Translations (English)": (
-                    "The gardens flourish after rain. "
-                    "Art and trade flourish here too."),
+                    "The gardens thrive after rain. "
+                    "Art and trade prosper here too."),
                 "Dictionary Meaning (English)": (
                     "To grow or develop successfully."),
                 "Pronunciation (English)": "IPA: /ˈflʌrɪʃ/",

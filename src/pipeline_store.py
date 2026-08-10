@@ -14,7 +14,7 @@ import runtime_paths
 import templates
 
 
-PIPELINE_CONFIG_VERSION = 9
+PIPELINE_CONFIG_VERSION = 10
 PIPELINE_CONFIG_FILE_NAME = "pipelines.json"
 ANKI_DECK_CACHE_FILE_NAME = "anki_decks.json"
 DEFAULT_PIPELINE_ID = "default-english-vocabulary"
@@ -159,6 +159,7 @@ class LanguageSettings:
     separate_target_decks: bool = False
     share_field_settings: bool = True
     make_items_for_characters: bool = False
+    include_sentence_translations: bool = True
     shared_fields: tuple[FieldSetting, ...] = ()
     shared_field_languages: tuple[FieldSetting, ...] = ()
 
@@ -174,6 +175,7 @@ class PipelineConfig:
     separate_target_decks: bool = False
     share_field_settings: bool = True
     make_items_for_characters: bool = False
+    include_sentence_translations: bool = True
     shared_fields: tuple[FieldSetting, ...] = ()
     shared_field_languages: tuple[FieldSetting, ...] = ()
     language_settings: tuple[LanguageSettings, ...] = ()
@@ -319,6 +321,8 @@ def default_pipeline():
         separate_target_decks=settings.separate_target_decks,
         share_field_settings=settings.share_field_settings,
         make_items_for_characters=settings.make_items_for_characters,
+        include_sentence_translations=(
+            settings.include_sentence_translations),
         shared_fields=settings.shared_fields,
         shared_field_languages=settings.shared_field_languages)
 
@@ -336,6 +340,8 @@ def get_language_settings(pipeline, language_key):
             separate_target_decks=pipeline.separate_target_decks,
             share_field_settings=pipeline.share_field_settings,
             make_items_for_characters=pipeline.make_items_for_characters,
+            include_sentence_translations=(
+                pipeline.include_sentence_translations),
             shared_fields=pipeline.shared_fields,
             shared_field_languages=pipeline.shared_field_languages)
     for settings in pipeline.language_settings:
@@ -367,6 +373,8 @@ def replace_active_language_settings(
         separate_target_decks=settings.separate_target_decks,
         share_field_settings=settings.share_field_settings,
         make_items_for_characters=settings.make_items_for_characters,
+        include_sentence_translations=(
+            settings.include_sentence_translations),
         shared_fields=settings.shared_fields,
         shared_field_languages=settings.shared_field_languages,
         language_settings=tuple(all_settings))
@@ -505,6 +513,13 @@ def requires_sentences(pipeline):
         for card in get_enabled_cards(pipeline))
 
 
+def requires_sentence_translations(pipeline):
+    """Return the persisted sentence-translation preference."""
+    return get_language_settings(
+        pipeline,
+        pipeline.language_key).include_sentence_translations
+
+
 def _validate_fields(
         fields,
         source_language_key,
@@ -555,6 +570,9 @@ def _validate_language_settings(
     if not isinstance(settings.make_items_for_characters, bool):
         raise ValueError(
             "Make-items-for-characters must be true or false.")
+    if not isinstance(settings.include_sentence_translations, bool):
+        raise ValueError(
+            "Include-sentence-translations must be true or false.")
     shared_fields = _validate_fields(
         settings.shared_fields,
         source_language_key,
@@ -964,6 +982,8 @@ def _migrate_legacy_item(item):
         separate_target_decks=active.separate_target_decks,
         share_field_settings=active.share_field_settings,
         make_items_for_characters=active.make_items_for_characters,
+        include_sentence_translations=(
+            active.include_sentence_translations),
         shared_fields=active.shared_fields,
         shared_field_languages=active.shared_field_languages,
         language_settings=tuple(retained))
@@ -1016,6 +1036,9 @@ def _language_settings_from_data(data):
         make_items_for_characters=data.get(
             "make_items_for_characters",
             False),
+        include_sentence_translations=data.get(
+            "include_sentence_translations",
+            True),
         shared_fields=shared_fields,
         shared_field_languages=complete_field_languages(
             language_key,
@@ -1056,6 +1079,9 @@ def pipeline_from_mapping(data):
             make_items_for_characters=data.get(
                 "make_items_for_characters",
                 False),
+            include_sentence_translations=data.get(
+                "include_sentence_translations",
+                True),
             shared_fields=tuple(
                 _field_setting_from_data(field)
                 for field in data.get("shared_fields", ())),
@@ -1098,7 +1124,7 @@ def load_pipelines(path=None):
             pipelines = tuple(
                 _migrate_legacy_item(item)
                 for item in data["pipelines"])
-        elif version in (6, 7, 8, PIPELINE_CONFIG_VERSION):
+        elif version in (6, 7, 8, 9, PIPELINE_CONFIG_VERSION):
             pipelines = tuple(
                 pipeline_from_mapping(item)
                 for item in data["pipelines"])

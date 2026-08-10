@@ -4,5 +4,5 @@ English translations as three separate strings in the
 the entire sentence and preserve the exact sense and grammar demonstrated by
 the card; do not give only a gloss of the requested term. Use plain English
 text without HTML. Never join translations with | and never put | inside an
-array item. If the source language is already Modern English, repeat each
-complete sentence so all three positions still align.
+array item. If the source language is already Modern English, follow the
+Modern English paraphrase requirements supplied separately.

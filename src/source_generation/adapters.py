@@ -389,6 +389,7 @@ class SourceGenerationBackend:
         memory_enabled = bool(
             plan.config.automatic_repair
             and use_source_examples
+            and pipeline_store.requires_sentence_translations(pipeline)
             and plan.config.request_protocol == "v10"
             and not include_source_context_nuance)
         translation_memory_by_chunk = (
@@ -536,6 +537,7 @@ class SourceGenerationBackend:
         memory_enabled = bool(
             plan.config.automatic_repair
             and use_source_examples
+            and pipeline_store.requires_sentence_translations(pipeline)
             and plan.config.request_protocol == "v10"
             and not include_source_context_nuance)
         authorized_estimate = request.get("estimate")

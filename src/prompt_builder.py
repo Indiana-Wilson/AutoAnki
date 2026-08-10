@@ -33,7 +33,7 @@ def build_prompt(
         pipeline,
         project_root=None,
         *,
-        include_sentence_translations=True,
+        include_sentence_translations=None,
         include_example_sentence_instructions=None,
         requested_field_settings=None,
         core_component_key=None,
@@ -50,6 +50,9 @@ def build_prompt(
             "Compact source examples require protocol 9 or 10.")
     language = pipeline_store.get_language(
         pipeline.language_key)
+    if include_sentence_translations is None:
+        include_sentence_translations = (
+            pipeline_store.requires_sentence_translations(pipeline))
     components = pipeline_store.prompt_component_map(project_root)
     shared_values = {
         "source_language": language.name,
@@ -115,6 +118,12 @@ def build_prompt(
                 _read_component(components, key),
                 key,
                 **shared_values))
+            if language.key == "english":
+                key = "directions/sentence_translations_english"
+                sections.append(_format_component(
+                    _read_component(components, key),
+                    key,
+                    **shared_values))
 
     if requested_field_settings is None:
         requested_field_settings = (

@@ -483,16 +483,21 @@ def _prepare_enhanced_event_audio(
         elif direction == "context":
             term = data[language.term_field]
             sentences = data.get("Sentences", "").split("|")
-            translations = data.get(
+            translations_text = data.get(
                 process_text.SENTENCE_TRANSLATIONS_FIELD_NAME,
-                "").split("|")
+                "")
+            translations = (
+                translations_text.split("|")
+                if translations_text
+                else [""] * len(sentences))
             if (
                     not sentences
                     or not sentences[0].strip()
                     or len(sentences) != len(translations)):
                 raise ValueError(
                     "Enhanced Sentence → Meaning cards require aligned "
-                    "example sentences and English translations.")
+                    "example sentences and any enabled English "
+                    "translations.")
             choice = enhanced_audio.deterministic_choice_index(
                 len(sentences),
                 presentation_key)
@@ -544,13 +549,16 @@ def create_source_package(
         guid_seed=None,
         allow_accepted_content_problems=False,
         use_source_for_example_sentences=False,
-        require_sentence_translations=True,
+        require_sentence_translations=None,
         separate_source_decks=False,
         shared_source_sentence_cards=None,
         audio_service=None,
         audio_media_directory=None,
         audio_progress_callback=None):
     """Validate output and package selected source card directions."""
+    if require_sentence_translations is None:
+        require_sentence_translations = (
+            pipeline_store.requires_sentence_translations(pipeline))
     value = _response_mapping(combined_response)
     if shared_source_sentence_cards is None:
         shared_source_sentence_cards = bool(

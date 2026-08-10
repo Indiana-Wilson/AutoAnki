@@ -36,6 +36,7 @@ _EXAMPLE_ITEM_PATH = re.compile(
     r'\["(?P<field>Sentences|Sentence Translations '
     r'\(English\))"\]\[(?P<item>\d+)\]$')
 _EXAMPLE_PAIR_REPAIRABLE_CODES = frozenset({
+    "english_sentence_translation_contains_term",
     "missing_exact_form_source_term",
     "sentence_translation_not_english",
     "sentence_collection_item_contains_delimiter",
@@ -184,7 +185,10 @@ def derive_compact_example_repair_scope(
                 and field_name != "Sentences"):
             return None
         if (
-                code == "sentence_translation_not_english"
+                code in {
+                    "english_sentence_translation_contains_term",
+                    "sentence_translation_not_english",
+                }
                 and field_name
                 != process_text.SENTENCE_TRANSLATIONS_FIELD_NAME):
             return None

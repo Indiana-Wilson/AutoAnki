@@ -3,5 +3,5 @@ translations in the "Sentence Translations (English)" field, separated with
 the pipe character, |, in the same order as the source sentences. Translate
 the entire sentence and preserve the exact sense and grammar demonstrated by
 the card; do not give only a gloss of the requested term. Use plain English
-text without HTML. If the source language is already Modern English, repeat
-each complete sentence so all three positions still align.
+text without HTML. If the source language is already Modern English, follow
+the Modern English paraphrase requirements supplied separately.

@@ -14,6 +14,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import pipeline_store
 import prompt_builder
+import process_text
 import templates
 
 
@@ -160,8 +161,10 @@ class PipelineStoreTests(unittest.TestCase):
             (chinese, japanese),
             active_language_key="classical_chinese")
 
-        restored = pipeline_store.pipeline_from_mapping(
-            pipeline_store.pipeline_to_mapping(pipeline))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pipelines.json"
+            pipeline_store.save_pipelines((pipeline,), path)
+            restored = pipeline_store.load_pipelines(path)[0]
 
         self.assertTrue(
             pipeline_store.get_language_settings(
@@ -175,6 +178,27 @@ class PipelineStoreTests(unittest.TestCase):
             pipeline_store.get_language_settings(
                 restored,
                 "english").make_items_for_characters)
+
+    def test_sentence_translation_choice_defaults_on_and_round_trips(self):
+        pipeline = pipeline_store.default_pipeline()
+        self.assertTrue(
+            pipeline_store.requires_sentence_translations(pipeline))
+        settings = replace(
+            pipeline_store.get_language_settings(pipeline, "english"),
+            include_sentence_translations=False)
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,),
+            active_language_key="english")
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pipelines.json"
+            pipeline_store.save_pipelines((pipeline,), path)
+            restored = pipeline_store.load_pipelines(path)[0]
+
+        self.assertFalse(
+            pipeline_store.requires_sentence_translations(restored))
 
     def test_enhanced_choice_round_trips_and_is_effective_only_when_supported(
             self):
@@ -261,10 +285,12 @@ class PipelineStoreTests(unittest.TestCase):
             raw = json.loads(path.read_text(encoding="utf-8"))
             raw["version"] = 6
             for item in raw["pipelines"]:
+                item.pop("include_sentence_translations", None)
                 item.pop("shared_field_languages", None)
                 for card in item["cards"]:
                     card.pop("field_languages", None)
                 for settings in item.get("language_settings", ()):
+                    settings.pop("include_sentence_translations", None)
                     settings.pop("shared_field_languages", None)
                     for card in settings["cards"]:
                         card.pop("field_languages", None)
@@ -282,6 +308,7 @@ class PipelineStoreTests(unittest.TestCase):
             len(card.field_languages)
             == len(pipeline_store.list_field_options())
             for card in settings.cards))
+        self.assertTrue(settings.include_sentence_translations)
 
     def test_legacy_card_types_migrate_to_directions_and_fields(self):
         legacy = {
@@ -648,11 +675,13 @@ class PromptComponentTests(unittest.TestCase):
                 "directions/sentence_translation_arrays",
                 "directions/sentence_translation_arrays_v9",
                 "directions/sentence_translation_arrays_v10",
+                "directions/sentence_translations_english",
                 "source/batch",
                 "source/batch_sentences_only",
                 "source/batch_v9",
                 "source/batch_v10",
                 "source/context_examples",
+                "source/context_examples_without_translations",
                 "source/context_examples_v5",
                 "source/context_examples_v6",
                 "source/context_examples_v7",
@@ -799,6 +828,54 @@ class PromptComponentTests(unittest.TestCase):
             'three complete, natural English translations in the '
             '"Sentence Translations (English)" field',
             " ".join(text.split()))
+
+    def test_modern_english_context_defaults_to_paraphrase_translations(self):
+        pipeline = language_pipeline("english", enabled=("context",))
+
+        text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
+        required = process_text.build_response_format(
+            pipeline)["schema"]["properties"]["cards"]["items"]["required"]
+
+        self.assertIn("exactly three short", text)
+        self.assertIn("Sentence Translations (English)", text)
+        self.assertIn(
+            "do not use the word or expression being defined",
+            " ".join(text.split()))
+        self.assertIn("Sentences", required)
+        self.assertIn("Sentence Translations (English)", required)
+
+    def test_unticked_sentence_translations_are_omitted(self):
+        pipeline = language_pipeline("english", enabled=("context",))
+        settings = replace(
+            pipeline_store.get_language_settings(pipeline, "english"),
+            include_sentence_translations=False)
+        pipeline = pipeline_store.replace_active_language_settings(
+            pipeline,
+            settings,
+            (settings,),
+            active_language_key="english")
+
+        text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
+        required = process_text.build_response_format(
+            pipeline)["schema"]["properties"]["cards"]["items"]["required"]
+
+        self.assertNotIn("Sentence Translations (English)", text)
+        self.assertNotIn("Sentence Translations (English)", required)
+
+    def test_historical_english_contexts_retain_sentence_translations(self):
+        for language_key in ("middle_english", "old_english"):
+            with self.subTest(language_key=language_key):
+                pipeline = language_pipeline(
+                    language_key,
+                    enabled=("context",))
+
+                text = prompt_builder.build_prompt(pipeline, PROJECT_ROOT)
+                required = process_text.build_response_format(
+                    pipeline)["schema"]["properties"]["cards"]["items"][
+                        "required"]
+
+                self.assertIn("Sentence Translations (English)", text)
+                self.assertIn("Sentence Translations (English)", required)
 
     def test_classical_chinese_context_requests_plain_examples(self):
         pipeline = language_pipeline(

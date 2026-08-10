@@ -406,6 +406,19 @@ def _sentence_translation_language_issue(
     return None, plain_source
 
 
+def _translation_contains_defined_term(translation, term):
+    """Return whether a Modern English paraphrase repeats its headword."""
+    plain_translation = unicodedata.normalize(
+        "NFKC", _plain_sentence_item(translation)).casefold()
+    plain_term = unicodedata.normalize(
+        "NFKC", html.unescape(str(term))).strip().casefold()
+    if not plain_term:
+        return False
+    return re.search(
+        rf"(?<!\w){re.escape(plain_term)}(?!\w)",
+        plain_translation) is not None
+
+
 def _generated_problem_id(code, path, identity=None):
     """Return a deterministic identity for one response-validation problem."""
     encoded = json.dumps(
@@ -546,7 +559,7 @@ def inspect_generated_response(
         *,
         optional_fields=(),
         enforce_sentence_count=True,
-        require_sentence_translations=True):
+        require_sentence_translations=None):
     """Describe every detectable generated-card problem without raising.
 
     Structural problems cannot be manually overridden because accepting them
@@ -556,6 +569,9 @@ def inspect_generated_response(
     """
     pipeline = pipeline or pipeline_store.default_pipeline()
     pipeline_store.validate_pipelines((pipeline,))
+    if require_sentence_translations is None:
+        require_sentence_translations = (
+            pipeline_store.requires_sentence_translations(pipeline))
     language_settings = pipeline_store.get_language_settings(
         pipeline,
         pipeline.language_key)
@@ -1008,6 +1024,52 @@ def inspect_generated_response(
                             "Retry, or remove the HTML after checking each "
                             "translation.")))
 
+                if source_language.key == "english":
+                    for item_index, translation in enumerate(
+                            translation_parts):
+                        if (
+                                not translation
+                                or not _translation_contains_defined_term(
+                                    translation,
+                                    term)):
+                            continue
+                        item_number = item_index + 1
+                        field_location, field_term = _card_location(
+                            card_index,
+                            note_data,
+                            term_field,
+                            SENTENCE_TRANSLATIONS_FIELD_NAME)
+                        problems.append(_generated_problem(
+                            "english_sentence_translation_contains_term",
+                            "English paraphrase repeats the defined term",
+                            "A Modern English sentence translation must "
+                            "paraphrase the example without using the word "
+                            "or expression being defined.",
+                            path=(
+                                _field_path(
+                                    card_index,
+                                    SENTENCE_TRANSLATIONS_FIELD_NAME)
+                                + f"[{item_index}]"),
+                            location=(
+                                f"{field_location} → item {item_number}"),
+                            scope="field",
+                            overrideable=False,
+                            card_index=card_index,
+                            term=field_term,
+                            field_name=SENTENCE_TRANSLATIONS_FIELD_NAME,
+                            expected=(
+                                "Natural English paraphrases that omit the "
+                                f"defined term {term!r}."),
+                            actual={
+                                "defined_term": term,
+                                "translation": translation,
+                                "position": item_number,
+                            },
+                            suggestion=(
+                                "Retry or replace the term with a natural "
+                                "synonym or explanation in each listed "
+                                "paraphrase.")))
+
                 if requires_english_translation:
                     for item_index, translation in enumerate(
                             translation_parts):
@@ -1153,8 +1215,11 @@ def get_api_key():
 def get_response_field_names(
         pipeline,
         *,
-        include_sentence_translations=True):
+        include_sentence_translations=None):
     pipeline_store.validate_pipelines((pipeline,))
+    if include_sentence_translations is None:
+        include_sentence_translations = (
+            pipeline_store.requires_sentence_translations(pipeline))
     language = pipeline_store.get_language(
         pipeline.language_key)
     field_names = [language.term_field]
@@ -1173,11 +1238,14 @@ def build_response_format(
         pipeline,
         *,
         optional_fields=(),
-        require_sentence_translations=True,
+        require_sentence_translations=None,
         sentence_collections_as_arrays=False,
         include_source_context_translations=False,
         split_source_context_cards=False):
     """Build a strict schema containing only fields selected in the UI."""
+    if require_sentence_translations is None:
+        require_sentence_translations = (
+            pipeline_store.requires_sentence_translations(pipeline))
     field_names = get_response_field_names(
         pipeline,
         include_sentence_translations=require_sentence_translations)
@@ -2051,7 +2119,7 @@ def validate_generated_cards(
         *,
         allow_accepted_content_problems=False,
         enforce_sentence_count=True,
-        require_sentence_translations=True,
+        require_sentence_translations=None,
         optional_fields=()):
     """Parse and validate generated data without writing an Anki package."""
     report = inspect_generated_response(
@@ -2091,7 +2159,7 @@ def validate_generated_response(
         *,
         allow_accepted_content_problems=False,
         enforce_sentence_count=True,
-        require_sentence_translations=True):
+        require_sentence_translations=None):
     """Return the canonical response object after structural validation."""
     return {
         "cards": validate_generated_cards(
@@ -2115,7 +2183,7 @@ def process_json_text(
         due_start=None,
         allow_accepted_content_problems=False,
         enforce_sentence_count=True,
-        require_sentence_translations=True,
+        require_sentence_translations=None,
         audio_service=None,
         audio_progress_callback=None,
         audio_media_directory=None,
@@ -2170,16 +2238,21 @@ def process_json_text(
                     "word"))
             if has_sentence_audio:
                 sentences = note_data.get("Sentences", "").split("|")
-                translations = note_data.get(
+                translations_text = note_data.get(
                     SENTENCE_TRANSLATIONS_FIELD_NAME,
-                    "").split("|")
+                    "")
+                translations = (
+                    translations_text.split("|")
+                    if translations_text
+                    else [""] * len(sentences))
                 if (
                         not sentences
                         or not sentences[0].strip()
                         or len(sentences) != len(translations)):
                     raise ValueError(
                         "Enhanced Sentence → Meaning cards require aligned "
-                        "example sentences and English translations.")
+                        "example sentences and any enabled English "
+                        "translations.")
                 choice = enhanced_audio.deterministic_choice_index(
                     len(sentences),
                     guid_seed or pipeline.pipeline_id,
@@ -2421,6 +2494,8 @@ def generate_deck(
         "pipeline": pipeline,
         "guid_seed": guid_seed,
     }
+    if not pipeline_store.requires_sentence_translations(pipeline):
+        process_arguments["require_sentence_translations"] = False
     if audio_service is not None:
         process_arguments["audio_service"] = audio_service
     process_json_text(

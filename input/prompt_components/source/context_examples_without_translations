@@ -1,0 +1,17 @@
+For this source request, the exact retained Modern English context will become
+the example text on the card for the contextual sense. For each supplied term:
+
+- Keep the sense used in the retained source context as the first entry for
+  that term, and OMIT the "Sentences" property from that entry. The processor
+  will insert the exact context that you received; do not repeat, rewrite,
+  shorten, or delimit it in "Sentences".
+- If the term has another genuinely disjoint common lexical sense that meets
+  the inclusion criteria, create its separate entry as usual and INCLUDE the
+  "Sentences" property with exactly three distinct, pipe-separated Modern
+  English example sentences. Each sentence must make that particular
+  additional sense unambiguous.
+
+Only the first, contextual entry for each term may omit "Sentences". Every
+additional sense entry must include it. Do not return a
+"Sentence Translations (English)" property: the retained source context and
+all generated examples are already Modern English.

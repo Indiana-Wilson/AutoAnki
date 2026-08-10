@@ -67,8 +67,9 @@ def valid_default_card():
             "Two <strong>astrolabes</strong>.|"
             "This <strong>astrolabe</strong>."),
         "Sentence Translations (English)": (
-            "One astrolabe.|Two astrolabes.|"
-            "This astrolabe."),
+            "One historical astronomical instrument.|"
+            "Two historical astronomical instruments.|"
+            "This historical astronomical instrument."),
         "Dictionary Meaning (English)": (
             "An instrument formerly used to determine celestial positions."),
         "Pronunciation (English)": "/ˈæstrəleɪb/",
@@ -1031,6 +1032,31 @@ class ProcessJsonTests(unittest.TestCase):
             if problem["code"] == "sentence_translation_contains_html")
         self.assertFalse(problem["overrideable"])
         self.assertFalse(report["can_manually_accept"])
+
+    def test_modern_english_translation_cannot_repeat_defined_term(self):
+        card = valid_default_card()
+        card["Word"] = "mellifluous"
+        card["Sentences"] = (
+            "Her <strong>mellifluous</strong> voice filled the room.|"
+            "The host spoke in a <strong>mellifluous</strong> tone.|"
+            "A <strong>mellifluous</strong> melody drifted outside.")
+        card["Sentence Translations (English)"] = (
+            "Her mellifluous voice filled the room.|"
+            "The host spoke in a smooth, sweet tone.|"
+            "A pleasant melody drifted outside.")
+
+        report = process_text.inspect_generated_response(
+            json.dumps({"cards": [card]}))
+
+        problem = next(
+            problem
+            for problem in report["problems"]
+            if problem["code"]
+            == "english_sentence_translation_contains_term")
+        self.assertEqual(
+            problem["actual"]["position"],
+            1)
+        self.assertFalse(problem["overrideable"])
 
     def test_translation_cannot_duplicate_dictionary_explanation(self):
         pipeline = configured_pipeline(
