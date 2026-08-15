@@ -71,9 +71,9 @@ def _style_worker(root: Path, output: Path) -> list[dict]:
 
     installation = _installation(root, STYLE_BACKEND)
     bert_path = _installed_path(root, installation, "bert_model")
-    bert_models.load_model(Languages.JP, str(bert_path))
-    bert_models.load_tokenizer(Languages.JP, str(bert_path))
     with gpu_synthesis_lease(STYLE_BACKEND):
+        bert_models.load_model(Languages.JP, str(bert_path))
+        bert_models.load_tokenizer(Languages.JP, str(bert_path))
         model = TTSModel(
             model_path=_installed_path(
                 root, installation, "voice_model"),

@@ -144,6 +144,17 @@ in `requirements-corpus-base.txt`; `requirements-corpus.txt` and
 prevents independently generated artifacts from appearing interchangeable
 when their numerical runtime differs.
 
+A CUDA CKIP run blocks on the same host-wide cooperative lease used by local
+TTS and other participating local-model applications. The established default
+is `~/.local/share/autoanki/tts/locks/worker-gpu.lock`; an absolute
+`LOCAL_LLM_GPU_LOCK_PATH` may replace it only when every participant receives
+the same value. One lease covers device resolution, model preparation/loading,
+all sections in the bounded document or built-in corpus, and model-reference
+and CUDA-cache cleanup on success or failure. It is not released between
+checkpointed sections while the model remains resident. CPU, XPU, and MPS
+tokenization do not take the NVIDIA lease. The lease serializes cooperating
+GPU work but does not require swap or impose a fixed host-RAM threshold.
+
 The historical models proved sensitive to unrelated sentences being combined
 in one inference window. AutoAnki therefore sends each sentence (or
 unterminated paragraph) to CKIP independently. Any all-Han result longer than

@@ -17,6 +17,7 @@ from _autoanki_tts_worker_common import (
     cuda_inventory,
     gpu_synthesis_lease,
     installed_path,
+    leased_cuda_inventory,
     load_installation,
     revision_for_assets,
     run_worker,
@@ -134,7 +135,7 @@ def _status() -> dict:
         installation_ok = True
     except Exception:
         pass
-    gpu_available, device_name, _problem = cuda_inventory()
+    gpu_available, device_name, _problem = leased_cuda_inventory(MELO_BACKEND)
     return status_response(
         backend=MELO_BACKEND,
         model_id=MELO_MODEL_ID,

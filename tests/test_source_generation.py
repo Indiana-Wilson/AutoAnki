@@ -59,6 +59,7 @@ from source_generation.requests import (
 from source_generation.planning import (
     BATCH_PRICING,
     STANDARD_PRICING,
+    _make_occurrence_locator,
     estimate_text_tokens,
     price_source_usage,
 )
@@ -163,6 +164,23 @@ def make_plan(
 
 
 class SourcePlanningTests(unittest.TestCase):
+    def test_occurrence_locator_finds_an_overlapping_identical_spelling(self):
+        context = SimpleNamespace(
+            context_id="context-overlap",
+            start_offset=0,
+            text="佳佳佳")
+        word = SimpleNamespace(
+            rank=17,
+            surface="佳佳",
+            start_offset=1,
+            end_offset=3)
+
+        locator = _make_occurrence_locator(word, context)
+
+        self.assertEqual(locator.target, "佳佳")
+        self.assertEqual(locator.literal_match_ordinal, 2)
+        self.assertEqual(locator.marked_excerpt, "佳⟪TARGET⟫佳佳⟪/TARGET⟫")
+
     def test_default_request_size_and_worker_count_are_30_and_8(self):
         config = SourceGenerationConfig(source_key="fixture_source")
 
@@ -2662,6 +2680,23 @@ class SourceBackendAdapterTests(unittest.TestCase):
         self.assertEqual(
             set(contract["max_output_tokens_by_chunk"]),
             set(self.backend.jobs.chunk_ids(job.job_id)))
+
+    def test_job_manifest_records_manual_offline_response_mode(self):
+        estimate = self.backend.estimate(self.request)
+
+        job = self.backend.create_job({
+            **self.request,
+            "paid_confirmed": False,
+            "estimate": estimate,
+            "manual_offline_responses": True,
+        })
+        manifest = json.loads(
+            (job.path / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertTrue(
+            manifest["request_metadata"]["manual_offline_responses"])
+        self.assertFalse(
+            manifest["request_metadata"]["paid_confirmed_at_creation"])
 
     def test_create_job_rejects_stale_prompt_authorization(self):
         estimate = self.backend.estimate(self.request)

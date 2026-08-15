@@ -32,6 +32,12 @@ import threading
 from typing import Any, Iterable, Mapping, Sequence
 import unicodedata
 
+from local_gpu_lease import (
+    LocalGPULeaseError,
+    local_llm_gpu_lease_handle,
+    local_llm_gpu_lock_path,
+)
+
 
 TTS_PROTOCOL_NAME = "autoanki-local-tts"
 TTS_PROTOCOL_VERSION = 1
@@ -786,29 +792,57 @@ class JSONSubprocessWorker:
         environment.setdefault(
             "HF_HOME",
             str(self.paths.huggingface_cache))
+        host_lock_path = local_llm_gpu_lock_path(
+            tts_root=self.paths.root).resolve()
+        delegated_lock_path = (
+            self.paths.root / "locks" / "delegated-worker-gpu.lock"
+        ).resolve()
+        if delegated_lock_path == host_lock_path:
+            delegated_lock_path = (
+                self.paths.root / "locks" / "delegated-worker-gpu-inner.lock"
+            ).resolve()
+        # The parent owns the host-wide lease until the one-shot child exits.
+        # Give the already-qualified worker a distinct inner lock so its own
+        # historical lease code cannot self-deadlock with its parent.
+        environment["LOCAL_LLM_GPU_LOCK_PATH"] = str(delegated_lock_path)
         effective_timeout = (
             self.timeout_seconds
             if timeout_seconds is None
             else max(self.timeout_seconds, float(timeout_seconds)))
         try:
-            completed = subprocess.run(
-                command.argv,
-                input=json.dumps(
-                    request,
-                    ensure_ascii=False,
-                    allow_nan=False,
-                    separators=(",", ":")) + "\n",
-                text=True,
-                encoding="utf-8",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=effective_timeout,
-                check=False,
-                env=environment)
+            with local_llm_gpu_lease_handle(
+                    f"autoanki-tts:{backend}:{request.get('operation')}",
+                    lock_path=host_lock_path) as host_lease:
+                process_options: dict[str, Any] = {}
+                if os.name == "posix":
+                    # Keep the same flock open in the worker. If this parent
+                    # dies abruptly, the inherited open-file description
+                    # remains locked until the worker itself exits.
+                    process_options["pass_fds"] = (
+                        host_lease.file_descriptor,)
+                completed = subprocess.run(
+                    command.argv,
+                    input=json.dumps(
+                        request,
+                        ensure_ascii=False,
+                        allow_nan=False,
+                        separators=(",", ":")) + "\n",
+                    text=True,
+                    encoding="utf-8",
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=effective_timeout,
+                    check=False,
+                    env=environment,
+                    **process_options)
         except subprocess.TimeoutExpired as error:
             raise TTSWorkerExecutionError(
                 f"The {backend} TTS worker timed out after "
                 f"{effective_timeout:g} seconds.") from error
+        except LocalGPULeaseError as error:
+            raise TTSRuntimeUnavailableError(
+                "The host-wide local-model GPU lease is unavailable.") \
+                from error
         except OSError as error:
             raise TTSRuntimeUnavailableError(
                 f"The {backend} TTS worker could not start: {error}") from error

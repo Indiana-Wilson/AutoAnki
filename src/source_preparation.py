@@ -6,6 +6,7 @@ the same audited build format used by the built-in Wikisource corpora.  It
 never imports OpenAI or Anki modules.
 """
 
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -1096,25 +1097,34 @@ def prepare_source_file(
     # it before deriving checkpoint keys so a cache-only rerun retains
     # exactly the same build identity. Custom tokenizers must expose a stable
     # identity; the adapter verifies that invariant around every call.
-    if isinstance(selected_tokenizer, CkipHanTokenizer):
-        selected_tokenizer.prepare()
-    checkpointing_tokenizer = _CheckpointingTokenizer(
-        selected_tokenizer,
-        snapshot,
-        corpus_root)
+    tokenizer_session = (
+        selected_tokenizer.execution_session()
+        if isinstance(selected_tokenizer, CkipHanTokenizer)
+        else nullcontext())
+    # Device-auto CKIP must resolve and load while holding the same host lease
+    # that remains active for every section. Releasing between checkpointed
+    # sections would leave the model resident in VRAM while another local
+    # process was allowed to load its own model.
+    with tokenizer_session:
+        if isinstance(selected_tokenizer, CkipHanTokenizer):
+            selected_tokenizer.prepare()
+        checkpointing_tokenizer = _CheckpointingTokenizer(
+            selected_tokenizer,
+            snapshot,
+            corpus_root)
 
-    def token_progress(current, total, section_title):
-        emit(
-            "tokenize",
-            current,
-            total,
-            f"Tokenized {section_title} ({current}/{total}).")
+        def token_progress(current, total, section_title):
+            emit(
+                "tokenize",
+                current,
+                total,
+                f"Tokenized {section_title} ({current}/{total}).")
 
-    build = build_vocabulary(
-        snapshot,
-        checkpointing_tokenizer,
-        BuildConfig(chunk_size=500),
-        progress_callback=token_progress)
+        build = build_vocabulary(
+            snapshot,
+            checkpointing_tokenizer,
+            BuildConfig(chunk_size=500),
+            progress_callback=token_progress)
 
     selected_refiner = refiner
     if selected_refiner is _AUTOMATIC_REFINER:

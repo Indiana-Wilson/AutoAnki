@@ -4,7 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,6 +31,7 @@ from corpus_pipeline.service import (
     make_snapshot,
 )
 from corpus_pipeline.storage import write_snapshot
+from corpus_pipeline.tokenizers import CkipHanTokenizer
 
 
 CHINESE_NUMERALS = tuple(
@@ -343,6 +344,51 @@ class SnapshotServiceTests(unittest.TestCase):
 
 
 class BuildServiceTests(unittest.TestCase):
+    def test_builtin_corpus_holds_one_ckip_session_for_all_sections(self):
+        events = []
+        active = []
+        tokenizer = CkipHanTokenizer(
+            "fixture/model",
+            "fixture-revision",
+            device="cuda")
+        tokenizer._resolved_device = "cuda"
+
+        @contextmanager
+        def execution_session():
+            events.append("lease-acquired")
+            active.append(True)
+            try:
+                yield tokenizer
+            finally:
+                active.pop()
+                events.append("lease-released")
+
+        def tokenize(text):
+            self.assertTrue(active)
+            events.append("section-tokenized")
+            return tuple(
+                TokenSpan(character, index, index + 1, 0.75)
+                for index, character in enumerate(text)
+                if not character.isspace())
+
+        tokenizer.execution_session = execution_session
+        tokenizer.tokenize = tokenize
+
+        with tempfile.TemporaryDirectory() as directory:
+            service = CorpusService(directory)
+            fetched = service.fetch(
+                catalogue.DAODEJING.key,
+                client=_client())
+            service.build(
+                catalogue.DAODEJING.key,
+                snapshot=fetched.snapshot,
+                tokenizer=tokenizer,
+                refiner=None)
+
+        self.assertEqual(events[0], "lease-acquired")
+        self.assertEqual(events[-1], "lease-released")
+        self.assertEqual(events.count("section-tokenized"), 81)
+
     def test_build_writes_pointer_reports_progress_and_audits_offline(self):
         events = []
         with tempfile.TemporaryDirectory() as directory:

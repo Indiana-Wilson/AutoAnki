@@ -204,9 +204,11 @@ def _normalise_translation_memory_snapshot(value, plan):
 class SourceGenerationBackend:
     """Free planning/status callbacks suitable for ``AutoAnkiApp`` hooks.
 
-    No method here makes an OpenAI request. ``create_job`` requires the GUI's
-    explicit paid-confirmation flag but only persists pending request units.
-    A controller may then construct ``GenerationJobRunner`` with its own paid
+    No method here makes an OpenAI request. ``create_job`` normally requires
+    the GUI's explicit paid-confirmation flag but only persists pending
+    request units.  A deliberately offline caller may instead mark a job for
+    manual responses; either mode still needs the exact saved estimate.  A
+    controller may then construct ``GenerationJobRunner`` with its own paid
     request callable.
     """
 
@@ -579,7 +581,12 @@ class SourceGenerationBackend:
                 plan.config,
                 request_contract))
         paid_confirmed = request.get("paid_confirmed") is True
-        if estimate.request_count and not paid_confirmed:
+        manual_offline_responses = (
+            request.get("manual_offline_responses") is True)
+        if (
+                estimate.request_count
+                and not paid_confirmed
+                and not manual_offline_responses):
             raise PermissionError(
                 "Paid source generation requires explicit confirmation.")
         expected_authorization = _estimate_authorization_fingerprint(
@@ -629,6 +636,7 @@ class SourceGenerationBackend:
                 "the chunk size or context.")
         metadata = {
             "paid_confirmed_at_creation": paid_confirmed,
+            "manual_offline_responses": manual_offline_responses,
             "authorization_bypassed_for_empty_plan": (
                 not plan.chunks),
             "pipeline": asdict(pipeline),

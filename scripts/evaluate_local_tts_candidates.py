@@ -23,6 +23,14 @@ from urllib.request import Request, urlopen
 import wave
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = PROJECT_ROOT / "src"
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
+
+from local_gpu_lease import local_llm_gpu_lease  # noqa: E402
+
+
 PROMPTS = {
     "japanese": (
         ("quick_brown_fox", "素早い茶色の狐が、怠け者の犬を飛び越える。"),
@@ -153,6 +161,20 @@ def _measure_cuda(function):
     value = function()
     _cuda_sync()
     return value, time.perf_counter() - started, _cuda_peak_mib()
+
+
+@contextmanager
+def _direct_cuda_evaluation_lease(engine: str):
+    """Serialize direct benchmark model lifecycles with production jobs."""
+    with local_llm_gpu_lease(f"tts-evaluation:{engine}"):
+        try:
+            yield
+        finally:
+            # Successful runners delete their large model references before
+            # returning. Keep this final sweep inside the lease as a guard for
+            # runtimes with deferred Python/CUDA cleanup.
+            gc.collect()
+            _reset_cuda_peak()
 
 
 def _write_results(output: Path, engine: str, entries: list[dict]) -> None:
@@ -901,13 +923,17 @@ def main(argv=None) -> int:
     if args.engine == "style":
         if args.style_bert_path is None:
             raise SystemExit("--style-bert-path is required for the Style-Bert run.")
-        _run_style(args)
+        with _direct_cuda_evaluation_lease(args.engine):
+            _run_style(args)
     elif args.engine == "kokoro":
-        _run_kokoro(args)
+        with _direct_cuda_evaluation_lease(args.engine):
+            _run_kokoro(args)
     elif args.engine == "qwen":
-        _run_qwen(args)
+        with _direct_cuda_evaluation_lease(args.engine):
+            _run_qwen(args)
     elif args.engine == "melo":
-        _run_melo(args)
+        with _direct_cuda_evaluation_lease(args.engine):
+            _run_melo(args)
     elif args.engine == "aivis":
         _run_aivis(args)
     else:

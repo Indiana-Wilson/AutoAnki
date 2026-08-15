@@ -535,11 +535,16 @@ def _make_occurrence_locator(word, context):
         ordinal += 1
         if match_start == relative_start:
             break
-        cursor = match_start + len(word.surface)
+        # Advance one code point so an audited occurrence which overlaps an
+        # earlier identical spelling is still discoverable.  For example,
+        # the second ``哈哈`` in ``哈哈哈`` starts inside the first match.
+        cursor = match_start + 1
     if match_start != relative_start:
         raise ValueError(
             "A source word's audited occurrence cannot be located inside its "
-            "retained context.")
+            f"retained context (rank {word.rank}, surface {word.surface!r}, "
+            f"context {context.context_id!r}, relative offset "
+            f"{relative_start}).")
     before = context.text[
         max(
             0,

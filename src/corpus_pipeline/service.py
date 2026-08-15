@@ -1,5 +1,6 @@
 """High-level corpus orchestration suitable for both CLI and future GUI use."""
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -375,11 +376,16 @@ class CorpusService:
             0,
             len(snapshot.sections),
             f"Loading tokenizer for {spec.title}.")
-        build = build_vocabulary(
-            snapshot,
-            selected_tokenizer,
-            selected_config,
-            progress_callback=token_progress)
+        tokenizer_session = (
+            selected_tokenizer.execution_session()
+            if isinstance(selected_tokenizer, CkipHanTokenizer)
+            else nullcontext())
+        with tokenizer_session:
+            build = build_vocabulary(
+                snapshot,
+                selected_tokenizer,
+                selected_config,
+                progress_callback=token_progress)
         if selected_refiner is not None:
             self._emit(
                 "refine",

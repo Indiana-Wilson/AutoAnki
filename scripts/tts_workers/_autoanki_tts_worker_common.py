@@ -32,6 +32,8 @@ STYLE_MODEL_ID = "Style-Bert-VITS2 JP-Extra"
 COSY_MODEL_ID = "Fun-CosyVoice3-0.5B"
 MELO_MODEL_ID = "myshell-ai/MeloTTS-Japanese"
 KOKORO_MODEL_ID = "hexgrad/Kokoro-82M-v1.1-zh"
+LOCAL_LLM_GPU_LOCK_PATH_ENVIRONMENT_VARIABLE = (
+    "LOCAL_LLM_GPU_LOCK_PATH")
 
 
 class RequestError(RuntimeError):
@@ -81,6 +83,25 @@ def shared_root() -> Path:
         return Path(override).expanduser().resolve()
     # <root>/runtimes/<backend>/autoanki_worker.py
     return runtime_root().parent.parent
+
+
+def local_llm_gpu_lock_path() -> Path:
+    """Resolve the host-wide CUDA lease without changing its old default."""
+    override = os.environ.get(
+        LOCAL_LLM_GPU_LOCK_PATH_ENVIRONMENT_VARIABLE)
+    if override is not None:
+        if not override.strip():
+            raise RequestError(
+                f"{LOCAL_LLM_GPU_LOCK_PATH_ENVIRONMENT_VARIABLE} cannot "
+                "be empty.")
+        path = Path(override).expanduser()
+        if not path.is_absolute():
+            raise RequestError(
+                f"{LOCAL_LLM_GPU_LOCK_PATH_ENVIRONMENT_VARIABLE} must be "
+                "an absolute path so every process opens the same lock.")
+        return path.resolve()
+    # Retain the exact path used by every already-installed AutoAnki worker.
+    return (shared_root() / "locks" / "worker-gpu.lock").resolve()
 
 
 def _safe_relative_path(value: Any, label: str) -> Path:
@@ -405,19 +426,27 @@ def seed_synthesis(seed: int) -> None:
 
 
 @contextmanager
-def gpu_synthesis_lease(backend: str):
-    """Serialize model load and synthesis across processes and repositories."""
-    lock_directory = shared_root() / "locks"
+def gpu_synthesis_lease(
+        backend: str,
+        *,
+        purpose: str = "tts-synthesis"):
+    """Serialize every CUDA-touching worker operation across repositories."""
+    if not isinstance(purpose, str) or not purpose.strip():
+        raise RequestError("The shared GPU lease purpose must be non-empty.")
+    lock_path = local_llm_gpu_lock_path()
+    lock_directory = lock_path.parent
     lock_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     # Distinct from the parent's ``orchestration.lock``: AutoAnki holds that
     # across worker execution and cache publication, while this lease also
     # protects VRAM when a worker is invoked directly.
-    lock_path = lock_directory / "worker-gpu.lock"
-    with lock_path.open("a+b") as stream:
+    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    if os.name == "posix":
+        os.fchmod(descriptor, 0o600)
+    with os.fdopen(descriptor, "a+b") as stream:
         if stream.tell() == 0:
             stream.write(b"\0")
             stream.flush()
-        log(f"{backend}: waiting for shared GPU synthesis lease")
+        log(f"{backend}: waiting for shared GPU {purpose} lease")
         if os.name == "posix":
             import fcntl
             fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
@@ -435,6 +464,8 @@ def gpu_synthesis_lease(backend: str):
                 "unsafe concurrent synthesis was refused.")
         try:
             metadata = json.dumps({
+                "owner": "autoanki",
+                "purpose": f"{purpose.strip()}:{backend}",
                 "backend": backend,
                 "pid": os.getpid(),
                 "acquired_at": datetime.now(timezone.utc).isoformat(),
@@ -444,10 +475,16 @@ def gpu_synthesis_lease(backend: str):
             stream.write(metadata)
             stream.flush()
             os.fsync(stream.fileno())
-            log(f"{backend}: acquired shared GPU synthesis lease")
+            log(f"{backend}: acquired shared GPU {purpose} lease")
             yield
         finally:
             unlock()
+
+
+def leased_cuda_inventory(backend: str) -> tuple[bool, str | None, str | None]:
+    """Probe CUDA only while the host-wide local-model lease is held."""
+    with gpu_synthesis_lease(backend, purpose="tts-status"):
+        return cuda_inventory()
 
 
 def write_tensor_wav(

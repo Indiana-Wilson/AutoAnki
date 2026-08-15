@@ -1,7 +1,9 @@
+from contextlib import contextmanager
 import hashlib
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 import tempfile
 import unittest
@@ -500,6 +502,80 @@ print(json.dumps(base))
             self.assertEqual(
                 manifest["request"]["output"]["encoder"],
                 "pcm_s16le")
+
+    def test_worker_parent_lease_spans_child_exit_without_self_deadlock(self):
+        events = []
+        inherited_descriptor = 73
+
+        @contextmanager
+        def lease(purpose, *, lock_path=None):
+            events.append(("lease-acquired", purpose, lock_path))
+            try:
+                yield SimpleNamespace(
+                    path=lock_path,
+                    file_descriptor=inherited_descriptor)
+            finally:
+                events.append("lease-released")
+
+        def run(_argv, **kwargs):
+            self.assertEqual(events[0][0], "lease-acquired")
+            child_lock = Path(
+                kwargs["env"]["LOCAL_LLM_GPU_LOCK_PATH"])
+            self.assertTrue(child_lock.is_absolute())
+            self.assertNotEqual(child_lock, events[0][2])
+            if os.name == "posix":
+                self.assertEqual(
+                    kwargs["pass_fds"],
+                    (inherited_descriptor,))
+            else:
+                self.assertNotIn("pass_fds", kwargs)
+            request = json.loads(kwargs["input"])
+            events.append("child-exited")
+            return SimpleNamespace(
+                returncode=0,
+                stderr="",
+                stdout=json.dumps({
+                    "protocol": request["protocol"],
+                    "version": request["version"],
+                    "operation": request["operation"],
+                    "backend": request["backend"],
+                    "ok": True,
+                }))
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            paths = enhanced_audio.TTSPaths.shared(root / "tts")
+            host_lock = root / "host" / "worker-gpu.lock"
+            worker = enhanced_audio.JSONSubprocessWorker(
+                commands={
+                    enhanced_audio.COSYVOICE_BACKEND:
+                        enhanced_audio.WorkerCommand((sys.executable,)),
+                },
+                paths=paths)
+            with (
+                    patch.object(
+                        enhanced_audio,
+                        "local_llm_gpu_lock_path",
+                        return_value=host_lock),
+                    patch.object(
+                        enhanced_audio,
+                        "local_llm_gpu_lease_handle",
+                        lease),
+                    patch.object(enhanced_audio.subprocess, "run", run)):
+                response = worker._invoke(
+                    enhanced_audio.COSYVOICE_BACKEND,
+                    {"operation": "status"})
+
+        self.assertTrue(response["ok"])
+        self.assertEqual(events, [
+            (
+                "lease-acquired",
+                "autoanki-tts:fun_cosyvoice3_0_5b:status",
+                host_lock,
+            ),
+            "child-exited",
+            "lease-released",
+        ])
 
     def test_materialize_media_deduplicates_and_refuses_collisions(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

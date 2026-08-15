@@ -1,5 +1,7 @@
 """Tokenizer interfaces and lazy era-specific CKIP Han adapters."""
 
+from contextlib import contextmanager, nullcontext
+import gc
 from importlib import metadata
 import os
 import platform
@@ -14,6 +16,7 @@ from corpus_pipeline.processing import (
     historical_english_word_ranges,
     is_han_component,
 )
+from local_gpu_lease import local_llm_gpu_lease
 
 
 SHANGGU_MODEL = "ckiplab/bert-base-han-chinese-ws-shanggu"
@@ -216,6 +219,8 @@ class CkipHanTokenizer:
         self._tokenizer = None
         self._model = None
         self._torch = None
+        self._execution_session_depth = 0
+        self._execution_session_device = None
 
     @classmethod
     def for_shanggu(cls, **kwargs):
@@ -264,7 +269,12 @@ class CkipHanTokenizer:
                 "packages in requirements-corpus.txt. No fallback tokenizer "
                 "was used.") from error
 
+        # Retain the runtime before any model or vocabulary operation so an
+        # exception during loading can still clear CUDA's allocator cache.
+        self._torch = torch
         resolved_device = self._resolve_device(torch)
+        tokenizer = None
+        model = None
         try:
             vocab_path = hf_hub_download(
                 self.model_name,
@@ -294,16 +304,30 @@ class CkipHanTokenizer:
                     os.environ[
                         "DISABLE_SAFETENSORS_CONVERSION"
                     ] = conversion_setting
+            if not getattr(tokenizer, "is_fast", False):
+                raise CorpusTokenizerUnavailableError(
+                    "The CKIP tokenizer did not provide offset mappings.")
+            # Publish model references before the CUDA transfer so the outer
+            # execution session can clear them even when transfer/eval fails.
+            self._tokenizer = tokenizer
+            self._model = model
+            model.to(resolved_device)
+            model.eval()
+        except CorpusTokenizerUnavailableError:
+            self._model = None
+            self._tokenizer = None
+            model = None
+            tokenizer = None
+            raise
         except Exception as error:
+            self._model = None
+            self._tokenizer = None
+            model = None
+            tokenizer = None
             raise CorpusTokenizerUnavailableError(
                 f"Could not load the pinned tokenizer {self.model_name}. "
                 "Check the network/cache and try again manually.") from error
 
-        if not getattr(tokenizer, "is_fast", False):
-            raise CorpusTokenizerUnavailableError(
-                "The CKIP tokenizer did not provide offset mappings.")
-        model.to(resolved_device)
-        model.eval()
         self._tokenizer = tokenizer
         self._model = model
         self._torch = torch
@@ -316,8 +340,92 @@ class CkipHanTokenizer:
         key. This intentionally avoids relying on the adapter's private
         runtime state when ``device="auto"`` is selected.
         """
-        self._load()
-        return self.identity
+        if self._execution_session_depth:
+            self._load()
+            return self.identity
+        with self.execution_session():
+            self._load()
+            return self.identity
+
+    def _session_device(self):
+        if self._resolved_device is not None:
+            return self._resolved_device
+        if self.device != "auto":
+            return self.device
+        try:
+            import torch
+        except (ImportError, ModuleNotFoundError):
+            # The normal load path will raise the established actionable
+            # optional-dependency error. No CUDA allocation can occur when
+            # PyTorch itself is unavailable, so no lease is needed first.
+            return None
+        # Retain the runtime early so a model-load exception can still empty
+        # CUDA's allocator cache before the host lease is released.
+        self._torch = torch
+        return self._resolve_device(torch)
+
+    def _release_model_resources(self):
+        """Drop every model reference before releasing a CUDA lease."""
+        torch_runtime = self._torch
+        resolved_device = (
+            self._resolved_device
+            if self._resolved_device is not None
+            else self._execution_session_device)
+        using_cuda = (
+            isinstance(resolved_device, str)
+            and resolved_device.startswith("cuda"))
+        if using_cuda and torch_runtime is not None:
+            try:
+                torch_runtime.cuda.synchronize()
+            except Exception:
+                # Cleanup must still discard model references after a failed
+                # CUDA operation. The original inference error remains the
+                # useful failure for the caller.
+                pass
+        self._model = None
+        self._tokenizer = None
+        self._torch = None
+        gc.collect()
+        if using_cuda and torch_runtime is not None:
+            try:
+                torch_runtime.cuda.empty_cache()
+            except Exception:
+                pass
+
+    @contextmanager
+    def execution_session(self):
+        """Keep one model and, for CUDA, one host lease for a bounded run."""
+        if self._execution_session_depth:
+            self._execution_session_depth += 1
+            try:
+                yield self
+            finally:
+                self._execution_session_depth -= 1
+            return
+
+        # ``device=auto`` itself may import Torch, create a CUDA context, and
+        # query the driver. Acquire before resolving it so even that probe is
+        # serialized with the other host model workloads.
+        requires_probe_lease = self.device == "auto" or (
+            isinstance(self.device, str)
+            and self.device.startswith("cuda"))
+        lease = (
+            local_llm_gpu_lease(
+                f"ckip-tokenizer:{self.model_name}")
+            if requires_probe_lease
+            else nullcontext())
+        with lease:
+            selected_device = self._session_device()
+            self._execution_session_device = selected_device
+            self._execution_session_depth = 1
+            try:
+                yield self
+            finally:
+                try:
+                    self._release_model_resources()
+                finally:
+                    self._execution_session_depth = 0
+                    self._execution_session_device = None
 
     def _resolve_device(self, torch):
         """Choose the fastest requested device without hiding fallbacks."""
@@ -545,7 +653,7 @@ class CkipHanTokenizer:
 
         return tuple(refined)
 
-    def tokenize(self, text):
+    def _tokenize_in_session(self, text):
         self._load()
         normalized = unicodedata.normalize("NFC", text)
         if normalized != text:
@@ -569,3 +677,9 @@ class CkipHanTokenizer:
                     "Tokenizer returned inconsistent source offsets.")
             previous_end = span.end_offset
         return tuple(spans)
+
+    def tokenize(self, text):
+        if self._execution_session_depth:
+            return self._tokenize_in_session(text)
+        with self.execution_session():
+            return self._tokenize_in_session(text)

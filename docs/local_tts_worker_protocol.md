@@ -214,9 +214,25 @@ fails. AutoAnki sends no more than 50 items to one subprocess even though the
 protocol permits larger batches.
 
 The parent holds `locks/orchestration.lock` from its final cache check through
-atomic publication. A worker independently holds `locks/worker-gpu.lock`
-while loading and using its model. These distinct shared locks serialize GPU
-use across AutoAnki repositories without causing a parent/child self-deadlock.
+atomic publication. Separately, `JSONSubprocessWorker` holds the host-wide
+cooperative GPU lease from before spawning a one-shot worker until after that
+process exits. Its default absolute location is
+`~/.local/share/autoanki/tts/locks/worker-gpu.lock`; every other participating
+application uses that same file. `LOCAL_LLM_GPU_LOCK_PATH` may override it
+with an absolute path when the same value is supplied to every participant.
+The complete child lifetime therefore covers CUDA inventory, model loading,
+the bounded batch, and interpreter/model teardown. On POSIX the same locked
+file descriptor is inherited by the worker, preserving ownership through the
+worker's exit even if its parent is terminated abruptly.
+
+The smoke-qualified child code retains its own historical lease. When the
+normal parent already owns the host lease, it supplies a distinct delegated
+child lock to prevent a recursive `flock` deadlock without changing the
+qualified worker bytes. A directly invoked child or installer smoke test still
+uses the host-wide default itself.
+The shared lease is a serialization mechanism, not a host-capacity gate: it
+does not require swap or impose a fixed host-RAM threshold. Backend-specific
+runtime and request validation still apply normally after lease acquisition.
 
 ## Runtime locations
 
@@ -241,3 +257,7 @@ On Windows, `Scripts/python.exe` is used. The commands can be overridden with
 `AUTOANKI_KOKORO_82M_ZH_WORKER`, and the optional
 `AUTOANKI_STYLE_BERT_VITS2_WORKER`. An override is parsed as an argument
 vector and is never executed through a shell.
+
+The installed workers retain the exact identities that passed the 2026-08-10
+CUDA smoke synthesis. GPU-lifetime coordination belongs to the parent launcher
+and is intentionally excluded from those model-worker identities.

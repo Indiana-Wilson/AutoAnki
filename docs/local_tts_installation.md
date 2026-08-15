@@ -122,9 +122,10 @@ python3 scripts/install_local_tts.py \
   --refresh-workers
 ```
 
-This returns each selected runtime to `testing`, revalidates CUDA
-torch/torchaudio, reconciles both environment and worker fingerprints, and
-therefore requires another `--verify-existing` smoke before use.
+This static maintenance operation returns each selected runtime to `testing`,
+preserves the already-recorded environment fingerprint, and reconciles the
+worker fingerprint without importing Torch or touching CUDA. It therefore
+still requires another `--verify-existing` smoke before use.
 
 ## Replacing or rolling back a runtime
 
@@ -197,11 +198,21 @@ load a backend once and synthesize all items sequentially:
 Each returned artifact echoes its `cache_key`, so callers need not depend on
 response ordering. Workers validate the entire batch before loading a model.
 If an item later fails, all staged outputs from that batch are removed.
-Every worker also holds `locks/worker-gpu.lock` across model loading and the
-entire batch, preventing unrelated repositories from loading two large models
-onto the same GPU at once. AutoAnki separately holds
-`locks/orchestration.lock` through shared-cache publication; the distinct lock
-names avoid a parent/child self-deadlock.
+AutoAnki's subprocess launcher holds the host-wide cooperative lease at
+`~/.local/share/autoanki/tts/locks/worker-gpu.lock` from before starting a
+worker until after that one-shot process exits. This covers model loading, the
+complete batch, interpreter/model teardown, and status probes. An absolute
+`LOCAL_LLM_GPU_LOCK_PATH` moves the parent-held lease when every participating
+application receives the same value. The smoke-qualified worker still takes
+its historical child-side lock, so the launcher gives it a distinct delegated
+lock path to avoid recursively acquiring the parent-held lease. Direct worker
+and installer invocations continue to take the host-wide default themselves.
+On POSIX the parent also passes the already-locked descriptor into the worker,
+so an abruptly terminated parent cannot release the host lease while its
+orphaned worker is still alive.
+AutoAnki separately holds `locks/orchestration.lock` through shared-cache
+publication. The GPU lease only serializes cooperating workloads; it does not
+require swap or impose a fixed host-RAM threshold.
 
 ## Voice inventory and listening samples
 

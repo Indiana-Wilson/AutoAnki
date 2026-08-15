@@ -456,6 +456,11 @@ class SourceWorkflowController:
             job_id = snapshot.job_id
             if requested is not None and job_id not in requested:
                 continue
+            if self._manual_offline_job(job_id):
+                # These pending rows are authoring checkpoints, not queued
+                # provider work. The dedicated offline ingestion command is
+                # the only operation which should advance them.
+                continue
             self.backend.jobs.recover_interrupted(job_id)
             connection_failed = tuple(
                 chunk_id
@@ -689,7 +694,17 @@ class SourceWorkflowController:
         return self.openai_client_factory(api_key)
 
     def _client_for_job(self, job_id):
+        if self._manual_offline_job(job_id):
+            raise PermissionError(
+                "This source job is reserved for manually authored offline "
+                "responses; paid provider dispatch is disabled.")
         return self._openai_client()
+
+    def _manual_offline_job(self, job_id):
+        return bool(
+            self._manifest(job_id).get(
+                "request_metadata",
+                {}).get("manual_offline_responses", False))
 
     def preview(self, request):
         """Load retained source metadata without contacting OpenAI or Anki."""

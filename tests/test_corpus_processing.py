@@ -1,5 +1,6 @@
 import ast
 import builtins
+from contextlib import contextmanager
 import errno
 import hashlib
 import json
@@ -797,6 +798,87 @@ class TokenizerUtilityTests(unittest.TestCase):
 
         Torch.backends.mps = Available(False)
         self.assertEqual(tokenizer._resolve_device(Torch()), "cpu")
+
+    def test_ckip_cuda_session_holds_lease_until_error_cleanup(self):
+        events = []
+
+        class Cuda:
+            @staticmethod
+            def synchronize():
+                events.append("cuda-synchronize")
+
+            @staticmethod
+            def empty_cache():
+                events.append("cuda-empty-cache")
+
+        class Torch:
+            cuda = Cuda()
+
+        tokenizer = CkipHanTokenizer(
+            "fixture/model",
+            "fixture-revision",
+            device="cuda")
+
+        def load():
+            events.append("model-load")
+            tokenizer._resolved_device = "cuda"
+            tokenizer._torch = Torch()
+            tokenizer._model = object()
+            tokenizer._tokenizer = object()
+
+        @contextmanager
+        def lease(purpose):
+            events.append(("lease-acquired", purpose))
+            try:
+                yield Path("/host/gpu.lock")
+            finally:
+                events.append("lease-released")
+
+        tokenizer._load = load
+        with patch(
+                "corpus_pipeline.tokenizers.local_llm_gpu_lease",
+                lease):
+            with self.assertRaisesRegex(RuntimeError, "injected"):
+                with tokenizer.execution_session():
+                    tokenizer.prepare()
+                    events.append("tokenization")
+                    raise RuntimeError("injected tokenizer failure")
+
+        self.assertEqual(events, [
+            ("lease-acquired", "ckip-tokenizer:fixture/model"),
+            "model-load",
+            "tokenization",
+            "cuda-synchronize",
+            "cuda-empty-cache",
+            "lease-released",
+        ])
+        self.assertIsNone(tokenizer._model)
+        self.assertIsNone(tokenizer._tokenizer)
+        self.assertIsNone(tokenizer._torch)
+
+    def test_ckip_cpu_session_skips_host_gpu_lease(self):
+        tokenizer = CkipHanTokenizer(
+            "fixture/model",
+            "fixture-revision",
+            device="cpu")
+        loaded = []
+
+        def load():
+            loaded.append(True)
+            tokenizer._resolved_device = "cpu"
+            tokenizer._model = object()
+            tokenizer._tokenizer = object()
+
+        tokenizer._load = load
+        with patch(
+                "corpus_pipeline.tokenizers.local_llm_gpu_lease") as lease:
+            with tokenizer.execution_session():
+                tokenizer.prepare()
+
+        lease.assert_not_called()
+        self.assertEqual(loaded, [True])
+        self.assertIsNone(tokenizer._model)
+        self.assertIsNone(tokenizer._tokenizer)
 
     def test_model_units_use_hard_boundaries_and_cover_edge_cases(self):
         text = "甲" * 80

@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import json
 import sys
 import tempfile
@@ -12,6 +13,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from corpus_pipeline.models import TokenSpan, TokenizerIdentity
 from corpus_pipeline.service import CorpusService
 from corpus_pipeline.storage import read_build
+from corpus_pipeline.tokenizers import CkipHanTokenizer
 import source_preparation
 
 
@@ -55,6 +57,62 @@ class FlakyCountingTokenizer:
 
 
 class SourcePreparationTests(unittest.TestCase):
+    def test_ckip_session_spans_prepare_and_every_document_section(self):
+        events = []
+        active = []
+        tokenizer = CkipHanTokenizer(
+            "fixture/model",
+            "fixture-revision",
+            device="cuda")
+
+        @contextmanager
+        def execution_session():
+            events.append("lease-acquired")
+            active.append(True)
+            try:
+                yield tokenizer
+            finally:
+                active.pop()
+                events.append("lease-released")
+
+        def prepare():
+            self.assertTrue(active)
+            events.append("model-prepared")
+            tokenizer._resolved_device = "cuda"
+            return tokenizer.identity
+
+        def tokenize(text):
+            self.assertTrue(active)
+            events.append(f"tokenized:{text}")
+            return tuple(
+                TokenSpan(character, index, index + 1, 0.75)
+                for index, character in enumerate(text)
+                if not character.isspace())
+
+        tokenizer.execution_session = execution_session
+        tokenizer.prepare = prepare
+        tokenizer.tokenize = tokenize
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "two-sections.txt"
+            source.write_text("道可道。\f名可名。", encoding="utf-8")
+            source_preparation.prepare_source_file(
+                source,
+                title="GPU Session Fixture",
+                language_key="classical_chinese_warring_states",
+                corpus_root=root / "corpora",
+                tokenizer=tokenizer,
+                refiner=None)
+
+        self.assertEqual(events, [
+            "lease-acquired",
+            "model-prepared",
+            "tokenized:道可道。",
+            "tokenized:名可名。",
+            "lease-released",
+        ])
+
     def test_skeat_corrections_cover_errata_and_transcription_repairs(self):
         corrections = (
             source_preparation._SKEAT_PUBLISHED_ERRATA_CORRECTIONS

@@ -27,6 +27,14 @@ from urllib.request import Request, urlopen
 import venv
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = PROJECT_ROOT / "src"
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
+
+from local_gpu_lease import local_llm_gpu_lease  # noqa: E402
+
+
 STYLE_BACKEND = "style_bert_vits2_jp_extra"
 COSY_BACKEND = "fun_cosyvoice3_0_5b"
 MELO_BACKEND = "melotts_jp"
@@ -453,9 +461,15 @@ def _assert_exact_cuda_torch(
         "'cuda':torch.version.cuda,"
         "'gpu':torch.cuda.get_device_name(0),"
         "'capability':list(torch.cuda.get_device_capability(0))}))")
-    _run(
-        (runtime_python, "-c", code),
-        environment=environment)
+    configured_lock = environment.get("LOCAL_LLM_GPU_LOCK_PATH")
+    lock_path = Path(configured_lock) if configured_lock else None
+    runtime_name = runtime_python.parent.parent.name or "isolated-runtime"
+    with local_llm_gpu_lease(
+            f"tts-runtime-check:{runtime_name}",
+            lock_path=lock_path):
+        _run(
+            (runtime_python, "-c", code),
+            environment=environment)
 
 
 def _download_snapshot(
@@ -1447,17 +1461,18 @@ def _refresh_existing_worker(root: Path, backend: str) -> Path:
         source_tree_revision = _source_tree_fingerprint(source / "melo")
         source_metadata["tree_sha256"] = source_tree_revision
 
-    torch_version = runtime_value.get("torch_requested")
-    if not isinstance(torch_version, str) or not torch_version:
+    if (
+            not isinstance(runtime_value.get("torch_requested"), str)
+            or not runtime_value["torch_requested"]):
         raise InstallationError(
             f"Runtime manifest has no requested torch version: {runtime}")
-    environment = _environment(root)
-    _assert_exact_cuda_torch(
-        _runtime_python(runtime),
-        expected_version=torch_version,
-        environment=environment)
-    environment_revision = _environment_fingerprint(
-        _runtime_python(runtime), environment)
+    environment_revision = runtime_value.get("environment_sha256")
+    if (
+            not isinstance(environment_revision, str)
+            or re.fullmatch(r"[0-9a-f]{64}", environment_revision) is None):
+        raise InstallationError(
+            f"Runtime manifest has no valid environment fingerprint: "
+            f"{runtime}")
     revision = model.get("revision")
     if not isinstance(revision, str):
         raise InstallationError(
@@ -1479,16 +1494,19 @@ def _refresh_existing_worker(root: Path, backend: str) -> Path:
                 f"{runtime}")
         component_indices[name] = matches[0]
 
+    if components[component_indices["environment"]] != (
+            f"environment:{environment_revision}"):
+        raise InstallationError(
+            f"Runtime environment fingerprint is internally inconsistent: "
+            f"{runtime}")
+
     try:
         worker_source = _BACKEND_WORKERS[backend]
     except KeyError as error:
         raise InstallationError(f"Unknown TTS backend: {backend}") from error
     _copy_worker(runtime, worker_source)
     worker_revision = _worker_fingerprint(runtime)
-    revision_updates = [
-        ("environment", environment_revision),
-        ("worker", worker_revision),
-    ]
+    revision_updates = [("worker", worker_revision)]
     if source_tree_revision is not None:
         revision_updates.append((
             "runtime",
@@ -1497,7 +1515,6 @@ def _refresh_existing_worker(root: Path, backend: str) -> Path:
     for name, value in revision_updates:
         components[component_indices[name]] = f"{name}:{value}"
     model["revision"] = ";".join(components)
-    runtime_value["environment_sha256"] = environment_revision
     runtime_value["worker_sha256"] = worker_revision
     manifest["state"] = "testing"
     manifest["worker_refreshed_at"] = (
@@ -1628,8 +1645,8 @@ def _parse_arguments(argv: list[str] | None = None):
         action="store_true",
         help=(
             "Refresh only installed worker code/fingerprints, return the "
-            "runtimes to testing, audit the environment fingerprint, and "
-            "leave models/environments unchanged."))
+            "runtimes to testing, preserve the recorded environment "
+            "fingerprint, and leave models/environments unchanged."))
     return parser.parse_args(argv)
 
 
@@ -1678,7 +1695,7 @@ def main(argv: list[str] | None = None) -> int:
             "shared_root": str(root),
             "state": "testing",
             "models_unchanged": True,
-            "environment_fingerprint_reconciled": True,
+            "environment_fingerprint_preserved": True,
         }, indent=2))
         return 0
     plan = _plan(args, root, backends)
